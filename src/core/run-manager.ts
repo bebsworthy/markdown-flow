@@ -1,0 +1,108 @@
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { createContextLogger, type ContextLogger } from "./context-logger.js";
+import type { RunInfo, RunStatus, WorkflowDefinition } from "./types.js";
+
+export interface RunDirectory {
+  id: string;
+  path: string;
+  workspacePath: string;
+  logger: ContextLogger;
+}
+
+interface RunMeta {
+  workflowName: string;
+  sourceFile: string;
+  startedAt: string;
+  status: RunStatus;
+  completedAt?: string;
+}
+
+export interface RunManager {
+  createRun(workflowDef: WorkflowDefinition): Promise<RunDirectory>;
+  listRuns(): Promise<RunInfo[]>;
+  getRun(id: string): Promise<RunInfo | null>;
+  completeRun(id: string, status: RunStatus): Promise<void>;
+}
+
+export function createRunManager(runsDir = "./runs"): RunManager {
+  return {
+    async createRun(workflowDef: WorkflowDefinition): Promise<RunDirectory> {
+      const id = new Date()
+        .toISOString()
+        .replace(/:/g, "-")
+        .replace(/\./g, "-");
+      const runPath = join(runsDir, id);
+      const workspacePath = join(runPath, "workspace");
+
+      await mkdir(workspacePath, { recursive: true });
+
+      const meta: RunMeta = {
+        workflowName: workflowDef.name,
+        sourceFile: workflowDef.sourceFile,
+        startedAt: new Date().toISOString(),
+        status: "running",
+      };
+      await writeFile(
+        join(runPath, "meta.json"),
+        JSON.stringify(meta, null, 2),
+        "utf-8",
+      );
+
+      // Create empty context.jsonl
+      await writeFile(join(runPath, "context.jsonl"), "", "utf-8");
+
+      const logger = createContextLogger(runPath);
+      return { id, path: runPath, workspacePath, logger };
+    },
+
+    async listRuns(): Promise<RunInfo[]> {
+      try {
+        const entries = await readdir(runsDir);
+        const runs: RunInfo[] = [];
+        for (const entry of entries.sort().reverse()) {
+          const run = await this.getRun(entry);
+          if (run) runs.push(run);
+        }
+        return runs;
+      } catch {
+        return [];
+      }
+    },
+
+    async getRun(id: string): Promise<RunInfo | null> {
+      const runPath = join(runsDir, id);
+      try {
+        const metaRaw = await readFile(join(runPath, "meta.json"), "utf-8");
+        const meta = JSON.parse(metaRaw) as RunMeta;
+        const logger = createContextLogger(runPath);
+        const steps = await logger.readAll();
+
+        return {
+          id,
+          workflowName: meta.workflowName,
+          sourceFile: meta.sourceFile,
+          status: meta.status,
+          startedAt: meta.startedAt,
+          completedAt: meta.completedAt,
+          steps,
+        };
+      } catch {
+        return null;
+      }
+    },
+
+    async completeRun(id: string, status: RunStatus): Promise<void> {
+      const runPath = join(runsDir, id);
+      const metaRaw = await readFile(join(runPath, "meta.json"), "utf-8");
+      const meta = JSON.parse(metaRaw) as RunMeta;
+      meta.status = status;
+      meta.completedAt = new Date().toISOString();
+      await writeFile(
+        join(runPath, "meta.json"),
+        JSON.stringify(meta, null, 2),
+        "utf-8",
+      );
+    },
+  };
+}

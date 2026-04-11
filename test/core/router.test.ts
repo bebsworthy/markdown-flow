@@ -1,0 +1,162 @@
+import { describe, it, expect } from "vitest";
+import { resolveRoute, createRetryState } from "../../src/core/router.js";
+import { DEFAULT_CONFIG } from "../../src/core/config.js";
+import type { FlowGraph, StepResult } from "../../src/core/types.js";
+
+function makeResult(overrides: Partial<StepResult> = {}): StepResult {
+  return {
+    node: "test",
+    type: "script",
+    edge: "pass",
+    summary: "",
+    started_at: "",
+    completed_at: "",
+    exit_code: 0,
+    ...overrides,
+  };
+}
+
+describe("resolveRoute", () => {
+  it("follows single outgoing edge regardless of label", () => {
+    const graph: FlowGraph = {
+      nodes: new Map([
+        ["A", { id: "A" }],
+        ["B", { id: "B" }],
+      ]),
+      edges: [{ from: "A", to: "B", label: "next", annotations: {} }],
+    };
+    const result = makeResult({ node: "A", edge: "whatever" });
+    const decision = resolveRoute(graph, "A", result, createRetryState(), DEFAULT_CONFIG);
+    expect(decision.targets).toHaveLength(1);
+    expect(decision.targets[0].nodeId).toBe("B");
+  });
+
+  it("matches edge by label", () => {
+    const graph: FlowGraph = {
+      nodes: new Map([
+        ["A", { id: "A" }],
+        ["B", { id: "B" }],
+        ["C", { id: "C" }],
+      ]),
+      edges: [
+        { from: "A", to: "B", label: "pass", annotations: {} },
+        { from: "A", to: "C", label: "fail", annotations: {} },
+      ],
+    };
+    const result = makeResult({ node: "A", edge: "fail" });
+    const decision = resolveRoute(graph, "A", result, createRetryState(), DEFAULT_CONFIG);
+    expect(decision.targets[0].nodeId).toBe("C");
+  });
+
+  it("maps exit code 0 to success labels", () => {
+    const graph: FlowGraph = {
+      nodes: new Map([
+        ["A", { id: "A" }],
+        ["B", { id: "B" }],
+        ["C", { id: "C" }],
+      ]),
+      edges: [
+        { from: "A", to: "B", label: "pass", annotations: {} },
+        { from: "A", to: "C", label: "fail", annotations: {} },
+      ],
+    };
+    const result = makeResult({ node: "A", edge: "nomatch", exit_code: 0 });
+    const decision = resolveRoute(graph, "A", result, createRetryState(), DEFAULT_CONFIG);
+    expect(decision.targets[0].nodeId).toBe("B");
+  });
+
+  it("maps non-zero exit code to failure labels", () => {
+    const graph: FlowGraph = {
+      nodes: new Map([
+        ["A", { id: "A" }],
+        ["B", { id: "B" }],
+        ["C", { id: "C" }],
+      ]),
+      edges: [
+        { from: "A", to: "B", label: "pass", annotations: {} },
+        { from: "A", to: "C", label: "fail", annotations: {} },
+      ],
+    };
+    const result = makeResult({ node: "A", edge: "nomatch", exit_code: 1 });
+    const decision = resolveRoute(graph, "A", result, createRetryState(), DEFAULT_CONFIG);
+    expect(decision.targets[0].nodeId).toBe("C");
+  });
+
+  it("respects retry budget and follows exhaustion handler", () => {
+    const graph: FlowGraph = {
+      nodes: new Map([
+        ["test", { id: "test" }],
+        ["fix", { id: "fix" }],
+        ["abort", { id: "abort" }],
+      ]),
+      edges: [
+        {
+          from: "test",
+          to: "fix",
+          label: "fail",
+          annotations: { maxRetries: 2 },
+        },
+        {
+          from: "test",
+          to: "abort",
+          label: "fail:max",
+          annotations: {
+            isExhaustionHandler: true,
+            exhaustionLabel: "fail",
+          },
+        },
+      ],
+    };
+
+    const retryState = createRetryState();
+    const failResult = makeResult({ node: "test", edge: "fail" });
+
+    // First two retries should go to fix
+    let d1 = resolveRoute(graph, "test", failResult, retryState, DEFAULT_CONFIG);
+    expect(d1.targets[0].nodeId).toBe("fix");
+    expect(d1.exhausted).toBe(false);
+
+    let d2 = resolveRoute(graph, "test", failResult, retryState, DEFAULT_CONFIG);
+    expect(d2.targets[0].nodeId).toBe("fix");
+    expect(d2.exhausted).toBe(false);
+
+    // Third retry should exhaust and go to abort
+    let d3 = resolveRoute(graph, "test", failResult, retryState, DEFAULT_CONFIG);
+    expect(d3.targets[0].nodeId).toBe("abort");
+    expect(d3.exhausted).toBe(true);
+  });
+
+  it("returns empty targets for terminal nodes", () => {
+    const graph: FlowGraph = {
+      nodes: new Map([["A", { id: "A" }]]),
+      edges: [],
+    };
+    const result = makeResult({ node: "A" });
+    const decision = resolveRoute(graph, "A", result, createRetryState(), DEFAULT_CONFIG);
+    expect(decision.targets).toHaveLength(0);
+  });
+
+  it("throws on no matching edge", () => {
+    const graph: FlowGraph = {
+      nodes: new Map([
+        ["A", { id: "A" }],
+        ["B", { id: "B" }],
+        ["C", { id: "C" }],
+      ]),
+      edges: [
+        { from: "A", to: "B", label: "pass", annotations: {} },
+        { from: "A", to: "C", label: "ok", annotations: {} },
+      ],
+    };
+    // Agent step with non-matching edge and no exit code fallback
+    const result = makeResult({
+      node: "A",
+      type: "agent",
+      edge: "unknown",
+      exit_code: null,
+    });
+    expect(() =>
+      resolveRoute(graph, "A", result, createRetryState(), DEFAULT_CONFIG),
+    ).toThrow("Routing error");
+  });
+});
