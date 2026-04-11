@@ -16,7 +16,7 @@ src/
     parser/
       index.ts                 # Orchestrates parsing: md → mermaid → steps
       markdown.ts              # Extracts H1 name, # Flow mermaid block, # Steps sections
-      mermaid.ts               # Custom regex parser for flowchart subset
+      mermaid.ts               # Adapter: @mermaid-js/parser AST → FlowGraph + annotation extraction
       steps.ts                 # Determines step type (script vs agent) from ## content
     validator.ts               # 5 structural validation rules from spec
     graph.ts                   # Adjacency queries: start nodes, fan-out, merge detection
@@ -66,7 +66,7 @@ test/
 | Dev runner | **tsx** | Runs TS directly during development |
 | Test | **vitest** | Native ESM, TS-first, fast |
 | Markdown parse | **unified + remark-parse** | Standard AST library, avoids custom MD parser |
-| Mermaid parse | **Custom regex parser** | No good library for structured flowchart AST; our subset is small |
+| Mermaid parse | **@mermaid-js/parser** | Official parser, structured AST, no rendering/D3/jsdom deps |
 | CLI framework | **yargs** | Mature, subcommand support |
 | Formatting | **chalk** | Terminal colors for CLI output |
 
@@ -82,9 +82,9 @@ test/
 - `src/core/types.ts` — all interfaces upfront
 
 ### Phase 2: Parser + Validator (testable in isolation)
-1. `parser/mermaid.ts` — regex-based flowchart parser
-   - Parses: `A --> B`, `A -->|label| B`, `A -->|label max:N| B`, `A -->|label:max| B`
-   - Extracts node IDs implicitly from edges, optional `nodeId[Label]` declarations
+1. `parser/mermaid.ts` — adapter over `@mermaid-js/parser`
+   - Parses flowchart via official parser, maps AST nodes/edges into our `FlowGraph` types
+   - Post-processes edge labels to extract annotations: `max:N`, `:max`
 2. `parser/markdown.ts` — uses remark-parse to extract 3 sections (name, flow mermaid block, steps)
 3. `parser/steps.ts` — determines type from content (code block → script with lang, prose → agent)
 4. `parser/index.ts` — orchestrates: `parseWorkflow(filePath) → WorkflowDefinition`
@@ -117,7 +117,7 @@ test/
 ## Key Design Decisions
 
 1. **JSONL not JSON** for run history — append-only, crash-safe, streamable. File: `context.jsonl`
-2. **Custom Mermaid parser** — full mermaid.js is 2MB+ rendering engine; our `flowchart` subset is ~100 lines of regex
+2. **`@mermaid-js/parser`** for Mermaid parsing — official parser, structured AST, no rendering deps. Our adapter just maps AST → `FlowGraph` and extracts annotations from labels
 3. **Token model** for execution — supports cycles via `generation` counter; merge nodes wait for current generation only
 4. **Event callback** for engine observability — `onEvent: (event: EngineEvent) => void` — CLI formats for humans, library consumers do whatever they want
 5. **Script materialization** — write step code to temp file before execution (debuggable, works with all interpreters)
