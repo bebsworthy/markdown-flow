@@ -37,12 +37,31 @@ function renderHeader(ctx: BeforeStepContext): void {
     console.log(chalk.dim(`   Inputs:  ${parts.join("  ")}`));
   }
 
-  // Runtime vars
+  // Runtime vars — one per line for readability
   const runtimeVars = Object.entries(ctx.env)
     .filter(([k]) => k.startsWith("MARKFLOW_") || k === "STATE" || k === "GLOBAL")
-    .map(([k, v]) => `${k.replace("MARKFLOW_", "")}=${v}`);
+    .map(([k, v]) => [k.replace("MARKFLOW_", ""), v] as const);
   if (runtimeVars.length > 0) {
-    console.log(chalk.dim(`   Runtime: ${runtimeVars.join("  ")}`));
+    console.log(chalk.dim(`   Runtime: ${runtimeVars[0][0]}=${runtimeVars[0][1]}`));
+    for (const [k, v] of runtimeVars.slice(1)) {
+      console.log(chalk.dim(`            ${k}=${v}`));
+    }
+  }
+
+  // Completed-steps summary — what $STEPS exposes to this step
+  if (ctx.completedResults.length > 0) {
+    const lines = ctx.completedResults.map((r) => {
+      let s = `${r.node}[${r.edge}]`;
+      if (r.state && Object.keys(r.state).length > 0) {
+        const json = JSON.stringify(r.state);
+        s += ` state=${json.length > 80 ? json.slice(0, 79) + "…" : json}`;
+      }
+      return s;
+    });
+    console.log(chalk.dim(`   Steps:   ${lines[0]}`));
+    for (const line of lines.slice(1)) {
+      console.log(chalk.dim(`            ${line}`));
+    }
   }
 
   // Outgoing edges with full annotations

@@ -35,7 +35,7 @@ describe("runAgent prompt delivery", () => {
       const stdinEnd = out.stdout.indexOf("\nSTDIN_END");
       const delivered = out.stdout.slice(stdinStart, stdinEnd);
       expect(delivered).toContain("Say hello and finish.");
-      expect(delivered).toContain("Your Task");
+      expect(delivered).toContain("RESULT:");
     } finally {
       await rm(workspace, { recursive: true, force: true });
     }

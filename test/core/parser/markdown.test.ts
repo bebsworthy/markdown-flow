@@ -160,4 +160,96 @@ echo hi
 \`\`\``;
     expect(() => parseMarkdownSections(source)).toThrow("unsupported language");
   });
+
+  it("preserves the full agent step body verbatim (lists, headings, nested fences, quotes)", () => {
+    const source = `# T
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  classify([start]) --> done
+\`\`\`
+
+# Steps
+
+## classify
+
+\`\`\`config
+agent: claude
+flags:
+  - -p
+\`\`\`
+
+Pick exactly one label:
+
+- \`Bug\` — something is broken
+- \`Improvement\` — feature request
+- \`Other\` — anything else
+
+### Output format
+
+Emit:
+
+\`\`\`
+STATE: {"label": "<choice>"}
+\`\`\`
+
+> Note: avoid guessing.
+
+## done
+
+\`\`\`bash
+echo done
+\`\`\`
+`;
+    const sections = parseMarkdownSections(source);
+    const classify = sections.steps.find((s) => s.id === "classify")!;
+    expect(classify.type).toBe("agent");
+    expect(classify.content).toContain("Pick exactly one label");
+    expect(classify.content).toContain("- `Bug` — something is broken");
+    expect(classify.content).toContain("- `Improvement` — feature request");
+    expect(classify.content).toContain("### Output format");
+    expect(classify.content).toContain('STATE: {"label": "<choice>"}');
+    expect(classify.content).toContain("> Note: avoid guessing.");
+    // The config block itself must not leak into the prompt body.
+    expect(classify.content).not.toContain("agent: claude");
+    expect(classify.content).not.toContain("```config");
+  });
+
+  it("preserves prose agent step (no config block) verbatim", () => {
+    const source = `# T
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  a([s]) --> b
+\`\`\`
+
+# Steps
+
+## a
+
+Review the PR.
+
+1. Check tests
+2. Check lint
+
+End.
+
+## b
+
+\`\`\`bash
+echo ok
+\`\`\`
+`;
+    const sections = parseMarkdownSections(source);
+    const a = sections.steps.find((s) => s.id === "a")!;
+    expect(a.type).toBe("agent");
+    expect(a.content).toContain("Review the PR.");
+    expect(a.content).toContain("1. Check tests");
+    expect(a.content).toContain("2. Check lint");
+    expect(a.content).toContain("End.");
+  });
 });

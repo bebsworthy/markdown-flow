@@ -402,29 +402,87 @@ echo "done"
   });
 });
 
-describe("Agent prompt includes step state", () => {
-  it("shows state in context section", () => {
-    const context: StepResult[] = [
-      {
-        node: "fetch",
-        type: "script",
-        edge: "pass",
-        summary: "fetched 3 issues",
-        state: { count: 3, source: "github" },
-        started_at: "2024-01-01T00:00:00Z",
-        completed_at: "2024-01-01T00:00:01Z",
-        exit_code: 0,
-      },
-    ];
+describe("Agent prompt template access to prior step state", () => {
+  const context: StepResult[] = [
+    {
+      node: "fetch",
+      type: "script",
+      edge: "pass",
+      summary: "fetched 3 issues",
+      state: { count: 3, source: "github" },
+      started_at: "2024-01-01T00:00:00Z",
+      completed_at: "2024-01-01T00:00:01Z",
+      exit_code: 0,
+    },
+  ];
 
+  it("does NOT auto-inject a workflow context section", () => {
     const prompt = assembleAgentPrompt(
       { id: "review", type: "agent", content: "Review the issues" },
       context,
       ["pass", "fail"],
       "/tmp/workdir",
     );
+    expect(prompt).not.toContain("fetch (script)");
+    expect(prompt).not.toContain("Workflow Context");
+  });
 
-    expect(prompt).toContain("fetch (script): fetched 3 issues");
-    expect(prompt).toContain('State: {"count":3,"source":"github"}');
+  it("substitutes ${STEPS.<id>.state.*} paths in the prompt body", () => {
+    const prompt = assembleAgentPrompt(
+      {
+        id: "review",
+        type: "agent",
+        content: "There are ${STEPS.fetch.state.count} issues from ${STEPS.fetch.state.source}.",
+      },
+      context,
+      ["pass", "fail"],
+      "/tmp/workdir",
+    );
+    expect(prompt).toContain("There are 3 issues from github.");
+  });
+
+  it("substitutes ${STEPS.<id>.summary} and ${STEPS.<id>.edge}", () => {
+    const prompt = assembleAgentPrompt(
+      {
+        id: "review",
+        type: "agent",
+        content: "Fetch said '${STEPS.fetch.summary}' and took edge ${STEPS.fetch.edge}.",
+      },
+      context,
+      ["pass", "fail"],
+      "/tmp/workdir",
+    );
+    expect(prompt).toContain("Fetch said 'fetched 3 issues' and took edge pass.");
+  });
+
+  it("substitutes ${GLOBAL.*} paths", () => {
+    const prompt = assembleAgentPrompt(
+      {
+        id: "review",
+        type: "agent",
+        content: "Using ${GLOBAL.api_base}",
+      },
+      context,
+      ["pass"],
+      "/tmp/workdir",
+      {},
+      { api_base: "https://example.com" },
+    );
+    expect(prompt).toContain("Using https://example.com");
+  });
+
+  it("errors on unresolved STEPS path", () => {
+    expect(() =>
+      assembleAgentPrompt(
+        {
+          id: "review",
+          type: "agent",
+          content: "${STEPS.nonexistent.state.x}",
+        },
+        context,
+        ["pass"],
+        "/tmp/workdir",
+      ),
+    ).toThrow(/nonexistent/);
   });
 });

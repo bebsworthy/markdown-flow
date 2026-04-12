@@ -16,6 +16,7 @@ export async function runStep(
   env: Record<string, string>,
   runDir: string,
   config: MarkflowConfig,
+  globalContext: Record<string, unknown>,
   onOutput?: StepOutputHandler,
 ): Promise<StepOutput> {
   if (step.type === "script") {
@@ -28,6 +29,7 @@ export async function runStep(
     workdirPath,
     config,
     env,
+    globalContext,
     onOutput,
   );
 }

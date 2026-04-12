@@ -6,61 +6,52 @@ import type {
   MarkflowConfig,
   StepOutputHandler,
 } from "../types.js";
-import { renderTemplate } from "../template.js";
+import { renderTemplate, type TemplateContext } from "../template.js";
 import { createStreamParser } from "./stream-parser.js";
 
 export function assembleAgentPrompt(
   step: StepDefinition,
   context: StepResult[],
   outgoingEdgeLabels: string[],
-  workdirPath: string,
+  _workdirPath: string,
   env: Record<string, string> = {},
+  globalContext: Record<string, unknown> = {},
 ): string {
-  const contextLines = context
-    .map((r) => {
-      let line = `- ${r.node} (${r.type}): ${r.summary}`;
-      if (r.state) line += `\n  State: ${JSON.stringify(r.state)}`;
-      return line;
-    })
-    .join("\n");
+  const stepsMap: Record<string, { edge: string; summary: string; state?: unknown }> = {};
+  for (const r of context) {
+    stepsMap[r.node] = {
+      edge: r.edge,
+      summary: r.summary,
+      ...(r.state ? { state: r.state } : {}),
+    };
+  }
 
-  const validEdges =
-    outgoingEdgeLabels.length === 1
-      ? `If there is only one outgoing edge, use: done`
-      : `Valid edge values: ${outgoingEdgeLabels.join(", ")}`;
+  const templateCtx: TemplateContext = {
+    vars: env,
+    namespaces: { GLOBAL: globalContext, STEPS: stepsMap },
+  };
+  const body = renderTemplate(step.content, templateCtx, step.id);
 
-  const renderedContent = renderTemplate(step.content, env, step.id);
+  // Trailing protocol instructions. The edge hint only appears when the step
+  // has multiple labelled outgoing edges — for single-edge steps the engine
+  // auto-routes and "done" is unambiguous.
+  const edgeHint =
+    outgoingEdgeLabels.length >= 2
+      ? `\n\nChoose edge from: ${outgoingEdgeLabels.join(", ")}`
+      : "";
 
-  return `## Workflow Context
-
-Completed steps:
-${contextLines || "(none)"}
-
-Current working directory: ${workdirPath}
-
----
-
-## Your Task
-
-${renderedContent}
+  return `${body}
 
 ---
 
-You may emit zero or more state/global lines anywhere in your response:
+The last line of your response MUST be exactly:
+RESULT: {"edge": "<label>", "summary": "<one sentence>"}
 
-STATE: {"key": "value", ...}
-GLOBAL: {"key": "value", ...}
+You MAY emit zero or more STATE/GLOBAL lines anywhere before that:
+STATE:  {...}   merges into this step's own state (visible as \${STEPS.<id>.state.*} to later steps)
+GLOBAL: {...}   merges into the workflow-wide global (visible as \${GLOBAL.*} to later steps)
 
-Multiple STATE lines shallow-merge (later keys win); same for GLOBAL.
-STATE is scoped to this step; GLOBAL is visible to all subsequent steps.
-
-The very last line of your response MUST be:
-
-RESULT: {"edge": "<label>", "summary": "<one sentence describing what you did>"}
-
-Do NOT include "state" or "global" keys inside RESULT — they are their own lines.
-
-${validEdges}`;
+Multiple STATE or GLOBAL lines shallow-merge (later keys win). Do NOT put "state" or "global" keys inside RESULT.${edgeHint}`;
 }
 
 export async function runAgent(
@@ -70,6 +61,7 @@ export async function runAgent(
   workdirPath: string,
   config: MarkflowConfig,
   env: Record<string, string> = {},
+  globalContext: Record<string, unknown> = {},
   onOutput?: StepOutputHandler,
 ): Promise<StepOutput> {
   const prompt = assembleAgentPrompt(
@@ -78,6 +70,7 @@ export async function runAgent(
     outgoingEdgeLabels,
     workdirPath,
     env,
+    globalContext,
   );
 
   // Per-step config overrides global: step agent wins, step flags append to global flags

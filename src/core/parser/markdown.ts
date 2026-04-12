@@ -60,7 +60,7 @@ export function parseMarkdownSections(source: string): RawSections {
 
   // Extract steps from the Steps section
   const stepsEnd = findNextH1(children, stepsIndex + 1);
-  const steps = extractSteps(children, stepsIndex, stepsEnd);
+  const steps = extractSteps(source, children, stepsIndex, stepsEnd);
 
   return { name, description, inputs, mermaidSource, steps };
 }
@@ -136,6 +136,7 @@ function extractTextBetween(
 }
 
 function extractSteps(
+  source: string,
   children: Root["children"],
   stepsStart: number,
   stepsEnd: number,
@@ -149,7 +150,7 @@ function extractSteps(
     if (node.type === "heading" && (node as Heading).depth === 2) {
       // Flush previous step
       if (currentId) {
-        steps.push(buildStep(currentId, currentNodes));
+        steps.push(buildStep(source, currentId, currentNodes));
       }
       currentId = extractHeadingText(node as Heading).trim();
       currentNodes = [];
@@ -160,13 +161,17 @@ function extractSteps(
 
   // Flush last step
   if (currentId) {
-    steps.push(buildStep(currentId, currentNodes));
+    steps.push(buildStep(source, currentId, currentNodes));
   }
 
   return steps;
 }
 
-function buildStep(id: string, nodes: Root["children"]): StepDefinition {
+function buildStep(
+  source: string,
+  id: string,
+  nodes: Root["children"],
+): StepDefinition {
   // If the first code block has lang "config", extract it as per-step agent config
   const firstCode = nodes.find((n) => n.type === "code") as Code | undefined;
   let agentConfig: StepAgentConfig | undefined;
@@ -178,9 +183,11 @@ function buildStep(id: string, nodes: Root["children"]): StepDefinition {
   }
 
   // If a config block was present, the step is definitively an agent step —
-  // any remaining code blocks are kept as prose content (e.g. templates, examples).
+  // the agent prompt is EVERYTHING between the config block and the next H2,
+  // sliced verbatim from the source so lists, sub-headings, quotes, and nested
+  // code fences survive intact.
   if (agentConfig !== undefined) {
-    const prose = collectProse(id, remainingNodes, /* includeCodeBlocks */ true);
+    const prose = sliceRemainingSource(source, firstCode, remainingNodes);
     return { id, type: "agent", content: prose, agentConfig };
   }
 
@@ -202,35 +209,33 @@ function buildStep(id: string, nodes: Root["children"]): StepDefinition {
     };
   }
 
-  // No code block — agent step, collect prose only.
-  const prose = collectProse(id, remainingNodes, /* includeCodeBlocks */ false);
+  // No code block — pure prose agent step. Slice from source verbatim.
+  const prose = sliceRemainingSource(source, undefined, remainingNodes);
   return { id, type: "agent", content: prose };
 }
 
-function collectProse(
-  _id: string,
-  nodes: Root["children"],
-  includeCodeBlocks: boolean,
+/**
+ * Slice the original markdown source from just after `afterNode` (or from
+ * the first remaining node if `afterNode` is undefined) through the last
+ * remaining node. Preserves all markdown structure (lists, headings, code
+ * fences, blockquotes) verbatim.
+ */
+function sliceRemainingSource(
+  source: string,
+  afterNode: Code | undefined,
+  remainingNodes: Root["children"],
 ): string {
-  return nodes
-    .map((n) => {
-      if (n.type === "paragraph") {
-        return n.children
-          .map((c) => {
-            if (c.type === "text") return c.value;
-            if (c.type === "inlineCode") return c.value;
-            return "";
-          })
-          .join("");
-      }
-      if (includeCodeBlocks && n.type === "code") {
-        const fence = (n as Code).lang ? `\`\`\`${(n as Code).lang}` : "```";
-        return `${fence}\n${(n as Code).value}\n\`\`\``;
-      }
-      return "";
-    })
-    .filter(Boolean)
-    .join("\n\n");
+  if (remainingNodes.length === 0) return "";
+
+  const startOffset =
+    afterNode?.position?.end?.offset ??
+    remainingNodes[0].position?.start?.offset ??
+    0;
+  const endOffset =
+    remainingNodes[remainingNodes.length - 1].position?.end?.offset ??
+    source.length;
+
+  return source.slice(startOffset, endOffset).trim();
 }
 
 function extractInputs(

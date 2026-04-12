@@ -266,6 +266,7 @@ export class WorkflowEngine {
                 edgeLabels,
                 this.runDir.workdirPath,
                 env,
+                this.globalContext,
               )
             : undefined,
       };
@@ -300,6 +301,7 @@ export class WorkflowEngine {
         env,
         this.runDir.path,
         this.config,
+        this.globalContext,
         (stream, chunk) =>
           this.emit({ type: "step:output", nodeId: token.nodeId, stream, chunk }),
       );

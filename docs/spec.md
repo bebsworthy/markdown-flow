@@ -198,42 +198,61 @@ Environment variables injected by the engine:
 
 #### Agent Steps
 
-The prose content of the step is used as the base prompt. The engine appends a standard instruction block before invoking the agent CLI:
+The prompt body is **verbatim** — everything between the optional ` ```config ` block and the next `## <step>` heading is used as-is, including lists, sub-headings, nested fenced blocks, and blockquotes. The engine does **not** inject a "Workflow Context" section or auto-list completed steps. The author decides exactly what context a step needs by referencing it explicitly through template substitution.
+
+**Template substitution.** Before the body is sent to the agent CLI, the engine rewrites these forms (see `$STEPS` / `$STATE` / `$GLOBAL` shapes in the env-var table above):
+
+| Form | Meaning |
+|---|---|
+| `${NAME}` | Flat variable (inputs, `MARKFLOW_*`, etc.). First identifier must be uppercase. |
+| `${GLOBAL.path.to.key}` | Dotted path into the workflow-wide global context. |
+| `${STEPS.<node>.state.<key>}` | State value emitted by an earlier step. |
+| `${STEPS.<node>.summary}` / `${STEPS.<node>.edge}` | Prior step's summary or routing edge. |
+| `$${NAME}` | Escape — emits the literal `${NAME}` with no substitution. |
+
+If a referenced variable, namespace, or dotted path does not resolve, the step fails with an error naming the missing reference. There is no silent fallback — authors get a loud signal that context they expected isn't there.
+
+Example — a classifier that pulls only the fields it needs:
+
+```markdown
+## classify
+
+\`\`\`config
+agent: claude
+flags: [--model, haiku, -p]
+\`\`\`
+
+Classify this issue into exactly one label.
+
+**Title:** ${STEPS.emit.state.item.title}
+
+**Body:** ${STEPS.emit.state.item.body}
+
+Pick one of: `Bug`, `Improvement`, `Maintenance`, `Other`.
+```
+
+**Trailing protocol block.** After the rendered body the engine appends a short fixed block describing the sentinel protocol:
 
 ```
-## Workflow Context
-
-Completed steps:
-- lint (script): Linted 42 files. No errors found.
-- test (script): 3 of 47 tests failed in auth module.
-
-Current working directory: /path/to/workspace
-
 ---
 
-## Your Task
+The last line of your response MUST be exactly:
+RESULT: {"edge": "<label>", "summary": "<one sentence>"}
 
-[...original prompt content...]
+You MAY emit zero or more STATE/GLOBAL lines anywhere before that:
+STATE:  {...}   merges into this step's own state (visible as ${STEPS.<id>.state.*} to later steps)
+GLOBAL: {...}   merges into the workflow-wide global (visible as ${GLOBAL.*} to later steps)
 
----
-
-You may emit zero or more state/global lines anywhere in your response:
-
-STATE: {"key": "value", ...}
-GLOBAL: {"key": "value", ...}
-
-Multiple STATE lines shallow-merge (later keys win); same for GLOBAL.
-STATE is scoped to this step; GLOBAL is visible to all subsequent steps.
-
-The very last line of your response MUST be:
-
-RESULT: {"edge": "<label>", "summary": "<one sentence describing what you did>"}
-
-Do NOT include "state" or "global" keys inside RESULT — they are their own lines.
-
-Valid edge values: fail, pass
-If there is only one outgoing edge, use: done
+Multiple STATE or GLOBAL lines shallow-merge (later keys win). Do NOT put "state" or "global" keys inside RESULT.
 ```
+
+When the step has 2+ outgoing edges, an additional line is appended:
+
+```
+Choose edge from: <label1>, <label2>, ...
+```
+
+Single-edge steps get no edge hint — the routing is unambiguous and `"edge": "done"` (or any label) suffices.
 
 The engine streams stdout, intercepting three sentinel prefixes on their own lines:
 
