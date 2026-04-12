@@ -20,8 +20,8 @@ const LANG_TO_EXT: Record<string, string> = {
   bash: ".sh",
   sh: ".sh",
   python: ".py",
-  js: ".js",
-  javascript: ".js",
+  js: ".mjs",
+  javascript: ".mjs",
 };
 
 export async function runScript(
