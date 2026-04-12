@@ -4,7 +4,7 @@ import { parseWorkflowFromString } from "../../src/core/index.js";
 import { assembleAgentPrompt } from "../../src/core/runner/agent.js";
 import type { BeforeStepContext, StepResult } from "../../src/core/types.js";
 
-const LINEAR_WORKFLOW = `# Data Passing
+const LINEAR_WORKFLOW = `# State Passing
 
 # Flow
 
@@ -67,30 +67,24 @@ echo "finish"
 \`\`\`
 `;
 
-describe("Step data", () => {
-  it("emits and persists step data", async () => {
+describe("Step state", () => {
+  it("emits and persists step state", async () => {
     const def = parseWorkflowFromString(LINEAR_WORKFLOW);
     const wft = new WorkflowTest(def);
-    wft.mock("step_a", { edge: "pass", data: { items: [1, 2, 3], cursor: 0 } });
+    wft.mock("step_a", { edge: "pass", state: { items: [1, 2, 3], cursor: 0 } });
     wft.mock("step_b", { edge: "pass" });
     wft.mock("step_c", { edge: "pass" });
 
     const result = await wft.run();
     expect(result.status).toBe("complete");
-    expect(result.stepData("step_a")).toEqual({ items: [1, 2, 3], cursor: 0 });
-    expect(result.stepData("step_b")).toBeUndefined();
+    expect(result.stepState("step_a")).toEqual({ items: [1, 2, 3], cursor: 0 });
+    expect(result.stepState("step_b")).toBeUndefined();
   });
 
-  it("provides MARKFLOW_STEPS_JSON to downstream steps", async () => {
+  it("provides $STEPS to downstream steps", async () => {
     const def = parseWorkflowFromString(LINEAR_WORKFLOW);
     const captured: Record<string, string>[] = [];
 
-    const wft = new WorkflowTest(def);
-    wft.mock("step_a", { edge: "pass", data: { color: "blue" } });
-    wft.mock("step_b", { edge: "pass" });
-    wft.mock("step_c", { edge: "pass" });
-
-    // Use raw executeWorkflow to capture env via beforeStep
     const { executeWorkflow } = await import("../../src/core/index.js");
     const { mkdtemp } = await import("node:fs/promises");
     const { tmpdir } = await import("node:os");
@@ -102,20 +96,19 @@ describe("Step data", () => {
       beforeStep: (ctx: BeforeStepContext) => {
         captured.push({ ...ctx.env });
         if (ctx.nodeId === "step_a") {
-          return { edge: "pass", data: { color: "blue" } };
+          return { edge: "pass", state: { color: "blue" } };
         }
         return { edge: "pass" };
       },
     });
 
-    // step_b should see step_a's data in MARKFLOW_STEPS_JSON
     const stepBEnv = captured.find((e) => e.MARKFLOW_STEP === "step_b");
     expect(stepBEnv).toBeDefined();
-    const stepsJson = JSON.parse(stepBEnv!.MARKFLOW_STEPS_JSON);
-    expect(stepsJson.step_a.data).toEqual({ color: "blue" });
+    const stepsJson = JSON.parse(stepBEnv!.STEPS);
+    expect(stepsJson.step_a.state).toEqual({ color: "blue" });
 
-    // Flattened env var
-    expect(stepBEnv!.MARKFLOW_DATA_STEP_A_COLOR).toBe("blue");
+    expect(stepBEnv!.MARKFLOW_DATA_STEP_A_COLOR).toBeUndefined();
+    expect(stepBEnv!.STATE).toBe("{}");
   });
 });
 
@@ -144,27 +137,22 @@ describe("Global context", () => {
       },
     });
 
-    // step_b sees step_a's global
     const stepBCtx = contexts.find((c) => c.nodeId === "step_b");
     expect(stepBCtx!.globalContext).toEqual({ api_base: "https://example.com" });
 
-    // step_c sees both globals
     const stepCCtx = contexts.find((c) => c.nodeId === "step_c");
     expect(stepCCtx!.globalContext).toEqual({
       api_base: "https://example.com",
       token: "abc123",
     });
 
-    // MARKFLOW_GLOBAL_JSON env var
-    const globalJson = JSON.parse(stepCCtx!.env.MARKFLOW_GLOBAL_JSON);
+    const globalJson = JSON.parse(stepCCtx!.env.GLOBAL);
     expect(globalJson).toEqual({
       api_base: "https://example.com",
       token: "abc123",
     });
-
-    // Flattened global env vars
-    expect(stepCCtx!.env.MARKFLOW_GLOBAL_API_BASE).toBe("https://example.com");
-    expect(stepCCtx!.env.MARKFLOW_GLOBAL_TOKEN).toBe("abc123");
+    expect(stepCCtx!.env.MARKFLOW_GLOBAL_API_BASE).toBeUndefined();
+    expect(stepCCtx!.env.MARKFLOW_GLOBAL_TOKEN).toBeUndefined();
   });
 
   it("later steps overwrite global keys", async () => {
@@ -196,18 +184,18 @@ describe("Global context", () => {
   });
 });
 
-describe("Back-edge loop with step data", () => {
-  it("iterates through items using data cursor", async () => {
+describe("Back-edge loop with step state", () => {
+  it("iterates through items using state cursor", async () => {
     const def = parseWorkflowFromString(LOOP_WORKFLOW);
     const wft = new WorkflowTest(def);
     const items = ["issue-1", "issue-2", "issue-3"];
 
-    wft.mock("fetch", { edge: "pass", data: { issues: items } });
+    wft.mock("fetch", { edge: "pass", state: { issues: items } });
     wft.mock("review", { edge: "pass" });
     wft.mock("post", [
-      { edge: "remaining", data: { cursor: 1 } },
-      { edge: "remaining", data: { cursor: 2 } },
-      { edge: "done", data: { cursor: 3 } },
+      { edge: "remaining", state: { cursor: 1 } },
+      { edge: "remaining", state: { cursor: 2 } },
+      { edge: "done", state: { cursor: 3 } },
     ]);
     wft.mock("finish", { edge: "pass" });
 
@@ -217,13 +205,47 @@ describe("Back-edge loop with step data", () => {
     expect(result.callCount("post")).toBe(3);
     expect(result.callCount("finish")).toBe(1);
 
-    // Each post invocation advanced the cursor
-    expect(result.stepData("post", 1)).toEqual({ cursor: 1 });
-    expect(result.stepData("post", 2)).toEqual({ cursor: 2 });
-    expect(result.stepData("post", 3)).toEqual({ cursor: 3 });
+    expect(result.stepState("post", 1)).toEqual({ cursor: 1 });
+    expect(result.stepState("post", 2)).toEqual({ cursor: 2 });
+    expect(result.stepState("post", 3)).toEqual({ cursor: 3 });
   });
 
-  it("makes loop data visible via MARKFLOW_STEPS_JSON", async () => {
+  it("injects $STATE with prior state on self-reentry", async () => {
+    const def = parseWorkflowFromString(LOOP_WORKFLOW);
+    const capturedEnvs: Record<string, Record<string, string>> = {};
+
+    const { executeWorkflow } = await import("../../src/core/index.js");
+    const { mkdtemp } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const runsDir = await mkdtemp(join(tmpdir(), "markflow-test-"));
+
+    let postCount = 0;
+
+    await executeWorkflow(def, {
+      runsDir,
+      beforeStep: (ctx: BeforeStepContext) => {
+        if (ctx.nodeId === "post") {
+          postCount++;
+          capturedEnvs[`post_${postCount}`] = { ...ctx.env };
+          if (postCount < 3) {
+            return { edge: "remaining", state: { cursor: postCount } };
+          }
+          return { edge: "done", state: { cursor: postCount } };
+        }
+        if (ctx.nodeId === "fetch") {
+          return { edge: "pass", state: { issues: ["a", "b", "c"] } };
+        }
+        return { edge: "pass" };
+      },
+    });
+
+    expect(capturedEnvs.post_1.STATE).toBe("{}");
+    expect(JSON.parse(capturedEnvs.post_2.STATE)).toEqual({ cursor: 1 });
+    expect(JSON.parse(capturedEnvs.post_3.STATE)).toEqual({ cursor: 2 });
+  });
+
+  it("exposes loop state via $STEPS", async () => {
     const def = parseWorkflowFromString(LOOP_WORKFLOW);
     const capturedEnvs: Record<string, Record<string, string>> = {};
 
@@ -240,7 +262,7 @@ describe("Back-edge loop with step data", () => {
       runsDir,
       beforeStep: (ctx: BeforeStepContext) => {
         if (ctx.nodeId === "fetch") {
-          return { edge: "pass", data: { issues: ["a", "b"] } };
+          return { edge: "pass", state: { issues: ["a", "b"] } };
         }
         if (ctx.nodeId === "review") {
           reviewCount++;
@@ -250,30 +272,145 @@ describe("Back-edge loop with step data", () => {
         if (ctx.nodeId === "post") {
           postCount++;
           if (postCount < 2) {
-            return { edge: "remaining", data: { cursor: postCount } };
+            return { edge: "remaining", state: { cursor: postCount } };
           }
-          return { edge: "done", data: { cursor: postCount } };
+          return { edge: "done", state: { cursor: postCount } };
         }
         return { edge: "pass" };
       },
     });
 
-    // On second review iteration, MARKFLOW_STEPS_JSON should have post's data from iteration 1
-    const stepsJson = JSON.parse(capturedEnvs.review_2.MARKFLOW_STEPS_JSON);
-    expect(stepsJson.post.data).toEqual({ cursor: 1 });
-    expect(stepsJson.fetch.data).toEqual({ issues: ["a", "b"] });
+    const stepsJson = JSON.parse(capturedEnvs.review_2.STEPS);
+    expect(stepsJson.post.state).toEqual({ cursor: 1 });
+    expect(stepsJson.fetch.state).toEqual({ issues: ["a", "b"] });
   });
 });
 
-describe("Agent prompt includes step data", () => {
-  it("shows data in context section", () => {
+describe("Streaming STATE/GLOBAL via script stdout", () => {
+  const MERGE_WORKFLOW = `# Merge
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  emit --> done
+\`\`\`
+
+# Steps
+
+## emit
+\`\`\`bash
+echo 'STATE: {"a": 1}'
+echo 'STATE: {"b": 2}'
+echo 'STATE: {"a": "x", "c": 3}'
+echo 'GLOBAL: {"region": "eu"}'
+echo 'GLOBAL: {"tier": "pro"}'
+echo 'RESULT: {"edge": "pass"}'
+\`\`\`
+
+## done
+\`\`\`bash
+echo "done"
+\`\`\`
+`;
+
+  it("shallow-merges multiple STATE lines (later keys win)", async () => {
+    const def = parseWorkflowFromString(MERGE_WORKFLOW);
+    const wft = new WorkflowTest(def);
+    const result = await wft.run();
+    expect(result.status).toBe("complete");
+    expect(result.stepState("emit")).toEqual({ a: "x", b: 2, c: 3 });
+  });
+
+  it("propagates GLOBAL to subsequent steps via $GLOBAL", async () => {
+    const def = parseWorkflowFromString(`# Merge
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  emit --> done
+\`\`\`
+
+# Steps
+
+## emit
+\`\`\`bash
+echo 'GLOBAL: {"region": "eu"}'
+echo 'GLOBAL: {"tier": "pro"}'
+echo 'RESULT: {"edge": "pass"}'
+\`\`\`
+
+## done
+\`\`\`bash
+echo "done"
+\`\`\`
+`);
+
+    const capturedEnv: Record<string, string> = {};
+
+    const { executeWorkflow } = await import("../../src/core/index.js");
+    const { mkdtemp } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const runsDir = await mkdtemp(join(tmpdir(), "markflow-test-"));
+
+    await executeWorkflow(def, {
+      runsDir,
+      beforeStep: (ctx: BeforeStepContext) => {
+        if (ctx.nodeId === "done") {
+          Object.assign(capturedEnv, ctx.env);
+          return { edge: "pass" };
+        }
+        return;
+      },
+    });
+
+    expect(JSON.parse(capturedEnv.GLOBAL)).toEqual({
+      region: "eu",
+      tier: "pro",
+    });
+  });
+
+  it("hard-errors when RESULT carries a state key", async () => {
+    const ERR_WORKFLOW = `# Bad
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  emit --> done
+\`\`\`
+
+# Steps
+
+## emit
+\`\`\`bash
+echo 'RESULT: {"edge": "pass", "state": {"x": 1}}'
+\`\`\`
+
+## done
+\`\`\`bash
+echo "done"
+\`\`\`
+`;
+    const def = parseWorkflowFromString(ERR_WORKFLOW);
+    const wft = new WorkflowTest(def);
+    const result = await wft.run();
+    const emit = result.stepResult("emit");
+    expect(emit.exit_code).not.toBe(0);
+  });
+});
+
+describe("Agent prompt includes step state", () => {
+  it("shows state in context section", () => {
     const context: StepResult[] = [
       {
         node: "fetch",
         type: "script",
         edge: "pass",
         summary: "fetched 3 issues",
-        data: { count: 3, source: "github" },
+        state: { count: 3, source: "github" },
         started_at: "2024-01-01T00:00:00Z",
         completed_at: "2024-01-01T00:00:01Z",
         exit_code: 0,
@@ -288,6 +425,6 @@ describe("Agent prompt includes step data", () => {
     );
 
     expect(prompt).toContain("fetch (script): fetched 3 issues");
-    expect(prompt).toContain('Data: {"count":3,"source":"github"}');
+    expect(prompt).toContain('State: {"count":3,"source":"github"}');
   });
 });

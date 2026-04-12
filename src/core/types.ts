@@ -24,6 +24,7 @@ export interface FlowGraph {
 export interface FlowNode {
   id: string;
   label?: string;
+  isStart?: boolean;
 }
 
 export interface FlowEdge {
@@ -100,7 +101,7 @@ export interface StepResult {
   type: StepType;
   edge: string;
   summary: string;
-  data?: Record<string, unknown>;
+  state?: Record<string, unknown>;
   started_at: string;
   completed_at: string;
   exit_code: number | null;
@@ -125,8 +126,9 @@ export interface StepOutput {
   parsedResult?: {
     edge?: string;
     summary?: string;
-    data?: Record<string, unknown>;
+    state?: Record<string, unknown>;
     global?: Record<string, unknown>;
+    errors?: string[];
   };
 }
 
@@ -185,7 +187,7 @@ export type BeforeStepDirective =
       edge: string;
       summary?: string;
       exitCode?: number;
-      data?: Record<string, unknown>;
+      state?: Record<string, unknown>;
       global?: Record<string, unknown>;
     };
 

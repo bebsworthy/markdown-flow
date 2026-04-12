@@ -209,23 +209,20 @@ export class WorkflowEngine {
       env.MARKFLOW_PREV_SUMMARY = prevResult.summary;
     }
 
-    // Step data and global context — structured JSON for full access
-    env.MARKFLOW_STEPS_JSON = JSON.stringify(this.buildStepsMap());
-    env.MARKFLOW_GLOBAL_JSON = JSON.stringify(this.globalContext);
+    // Cross-step reads: structured JSON for full access
+    env.STEPS = JSON.stringify(this.buildStepsMap());
 
-    // Flattened env vars for template interpolation
-    for (const r of this.completedResults) {
-      if (r.data) {
-        for (const [key, value] of Object.entries(r.data)) {
-          const envKey = `MARKFLOW_DATA_${r.node.toUpperCase()}_${key.toUpperCase()}`;
-          env[envKey] = typeof value === "string" ? value : JSON.stringify(value);
-        }
+    // Self state (from prior invocation of this same step, on re-entry) and
+    // workflow-wide globals, injected as JSON strings scripts can jq into.
+    let selfPrior: StepResult | undefined;
+    for (let i = this.completedResults.length - 1; i >= 0; i--) {
+      if (this.completedResults[i].node === token.nodeId) {
+        selfPrior = this.completedResults[i];
+        break;
       }
     }
-    for (const [key, value] of Object.entries(this.globalContext)) {
-      env[`MARKFLOW_GLOBAL_${key.toUpperCase()}`] =
-        typeof value === "string" ? value : JSON.stringify(value);
-    }
+    env.STATE = JSON.stringify(selfPrior?.state ?? {});
+    env.GLOBAL = JSON.stringify(this.globalContext);
 
     // Get outgoing edge labels for agent prompt
     const outgoing = getOutgoingEdges(this.def.graph, token.nodeId);
@@ -249,7 +246,7 @@ export class WorkflowEngine {
       }
     }
 
-    let mockDirective: { edge: string; summary?: string; exitCode?: number; data?: Record<string, unknown>; global?: Record<string, unknown> } | undefined;
+    let mockDirective: { edge: string; summary?: string; exitCode?: number; state?: Record<string, unknown>; global?: Record<string, unknown> } | undefined;
     if (this.options.beforeStep) {
       const ctx: BeforeStepContext = {
         nodeId: token.nodeId,
@@ -290,7 +287,7 @@ export class WorkflowEngine {
         parsedResult: {
           edge: mockDirective.edge,
           summary: mockDirective.summary ?? "",
-          data: mockDirective.data,
+          state: mockDirective.state,
           global: mockDirective.global,
         },
       };
@@ -330,7 +327,7 @@ export class WorkflowEngine {
       type: step.type,
       edge,
       summary,
-      data: output.parsedResult?.data,
+      state: output.parsedResult?.state,
       started_at: startedAt,
       completed_at: completedAt,
       exit_code:
@@ -493,10 +490,10 @@ export class WorkflowEngine {
     return resolved;
   }
 
-  private buildStepsMap(): Record<string, { edge: string; summary: string; data?: Record<string, unknown> }> {
-    const map: Record<string, { edge: string; summary: string; data?: Record<string, unknown> }> = {};
+  private buildStepsMap(): Record<string, { edge: string; summary: string; state?: Record<string, unknown> }> {
+    const map: Record<string, { edge: string; summary: string; state?: Record<string, unknown> }> = {};
     for (const r of this.completedResults) {
-      map[r.node] = { edge: r.edge, summary: r.summary, data: r.data };
+      map[r.node] = { edge: r.edge, summary: r.summary, state: r.state };
     }
     return map;
   }

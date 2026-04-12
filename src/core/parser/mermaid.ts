@@ -17,12 +17,13 @@ export function parseMermaidFlowchart(source: string): FlowGraph {
   }
 
   // Regex for edges: nodeA --> nodeB, nodeA -->|label| nodeB
-  // Node IDs can contain word chars and hyphens
+  // Node IDs can contain word chars and hyphens; optional label in [..] (rectangle)
+  // or ([..]) (stadium — marks a start node).
   const edgeRegex =
-    /^([\w-]+)(?:\[([^\]]*)\])?\s*-->\s*(?:\|([^|]*)\|\s*)?([\w-]+)(?:\[([^\]]*)\])?$/;
+    /^([\w-]+)(?:\[([^\]]*)\]|\(\[([^\]]*)\]\))?\s*-->\s*(?:\|([^|]*)\|\s*)?([\w-]+)(?:\[([^\]]*)\]|\(\[([^\]]*)\]\))?$/;
 
-  // Regex for standalone node declarations: nodeId[Label text]
-  const nodeRegex = /^([\w-]+)\[([^\]]*)\]$/;
+  // Regex for standalone node declarations
+  const nodeRegex = /^([\w-]+)(?:\[([^\]]*)\]|\(\[([^\]]*)\]\))$/;
 
   for (const line of lines) {
     if (
@@ -35,10 +36,11 @@ export function parseMermaidFlowchart(source: string): FlowGraph {
 
     const edgeMatch = line.match(edgeRegex);
     if (edgeMatch) {
-      const [, fromId, fromLabel, rawLabel, toId, toLabel] = edgeMatch;
+      const [, fromId, fromRect, fromStadium, rawLabel, toId, toRect, toStadium] =
+        edgeMatch;
 
-      ensureNode(nodes, fromId, fromLabel);
-      ensureNode(nodes, toId, toLabel);
+      ensureNode(nodes, fromId, fromRect ?? fromStadium, fromStadium !== undefined);
+      ensureNode(nodes, toId, toRect ?? toStadium, toStadium !== undefined);
 
       const { label, annotations } = parseEdgeLabel(rawLabel);
       edges.push({ from: fromId, to: toId, label, annotations });
@@ -47,8 +49,8 @@ export function parseMermaidFlowchart(source: string): FlowGraph {
 
     const nodeMatch = line.match(nodeRegex);
     if (nodeMatch) {
-      const [, id, label] = nodeMatch;
-      ensureNode(nodes, id, label);
+      const [, id, rectLabel, stadiumLabel] = nodeMatch;
+      ensureNode(nodes, id, rectLabel ?? stadiumLabel, stadiumLabel !== undefined);
       continue;
     }
 
@@ -62,12 +64,19 @@ function ensureNode(
   nodes: Map<string, FlowNode>,
   id: string,
   label?: string,
+  isStart?: boolean,
 ): void {
   if (!nodes.has(id)) {
-    nodes.set(id, { id, label: label || undefined });
-  } else if (label && !nodes.get(id)!.label) {
-    nodes.get(id)!.label = label;
+    nodes.set(id, {
+      id,
+      label: label || undefined,
+      ...(isStart ? { isStart: true } : {}),
+    });
+    return;
   }
+  const existing = nodes.get(id)!;
+  if (label && !existing.label) existing.label = label;
+  if (isStart) existing.isStart = true;
 }
 
 function parseEdgeLabel(

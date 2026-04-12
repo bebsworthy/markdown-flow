@@ -6,6 +6,7 @@ import type {
   StepOutput,
   StepOutputHandler,
 } from "../types.js";
+import { createStreamParser } from "./stream-parser.js";
 
 const LANG_TO_INTERPRETER: Record<string, string> = {
   bash: "bash",
@@ -49,10 +50,13 @@ export async function runScript(
 
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
+    const parser = createStreamParser();
 
     child.stdout.on("data", (chunk: Buffer) => {
       stdoutChunks.push(chunk);
-      if (onOutput) onOutput("stdout", chunk.toString("utf-8"));
+      const text = chunk.toString("utf-8");
+      parser.feed(text);
+      if (onOutput) onOutput("stdout", text);
     });
     child.stderr.on("data", (chunk: Buffer) => {
       stderrChunks.push(chunk);
@@ -61,10 +65,24 @@ export async function runScript(
 
     child.on("close", (code) => {
       const stdout = Buffer.concat(stdoutChunks).toString("utf-8");
-      const stderr = Buffer.concat(stderrChunks).toString("utf-8");
-      const exitCode = code ?? 1;
+      let stderr = Buffer.concat(stderrChunks).toString("utf-8");
+      const parsed = parser.finish();
 
-      const parsedResult = parseResultLine(stdout);
+      const hasErrors = parsed.errors.length > 0;
+      if (hasErrors) {
+        stderr += (stderr.endsWith("\n") || stderr === "" ? "" : "\n") +
+          parsed.errors.map((e) => `[markflow] ${e}`).join("\n") + "\n";
+      }
+
+      const exitCode = hasErrors ? (code === 0 ? 1 : code ?? 1) : code ?? 1;
+
+      const parsedResult: StepOutput["parsedResult"] = {
+        edge: parsed.result?.edge,
+        summary: parsed.result?.summary,
+        state: Object.keys(parsed.state).length > 0 ? parsed.state : undefined,
+        global: Object.keys(parsed.global).length > 0 ? parsed.global : undefined,
+        errors: hasErrors ? parsed.errors : undefined,
+      };
 
       resolve({ exitCode, stdout, stderr, parsedResult });
     });
@@ -80,25 +98,3 @@ export async function runScript(
   });
 }
 
-function parseResultLine(
-  stdout: string,
-): StepOutput["parsedResult"] | undefined {
-  const lines = stdout.trim().split("\n");
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const match = lines[i].match(/^RESULT:\s*(\{.*\})\s*$/);
-    if (match) {
-      try {
-        const parsed = JSON.parse(match[1]);
-        return {
-          edge: parsed.edge,
-          summary: parsed.summary,
-          data: parsed.data,
-          global: parsed.global,
-        };
-      } catch {
-        return undefined;
-      }
-    }
-  }
-  return undefined;
-}

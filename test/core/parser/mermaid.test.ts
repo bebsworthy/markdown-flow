@@ -60,6 +60,23 @@ describe("parseMermaidFlowchart", () => {
     expect(() => parseMermaidFlowchart("sequence\n  A -> B")).toThrow();
   });
 
+  it("parses stadium shape as start node marker", () => {
+    const graph = parseMermaidFlowchart(`flowchart TD
+  emit([Emit next]) -->|next| check
+  check --> emit`);
+    const emit = graph.nodes.get("emit");
+    expect(emit?.isStart).toBe(true);
+    expect(emit?.label).toBe("Emit next");
+    expect(graph.nodes.get("check")?.isStart).toBeUndefined();
+  });
+
+  it("stadium shape sticks when node re-appears plain", () => {
+    const graph = parseMermaidFlowchart(`flowchart TD
+  emit([Start]) --> check
+  check --> emit`);
+    expect(graph.nodes.get("emit")?.isStart).toBe(true);
+  });
+
   it("handles complex retry scenario", () => {
     const graph = parseMermaidFlowchart(`flowchart TD
   test -->|pass| deploy

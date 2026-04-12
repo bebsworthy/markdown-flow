@@ -39,7 +39,7 @@ function renderHeader(ctx: BeforeStepContext): void {
 
   // Runtime vars
   const runtimeVars = Object.entries(ctx.env)
-    .filter(([k]) => k.startsWith("MARKFLOW_"))
+    .filter(([k]) => k.startsWith("MARKFLOW_") || k === "STATE" || k === "GLOBAL")
     .map(([k, v]) => `${k.replace("MARKFLOW_", "")}=${v}`);
   if (runtimeVars.length > 0) {
     console.log(chalk.dim(`   Runtime: ${runtimeVars.join("  ")}`));

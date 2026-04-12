@@ -107,6 +107,21 @@ nodeId[Human readable label]
 nodeId[Human readable label annotation:value]
 ```
 
+#### Start Nodes
+
+By default the engine treats any node with no incoming edges as a start
+node. In cyclic workflows every node may have an incoming edge (e.g. a
+loop returns to its emitter), so the entry must be marked explicitly
+using Mermaid's stadium shape:
+
+```
+emit([Emit next issue])
+```
+
+When any node carries the stadium shape, those nodes are the start set
+and the "no incoming edges" fallback is ignored. Only the first mention
+of a node needs the shape; subsequent references can use the plain ID.
+
 ### Edge Declaration
 
 ```
@@ -177,6 +192,9 @@ Environment variables injected by the engine:
 | `MARKFLOW_PREV_STEP` | ID of the previous step |
 | `MARKFLOW_PREV_EDGE` | Edge label that led to this step |
 | `MARKFLOW_PREV_SUMMARY` | Summary from the previous step result |
+| `STEPS` | JSON object `{ <node>: { edge, summary, state? } }` for every completed step |
+| `STATE` | JSON string of this step's own accumulated state from its prior invocation; `{}` on first entry |
+| `GLOBAL` | JSON string of the current workflow-wide global context |
 
 #### Agent Steps
 
@@ -199,15 +217,31 @@ Current working directory: /path/to/workspace
 
 ---
 
-When complete, output the following as the very last line of your response:
+You may emit zero or more state/global lines anywhere in your response:
+
+STATE: {"key": "value", ...}
+GLOBAL: {"key": "value", ...}
+
+Multiple STATE lines shallow-merge (later keys win); same for GLOBAL.
+STATE is scoped to this step; GLOBAL is visible to all subsequent steps.
+
+The very last line of your response MUST be:
 
 RESULT: {"edge": "<label>", "summary": "<one sentence describing what you did>"}
+
+Do NOT include "state" or "global" keys inside RESULT — they are their own lines.
 
 Valid edge values: fail, pass
 If there is only one outgoing edge, use: done
 ```
 
-The engine reads the last line of stdout, extracts the JSON from `RESULT:`, and uses it for routing and context.
+The engine streams stdout, intercepting three sentinel prefixes on their own lines:
+
+- `STATE: {...}` — shallow-merged into this step's `state` (accumulates across multiple lines).
+- `GLOBAL: {...}` — shallow-merged into the workflow-wide `global` context (visible to every subsequent step via `$GLOBAL` / `$STEPS`).
+- `RESULT: {"edge": "...", "summary": "..."}` — the terminal routing decision. Must appear exactly once. Including `state` or `global` keys inside RESULT is an error and fails the step.
+
+Everything else in stdout is logged unchanged and ignored by the engine. Sentinel-looking lines whose JSON is malformed are treated as prose.
 
 Invocation: the engine spawns the agent with only the configured `agent_flags`
 in argv and pipes the assembled prompt to stdin, e.g. equivalent to:
@@ -231,6 +265,7 @@ After each step completes the engine records a result object in `context.json`:
   "type": "script",
   "edge": "fail",
   "summary": "3 of 47 tests failed in auth module.",
+  "state": { "failed": 3, "total": 47 },
   "started_at": "2026-04-09T10:23:01Z",
   "completed_at": "2026-04-09T10:23:04Z",
   "exit_code": 1

@@ -51,6 +51,33 @@ describe("graph utilities", () => {
     expect(targets).toHaveLength(3);
   });
 
+  it("prefers explicitly-marked start nodes over topology", () => {
+    const source = `# Loop
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  emit([Start]) -->|next| check
+  check --> emit
+\`\`\`
+
+# Steps
+
+## emit
+\`\`\`bash
+echo "emit"
+\`\`\`
+
+## check
+\`\`\`bash
+echo "check"
+\`\`\`
+`;
+    const def = parseWorkflowFromString(source);
+    expect(getStartNodes(def.graph)).toEqual(["emit"]);
+  });
+
   it("does NOT treat labeled-edge convergence as a merge node", () => {
     // A node with multiple labeled incoming edges is an or-join (any one token fires it),
     // not an and-join (parallel merge). This was a deadlock bug: the error node in

@@ -6,7 +6,7 @@ Tests retry logic with max:N and :max handler.
 
 ```mermaid
 flowchart TD
-  test -->|pass| done
+  test([Run tests]) -->|pass| done
   test -->|fail max:3| fix
   test -->|fail:max| abort
   fix --> test

@@ -7,6 +7,7 @@ import type {
   StepOutputHandler,
 } from "../types.js";
 import { renderTemplate } from "../template.js";
+import { createStreamParser } from "./stream-parser.js";
 
 export function assembleAgentPrompt(
   step: StepDefinition,
@@ -18,7 +19,7 @@ export function assembleAgentPrompt(
   const contextLines = context
     .map((r) => {
       let line = `- ${r.node} (${r.type}): ${r.summary}`;
-      if (r.data) line += `\n  Data: ${JSON.stringify(r.data)}`;
+      if (r.state) line += `\n  State: ${JSON.stringify(r.state)}`;
       return line;
     })
     .join("\n");
@@ -45,12 +46,19 @@ ${renderedContent}
 
 ---
 
-When complete, output the following as the very last line of your response:
+You may emit zero or more state/global lines anywhere in your response:
 
-RESULT: {"edge": "<label>", "summary": "<one sentence describing what you did>", "data": { ... }, "global": { ... }}
+STATE: {"key": "value", ...}
+GLOBAL: {"key": "value", ...}
 
-The "data" field is optional — use it to pass structured data to downstream steps.
-The "global" field is optional — use it to set workflow-wide key-value pairs readable by all subsequent steps.
+Multiple STATE lines shallow-merge (later keys win); same for GLOBAL.
+STATE is scoped to this step; GLOBAL is visible to all subsequent steps.
+
+The very last line of your response MUST be:
+
+RESULT: {"edge": "<label>", "summary": "<one sentence describing what you did>"}
+
+Do NOT include "state" or "global" keys inside RESULT — they are their own lines.
 
 ${validEdges}`;
 }
@@ -91,10 +99,13 @@ export async function runAgent(
 
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
+    const parser = createStreamParser();
 
     child.stdout.on("data", (chunk: Buffer) => {
       stdoutChunks.push(chunk);
-      if (onOutput) onOutput("stdout", chunk.toString("utf-8"));
+      const text = chunk.toString("utf-8");
+      parser.feed(text);
+      if (onOutput) onOutput("stdout", text);
     });
     child.stderr.on("data", (chunk: Buffer) => {
       stderrChunks.push(chunk);
@@ -103,10 +114,24 @@ export async function runAgent(
 
     child.on("close", (code) => {
       const stdout = Buffer.concat(stdoutChunks).toString("utf-8");
-      const stderr = Buffer.concat(stderrChunks).toString("utf-8");
-      const exitCode = code ?? 1;
+      let stderr = Buffer.concat(stderrChunks).toString("utf-8");
+      const parsed = parser.finish();
 
-      const parsedResult = parseResultLine(stdout);
+      const hasErrors = parsed.errors.length > 0;
+      if (hasErrors) {
+        stderr += (stderr.endsWith("\n") || stderr === "" ? "" : "\n") +
+          parsed.errors.map((e) => `[markflow] ${e}`).join("\n") + "\n";
+      }
+
+      const exitCode = hasErrors ? (code === 0 ? 1 : code ?? 1) : code ?? 1;
+
+      const parsedResult: StepOutput["parsedResult"] = {
+        edge: parsed.result?.edge,
+        summary: parsed.result?.summary,
+        state: Object.keys(parsed.state).length > 0 ? parsed.state : undefined,
+        global: Object.keys(parsed.global).length > 0 ? parsed.global : undefined,
+        errors: hasErrors ? parsed.errors : undefined,
+      };
 
       resolve({ exitCode, stdout, stderr, parsedResult });
     });
@@ -122,25 +147,3 @@ export async function runAgent(
   });
 }
 
-function parseResultLine(
-  stdout: string,
-): StepOutput["parsedResult"] | undefined {
-  const lines = stdout.trim().split("\n");
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const match = lines[i].match(/^RESULT:\s*(\{.*\})\s*$/);
-    if (match) {
-      try {
-        const parsed = JSON.parse(match[1]);
-        return {
-          edge: parsed.edge,
-          summary: parsed.summary,
-          data: parsed.data,
-          global: parsed.global,
-        };
-      } catch {
-        return undefined;
-      }
-    }
-  }
-  return undefined;
-}

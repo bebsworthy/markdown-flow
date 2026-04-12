@@ -8,8 +8,18 @@ export function getIncomingEdges(graph: FlowGraph, nodeId: string): FlowEdge[] {
   return graph.edges.filter((e) => e.to === nodeId);
 }
 
-/** Nodes with no incoming edges — entry points of the workflow. */
+/**
+ * Entry points of the workflow. Nodes explicitly marked with Mermaid's
+ * stadium shape (`id([Label])`) take precedence — required for cyclic
+ * graphs where every node has an incoming edge. Falls back to nodes with
+ * no incoming edges for acyclic workflows.
+ */
 export function getStartNodes(graph: FlowGraph): string[] {
+  const explicit = [...graph.nodes.values()]
+    .filter((n) => n.isStart)
+    .map((n) => n.id);
+  if (explicit.length > 0) return explicit;
+
   const targets = new Set(graph.edges.map((e) => e.to));
   return [...graph.nodes.keys()].filter((id) => !targets.has(id));
 }

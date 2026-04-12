@@ -3,6 +3,7 @@ import type {
   ValidationDiagnostic,
   FlowEdge,
 } from "./types.js";
+import { getStartNodes } from "./graph.js";
 
 export function validateWorkflow(
   def: WorkflowDefinition,
@@ -89,6 +90,15 @@ export function validateWorkflow(
         });
       }
     }
+  }
+
+  // 5. At least one start node
+  if (graph.nodes.size > 0 && getStartNodes(graph).length === 0) {
+    diagnostics.push({
+      severity: "error",
+      message:
+        "Workflow has no start node. Mark the entry node with Mermaid stadium shape (e.g. `emit([Emit next issue])`), or ensure at least one node has no incoming edges.",
+    });
   }
 
   return diagnostics;
