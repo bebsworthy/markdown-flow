@@ -100,6 +100,7 @@ export interface StepResult {
   type: StepType;
   edge: string;
   summary: string;
+  data?: Record<string, unknown>;
   started_at: string;
   completed_at: string;
   exit_code: number | null;
@@ -121,7 +122,12 @@ export interface StepOutput {
   exitCode: number;
   stdout: string;
   stderr: string;
-  parsedResult?: { edge?: string; summary?: string };
+  parsedResult?: {
+    edge?: string;
+    summary?: string;
+    data?: Record<string, unknown>;
+    global?: Record<string, unknown>;
+  };
 }
 
 // ---- Engine events ----
@@ -164,6 +170,7 @@ export interface BeforeStepContext {
   /** Retry counts for edges with budgets. count = retries already consumed before this invocation. */
   retryBudgets: Array<{ label: string; count: number; max: number }>;
   completedResults: StepResult[];
+  globalContext: Record<string, unknown>;
   /** Pre-assembled prompt for agent steps; undefined for scripts */
   prompt?: string;
 }
@@ -178,6 +185,8 @@ export type BeforeStepDirective =
       edge: string;
       summary?: string;
       exitCode?: number;
+      data?: Record<string, unknown>;
+      global?: Record<string, unknown>;
     };
 
 export type BeforeStepHook = (

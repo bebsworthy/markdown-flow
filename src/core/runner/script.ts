@@ -1,7 +1,11 @@
 import { spawn } from "node:child_process";
 import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { StepDefinition, StepOutput, StepOutputHandler } from "../types.js";
+import type {
+  StepDefinition,
+  StepOutput,
+  StepOutputHandler,
+} from "../types.js";
 
 const LANG_TO_INTERPRETER: Record<string, string> = {
   bash: "bash",
@@ -78,7 +82,7 @@ export async function runScript(
 
 function parseResultLine(
   stdout: string,
-): { edge?: string; summary?: string } | undefined {
+): StepOutput["parsedResult"] | undefined {
   const lines = stdout.trim().split("\n");
   for (let i = lines.length - 1; i >= 0; i--) {
     const match = lines[i].match(/^RESULT:\s*(\{.*\})\s*$/);
@@ -88,6 +92,8 @@ function parseResultLine(
         return {
           edge: parsed.edge,
           summary: parsed.summary,
+          data: parsed.data,
+          global: parsed.global,
         };
       } catch {
         return undefined;

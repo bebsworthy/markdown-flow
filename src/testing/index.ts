@@ -18,6 +18,8 @@ export interface MockResult {
   edge?: string;
   summary?: string;
   exitCode?: number;
+  data?: Record<string, unknown>;
+  global?: Record<string, unknown>;
 }
 
 export interface WorkflowTestRunOptions {
@@ -64,6 +66,10 @@ export class WorkflowTestResult {
       );
     }
     return match[nth - 1];
+  }
+
+  stepData(nodeId: string, nth = 1): Record<string, unknown> | undefined {
+    return this.stepResult(nodeId, nth).data;
   }
 }
 
@@ -145,6 +151,8 @@ export class WorkflowTest {
             edge: spec.edge ?? (ctx.step.type === "agent" ? "done" : "pass"),
             summary: spec.summary,
             exitCode: spec.exitCode,
+            data: spec.data,
+            global: spec.global,
           };
           return directive;
         },

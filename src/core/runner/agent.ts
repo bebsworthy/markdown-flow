@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import type {
   StepDefinition,
-  StepResult,
   StepOutput,
+  StepResult,
   MarkflowConfig,
   StepOutputHandler,
 } from "../types.js";
@@ -16,7 +16,11 @@ export function assembleAgentPrompt(
   env: Record<string, string> = {},
 ): string {
   const contextLines = context
-    .map((r) => `- ${r.node} (${r.type}): ${r.summary}`)
+    .map((r) => {
+      let line = `- ${r.node} (${r.type}): ${r.summary}`;
+      if (r.data) line += `\n  Data: ${JSON.stringify(r.data)}`;
+      return line;
+    })
     .join("\n");
 
   const validEdges =
@@ -43,7 +47,10 @@ ${renderedContent}
 
 When complete, output the following as the very last line of your response:
 
-RESULT: {"edge": "<label>", "summary": "<one sentence describing what you did>"}
+RESULT: {"edge": "<label>", "summary": "<one sentence describing what you did>", "data": { ... }, "global": { ... }}
+
+The "data" field is optional — use it to pass structured data to downstream steps.
+The "global" field is optional — use it to set workflow-wide key-value pairs readable by all subsequent steps.
 
 ${validEdges}`;
 }
@@ -117,14 +124,19 @@ export async function runAgent(
 
 function parseResultLine(
   stdout: string,
-): { edge?: string; summary?: string } | undefined {
+): StepOutput["parsedResult"] | undefined {
   const lines = stdout.trim().split("\n");
   for (let i = lines.length - 1; i >= 0; i--) {
     const match = lines[i].match(/^RESULT:\s*(\{.*\})\s*$/);
     if (match) {
       try {
         const parsed = JSON.parse(match[1]);
-        return { edge: parsed.edge, summary: parsed.summary };
+        return {
+          edge: parsed.edge,
+          summary: parsed.summary,
+          data: parsed.data,
+          global: parsed.global,
+        };
       } catch {
         return undefined;
       }

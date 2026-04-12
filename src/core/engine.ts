@@ -52,6 +52,7 @@ export class WorkflowEngine {
   private runDir!: RunDirectory;
   private tokens: Map<string, Token> = new Map();
   private completedResults: StepResult[] = [];
+  private globalContext: Record<string, unknown> = {};
   private tokenCounter = 0;
   private resolvedInputs: Record<string, string> = {};
 
@@ -208,6 +209,24 @@ export class WorkflowEngine {
       env.MARKFLOW_PREV_SUMMARY = prevResult.summary;
     }
 
+    // Step data and global context — structured JSON for full access
+    env.MARKFLOW_STEPS_JSON = JSON.stringify(this.buildStepsMap());
+    env.MARKFLOW_GLOBAL_JSON = JSON.stringify(this.globalContext);
+
+    // Flattened env vars for template interpolation
+    for (const r of this.completedResults) {
+      if (r.data) {
+        for (const [key, value] of Object.entries(r.data)) {
+          const envKey = `MARKFLOW_DATA_${r.node.toUpperCase()}_${key.toUpperCase()}`;
+          env[envKey] = typeof value === "string" ? value : JSON.stringify(value);
+        }
+      }
+    }
+    for (const [key, value] of Object.entries(this.globalContext)) {
+      env[`MARKFLOW_GLOBAL_${key.toUpperCase()}`] =
+        typeof value === "string" ? value : JSON.stringify(value);
+    }
+
     // Get outgoing edge labels for agent prompt
     const outgoing = getOutgoingEdges(this.def.graph, token.nodeId);
     const edgeLabels = outgoing
@@ -230,7 +249,7 @@ export class WorkflowEngine {
       }
     }
 
-    let mockDirective: { edge: string; summary?: string; exitCode?: number } | undefined;
+    let mockDirective: { edge: string; summary?: string; exitCode?: number; data?: Record<string, unknown>; global?: Record<string, unknown> } | undefined;
     if (this.options.beforeStep) {
       const ctx: BeforeStepContext = {
         nodeId: token.nodeId,
@@ -241,6 +260,7 @@ export class WorkflowEngine {
         outgoingEdges: outgoing,
         retryBudgets,
         completedResults: this.completedResults,
+        globalContext: { ...this.globalContext },
         prompt:
           step.type === "agent"
             ? assembleAgentPrompt(
@@ -270,6 +290,8 @@ export class WorkflowEngine {
         parsedResult: {
           edge: mockDirective.edge,
           summary: mockDirective.summary ?? "",
+          data: mockDirective.data,
+          global: mockDirective.global,
         },
       };
     } else {
@@ -308,6 +330,7 @@ export class WorkflowEngine {
       type: step.type,
       edge,
       summary,
+      data: output.parsedResult?.data,
       started_at: startedAt,
       completed_at: completedAt,
       exit_code:
@@ -315,6 +338,10 @@ export class WorkflowEngine {
           ? output.exitCode
           : mockDirective?.exitCode ?? null,
     };
+
+    if (output.parsedResult?.global) {
+      Object.assign(this.globalContext, output.parsedResult.global);
+    }
 
     token.state = "complete";
     token.edge = edge;
@@ -464,6 +491,14 @@ export class WorkflowEngine {
     }
 
     return resolved;
+  }
+
+  private buildStepsMap(): Record<string, { edge: string; summary: string; data?: Record<string, unknown> }> {
+    const map: Record<string, { edge: string; summary: string; data?: Record<string, unknown> }> = {};
+    for (const r of this.completedResults) {
+      map[r.node] = { edge: r.edge, summary: r.summary, data: r.data };
+    }
+    return map;
   }
 
   private createToken(nodeId: string): Token {
