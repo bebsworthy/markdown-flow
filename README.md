@@ -55,7 +55,7 @@ npm test
 
 ## fix
 
-You are a coding agent. The deploy target is ${DEPLOY_TARGET}.
+You are a coding agent. The deploy target is {{ DEPLOY_TARGET }}.
 Review the test failures in context and fix the source code so the tests pass.
 
 ## deploy
@@ -96,25 +96,49 @@ At runtime inputs are resolved from (highest priority first): `--input` flags, `
 
 #### Variable Templating in Agent Prompts
 
-Agent prompts use `${VAR}` syntax to reference workflow inputs and runtime context. Only explicitly referenced variables appear in the prompt — nothing is injected automatically.
+Agent prompts are rendered with [LiquidJS](https://liquidjs.com/) in strict mode. Use `{{ VAR }}` to interpolate, `{% … %}` for control flow, and `|` for filters. Undefined variables cause the run to fail with a descriptive error.
 
 ```markdown
 ## review
 
-You are a code reviewer. The repository is at ${MARKFLOW_WORKDIR}.
-The previous step reported: ${MARKFLOW_PREV_SUMMARY}
-Review the code for ${REVIEW_CRITERIA}.
+You are a code reviewer. The repository is at {{ MARKFLOW_WORKDIR }}.
+The previous step reported: {{ MARKFLOW_PREV_SUMMARY }}
+Review the code for {{ REVIEW_CRITERIA }}.
 ```
 
-Available variables:
-- Any declared workflow input (e.g. `${DEPLOY_TARGET}`)
-- `${MARKFLOW_STEP}` — current step name
-- `${MARKFLOW_PREV_STEP}`, `${MARKFLOW_PREV_EDGE}`, `${MARKFLOW_PREV_SUMMARY}` — context from the previous step
-- `${MARKFLOW_WORKDIR}` — per-run working directory (cwd for scripts and agents)
-- `${MARKFLOW_WORKSPACE}` — persistent workspace directory (contains `.env` and `runs/`)
-- `${MARKFLOW_RUNDIR}` — run log directory
+Flat variables:
+- Any declared workflow input (e.g. `{{ DEPLOY_TARGET }}`)
+- `{{ MARKFLOW_STEP }}` — current step name
+- `{{ MARKFLOW_PREV_STEP }}`, `{{ MARKFLOW_PREV_EDGE }}`, `{{ MARKFLOW_PREV_SUMMARY }}` — context from the previous step
+- `{{ MARKFLOW_WORKDIR }}` — per-run working directory (cwd for scripts and agents)
+- `{{ MARKFLOW_WORKSPACE }}` — persistent workspace directory (contains `.env` and `runs/`)
+- `{{ MARKFLOW_RUNDIR }}` — run log directory
 
-Undefined variables cause the run to fail with a descriptive error. To include a literal `${VAR}` in your prompt, escape it as `$${VAR}`.
+Structured namespaces:
+- `{{ GLOBAL.* }}` — workflow-wide context accumulated across steps
+- `{{ STEPS.<id>.edge }}`, `{{ STEPS.<id>.summary }}`, `{{ STEPS.<id>.local.* }}` — results from prior steps
+
+To include literal `{{` or `{%` in a prompt, wrap the region in `{% raw %}…{% endraw %}`.
+
+Markdown-oriented filters are registered for turning structured data into prompt-ready markdown: `json`, `yaml`, `list`, `table`, `code`, `heading`, `quote`, `indent`, `pluck`, `keys`, `values`. The `json` and `yaml` filters accept an optional comma-separated field list, e.g. `{{ issue | json: "number,title" }}`.
+
+#### Context Surfaces (`LOCAL` / `GLOBAL` / `STEPS`)
+
+Every step can read and emit two JSON-shaped context surfaces:
+
+- **`LOCAL`** — step-private. Only the same step sees it on re-entry (the cursor memory used by loops/emitters).
+- **`GLOBAL`** — workflow-wide. All subsequent steps read it.
+- **`STEPS`** — read-only map of prior steps' `{ edge, summary, local }`.
+
+Scripts receive `$LOCAL`, `$GLOBAL`, and `$STEPS` as JSON-string env vars, and emit updates as stdout sentinels:
+
+```
+LOCAL:  {"cursor": 3}
+GLOBAL: {"item": {...}}
+RESULT: {"edge": "next", "summary": "..."}
+```
+
+Multiple `LOCAL:` / `GLOBAL:` lines shallow-merge (later keys win). These surfaces are unrelated to the engine's internal token-state machine.
 
 ### Edge Annotations
 
@@ -232,12 +256,16 @@ expect(result.events.filter(e => e.type === "retry:increment")).toHaveLength(2);
 
 Unmocked steps run for real — mock only the steps you need to isolate.
 
+## Examples
+
+- [`docs/examples/loop.md`](docs/examples/loop.md) — issue-triage loop demonstrating the **emitter pattern**: one step owns a cached list, keeps its cursor in `LOCAL`, publishes the current item into `GLOBAL`, and self-loops until exhausted. Ports in [JavaScript](docs/examples/loop-js.md) and [Python](docs/examples/loop-py.md) show the protocol is language-agnostic.
+
 ## How It Works
 
 - **Parser** extracts name, declared inputs, Mermaid topology, and step definitions.
 - **Validator** checks structural correctness: node-step matching, retry handler completeness, edge label uniqueness.
 - **Engine** runs a token-based execution loop — linear flows, branching, parallel fan-out/fan-in, cycles, and retry budgets.
-- **Routing** maps script exit codes to edges (`0` → pass/ok/success/done, non-zero → fail/error/retry). Scripts and agents can also emit `RESULT: {"edge": "...", "summary": "..."}` as the final stdout line for explicit control.
+- **Routing** maps script exit codes to edges (`0` → pass/ok/success/done, non-zero → fail/error/retry). Scripts and agents can also emit `RESULT: {"edge": "...", "summary": "..."}` as the final stdout line for explicit control, plus zero or more `LOCAL: {...}` / `GLOBAL: {...}` lines to publish state to later steps.
 - **Run history** is persisted as JSONL in `<workspace>/runs/<timestamp>/context.jsonl`.
 
 ## Configuration
@@ -255,13 +283,15 @@ Place a `.workflow.json` next to your workflow `.md` file to override defaults:
 
 The assembled prompt is piped to the agent's stdin; argv contains only the flags in `agent_flags`. Set `agent_flags` to whatever puts your CLI into non-interactive mode — e.g. `["-p"]` for `claude` and `gemini`, or `["exec", "-"]` for `codex`. The default is `["-p"]`.
 
-Per-step overrides live in a fenced config block inside the step body:
+Per-step overrides live in a fenced **YAML** config block (language `config`) at the top of the step body:
 
 ````markdown
 ## analyze-ticket
 
-```json
-{ "agent": "gemini", "flags": ["-p"] }
+```config
+agent: gemini
+flags:
+  - -p
 ```
 
 You are a ticket analyst. …
