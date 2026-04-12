@@ -1,13 +1,13 @@
 import chalk from "chalk";
+import { join } from "node:path";
 import { createRunManager } from "../../core/index.js";
 
 export interface LsOptions {
-  runsDir?: string;
   json?: boolean;
 }
 
-export async function lsCommand(options: LsOptions): Promise<void> {
-  const manager = createRunManager(options.runsDir);
+export async function lsCommand(workspace: string, options: LsOptions): Promise<void> {
+  const manager = createRunManager(join(workspace, "runs"));
   const runs = await manager.listRuns();
 
   if (runs.length === 0) {

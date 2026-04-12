@@ -13,6 +13,8 @@ export function createRetryState(): RetryState {
 export interface RouteDecision {
   targets: Array<{ nodeId: string; edge: FlowEdge }>;
   exhausted: boolean;
+  /** Set when the matched edge has a retry budget; includes count and max. */
+  retryIncrement?: { label: string; count: number; max: number };
 }
 
 const SUCCESS_LABELS = ["pass", "ok", "success", "done"];
@@ -93,9 +95,11 @@ export function resolveRoute(
   }
 
   // Check retry budget
+  let retryIncrement: RouteDecision["retryIncrement"];
   if (matchedEdge.annotations.maxRetries !== undefined && matchedEdge.label) {
     const count = incrementRetry(retryState, nodeId, matchedEdge.label);
     const max = matchedEdge.annotations.maxRetries;
+    retryIncrement = { label: matchedEdge.label, count, max };
 
     if (count > max) {
       // Budget exhausted — look for :max handler
@@ -110,6 +114,7 @@ export function resolveRoute(
       return {
         targets: [{ nodeId: handler.to, edge: handler }],
         exhausted: true,
+        retryIncrement,
       };
     }
   }
@@ -117,6 +122,7 @@ export function resolveRoute(
   return {
     targets: [{ nodeId: matchedEdge.to, edge: matchedEdge }],
     exhausted: false,
+    retryIncrement,
   };
 }
 

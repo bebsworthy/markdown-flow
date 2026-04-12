@@ -15,6 +15,7 @@ export function parseWorkflowFromString(
   return {
     name: sections.name,
     description: sections.description,
+    inputs: sections.inputs,
     graph,
     steps,
     sourceFile: filePath,

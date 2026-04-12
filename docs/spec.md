@@ -207,13 +207,17 @@ If there is only one outgoing edge, use: done
 
 The engine reads the last line of stdout, extracts the JSON from `RESULT:`, and uses it for routing and context.
 
-Invocation:
+Invocation: the engine spawns the agent with only the configured `agent_flags`
+in argv and pipes the assembled prompt to stdin, e.g. equivalent to:
 
 ```bash
-claude --prompt "<assembled prompt>"
+echo "<assembled prompt>" | claude -p
 ```
 
-The agent CLI is configurable. Supported values: `claude`, `codex`. Default: `claude`.
+The agent CLI is configurable via `.workflow.json` (`agent`, `agent_flags`).
+Default: `{ agent: "claude", agent_flags: ["-p"] }`. For other CLIs set the
+appropriate headless-mode flags — e.g. `["-p"]` for `gemini`, `["exec", "-"]`
+for `codex`.
 
 ### Step Result
 

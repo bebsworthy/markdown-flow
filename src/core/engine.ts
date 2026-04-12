@@ -5,18 +5,35 @@ import type {
   Token,
   StepResult,
   RunInfo,
-  FlowEdge,
+  BeforeStepHook,
+  BeforeStepContext,
+  StepOutput,
 } from "./types.js";
 import { getOutgoingEdges, getStartNodes, getUpstreamNodes, isMergeNode } from "./graph.js";
 import { resolveRoute, createRetryState, type RetryState } from "./router.js";
 import { runStep } from "./runner/index.js";
+import { assembleAgentPrompt } from "./runner/agent.js";
 import { createRunManager, type RunDirectory } from "./run-manager.js";
-import { loadConfig, DEFAULT_CONFIG } from "./config.js";
+import { loadConfig } from "./config.js";
+import { loadEnvFile } from "./env.js";
+import { join } from "node:path";
 
 export interface EngineOptions {
   config?: Partial<MarkflowConfig>;
   runsDir?: string;
   onEvent?: EngineEventHandler;
+  /** Workspace directory — loads <workspaceDir>/.env as layer 3. */
+  workspaceDir?: string;
+  /** Extra env file to load (layer 4, overrides workspace .env). */
+  envFile?: string;
+  /** Explicit key/value overrides — highest priority. */
+  inputs?: Record<string, string>;
+  /**
+   * Called before each step executes. Return void to run the step normally,
+   * or a mock directive to short-circuit execution with a synthetic result.
+   * Used by the interactive debugger and the test harness.
+   */
+  beforeStep?: BeforeStepHook;
 }
 
 export async function executeWorkflow(
@@ -36,6 +53,10 @@ export class WorkflowEngine {
   private tokens: Map<string, Token> = new Map();
   private completedResults: StepResult[] = [];
   private tokenCounter = 0;
+  private resolvedInputs: Record<string, string> = {};
+
+  /** Per-node execution counts (nodeId → count). */
+  private nodeCalls: Map<string, number> = new Map();
 
   /** Track which upstream nodes have completed for each merge node */
   private mergeCompletions: Map<string, Set<string>> = new Map();
@@ -52,6 +73,9 @@ export class WorkflowEngine {
     // Load config
     const fileConfig = await loadConfig(this.def.sourceFile);
     this.config = { ...fileConfig, ...this.options.config } as MarkflowConfig;
+
+    // Resolve workflow inputs through the layered source stack
+    this.resolvedInputs = await this.resolveInputs();
 
     // Create run directory
     const runManager = createRunManager(this.options.runsDir);
@@ -170,6 +194,7 @@ export class WorkflowEngine {
 
     // Build environment variables for script steps
     const env: Record<string, string> = {
+      ...this.resolvedInputs,
       WORKFLOW_RUN_DIR: this.runDir.path,
       WORKFLOW_WORKSPACE: this.runDir.workspacePath,
     };
@@ -188,15 +213,65 @@ export class WorkflowEngine {
       .filter((e) => e.label && !e.annotations.isExhaustionHandler)
       .map((e) => e.label!);
 
-    const output = await runStep(
-      step,
-      this.completedResults,
-      edgeLabels,
-      this.runDir.workspacePath,
-      env,
-      this.runDir.path,
-      this.config,
-    );
+    // Increment per-node call count (1-indexed) and invoke beforeStep hook
+    const callCount = (this.nodeCalls.get(token.nodeId) ?? 0) + 1;
+    this.nodeCalls.set(token.nodeId, callCount);
+
+    let mockDirective: { edge: string; summary?: string; exitCode?: number } | undefined;
+    if (this.options.beforeStep) {
+      const ctx: BeforeStepContext = {
+        nodeId: token.nodeId,
+        step,
+        callCount,
+        env,
+        resolvedInputs: this.resolvedInputs,
+        outgoingEdges: outgoing,
+        completedResults: this.completedResults,
+        prompt:
+          step.type === "agent"
+            ? assembleAgentPrompt(
+                step,
+                this.completedResults,
+                edgeLabels,
+                this.runDir.workspacePath,
+                this.resolvedInputs,
+              )
+            : undefined,
+      };
+      const directive = await this.options.beforeStep(ctx);
+      if (directive) {
+        mockDirective = directive;
+      }
+    }
+
+    // Either synthesize a StepOutput from the mock directive, or run the step
+    let output: StepOutput;
+    if (mockDirective) {
+      const defaultExit =
+        step.type === "script" ? (mockDirective.edge === "fail" ? 1 : 0) : 0;
+      output = {
+        exitCode: mockDirective.exitCode ?? defaultExit,
+        stdout: "",
+        stderr: "",
+        parsedResult: {
+          edge: mockDirective.edge,
+          summary: mockDirective.summary ?? "",
+        },
+      };
+    } else {
+      output = await runStep(
+        step,
+        this.completedResults,
+        edgeLabels,
+        this.runDir.workspacePath,
+        env,
+        this.runDir.path,
+        this.config,
+        this.resolvedInputs,
+        (stream, chunk) =>
+          this.emit({ type: "step:output", nodeId: token.nodeId, stream, chunk }),
+      );
+    }
 
     // Build StepResult
     const completedAt = new Date().toISOString();
@@ -222,7 +297,10 @@ export class WorkflowEngine {
       summary,
       started_at: startedAt,
       completed_at: completedAt,
-      exit_code: step.type === "script" ? output.exitCode : null,
+      exit_code:
+        step.type === "script"
+          ? output.exitCode
+          : mockDirective?.exitCode ?? null,
     };
 
     token.state = "complete";
@@ -250,6 +328,16 @@ export class WorkflowEngine {
       this.retryState,
       this.config,
     );
+
+    if (decision.retryIncrement) {
+      this.emit({
+        type: "retry:increment",
+        nodeId: token.nodeId,
+        label: decision.retryIncrement.label,
+        count: decision.retryIncrement.count,
+        max: decision.retryIncrement.max,
+      });
+    }
 
     if (decision.exhausted) {
       this.emit({
@@ -316,6 +404,53 @@ export class WorkflowEngine {
       }
     }
     return undefined;
+  }
+
+  private async resolveInputs(): Promise<Record<string, string>> {
+    const declared = this.def.inputs;
+    const names = new Set(declared.map((d) => d.name));
+    const resolved: Record<string, string> = {};
+
+    const overlay = (source: Record<string, string>, onlyDeclared = true) => {
+      for (const [k, v] of Object.entries(source)) {
+        if (!onlyDeclared || names.has(k)) resolved[k] = v;
+      }
+    };
+
+    // 1. Declared defaults (lowest priority)
+    for (const decl of declared) {
+      if (decl.default !== undefined) resolved[decl.name] = decl.default;
+    }
+
+    // 2. Global environment — only for declared input names
+    overlay(process.env as Record<string, string>);
+
+    // 3. Workspace .env (if workspaceDir provided)
+    if (this.options.workspaceDir) {
+      overlay(await loadEnvFile(join(this.options.workspaceDir, ".env")));
+    }
+
+    // 4. --env file (explicit path)
+    if (this.options.envFile) {
+      overlay(await loadEnvFile(this.options.envFile));
+    }
+
+    // 5. --input flags — highest priority, accept any key
+    overlay(this.options.inputs ?? {}, false);
+
+    // Validate required inputs are present
+    const missing = declared
+      .filter((d) => d.required && !(d.name in resolved))
+      .map((d) => d.name);
+
+    if (missing.length > 0) {
+      throw new Error(
+        `Missing required workflow inputs: ${missing.join(", ")}. ` +
+          `Set them in the environment, a .env file, or pass with --input KEY=VALUE`,
+      );
+    }
+
+    return resolved;
   }
 
   private createToken(nodeId: string): Token {

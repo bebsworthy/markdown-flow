@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import type { StepDefinition, StepOutput } from "../types.js";
+import type { StepDefinition, StepOutput, StepOutputHandler } from "../types.js";
 
 const LANG_TO_INTERPRETER: Record<string, string> = {
   bash: "bash",
@@ -24,6 +24,7 @@ export async function runScript(
   env: Record<string, string>,
   workspacePath: string,
   runDir: string,
+  onOutput?: StepOutputHandler,
 ): Promise<StepOutput> {
   const lang = step.lang ?? "bash";
   const interpreter = LANG_TO_INTERPRETER[lang];
@@ -45,8 +46,14 @@ export async function runScript(
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
 
-    child.stdout.on("data", (chunk: Buffer) => stdoutChunks.push(chunk));
-    child.stderr.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdoutChunks.push(chunk);
+      if (onOutput) onOutput("stdout", chunk.toString("utf-8"));
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderrChunks.push(chunk);
+      if (onOutput) onOutput("stderr", chunk.toString("utf-8"));
+    });
 
     child.on("close", (code) => {
       const stdout = Buffer.concat(stdoutChunks).toString("utf-8");

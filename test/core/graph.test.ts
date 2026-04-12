@@ -50,4 +50,52 @@ describe("graph utilities", () => {
     expect(targets).toContain("typecheck");
     expect(targets).toHaveLength(3);
   });
+
+  it("does NOT treat labeled-edge convergence as a merge node", () => {
+    // A node with multiple labeled incoming edges is an or-join (any one token fires it),
+    // not an and-join (parallel merge). This was a deadlock bug: the error node in
+    // plane-ticket-analysis had two labeled incoming edges (|fail| from fetch-ticket and
+    // |fail:max| from post-comment). The engine was waiting for both upstreams before
+    // firing — but when one upstream routed to error, the other never ran.
+    const source = `# Branch Convergence Test
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  stepA -->|fail| error
+  stepB -->|fail| error
+  stepA -->|pass| done
+  stepB -->|pass| done
+\`\`\`
+
+# Steps
+
+## stepA
+\`\`\`bash
+echo "RESULT: {\"edge\": \"pass\"}"
+\`\`\`
+
+## stepB
+\`\`\`bash
+echo "RESULT: {\"edge\": \"pass\"}"
+\`\`\`
+
+## done
+\`\`\`bash
+echo "done"
+\`\`\`
+
+## error
+\`\`\`bash
+echo "error" >&2
+exit 1
+\`\`\`
+`;
+    const def = parseWorkflowFromString(source);
+    // error has two labeled incoming edges — must be or-join, not and-join
+    expect(isMergeNode(def.graph, "error")).toBe(false);
+    // done also has two labeled incoming edges
+    expect(isMergeNode(def.graph, "done")).toBe(false);
+  });
 });

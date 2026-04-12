@@ -20,9 +20,19 @@ export function getTerminalNodes(graph: FlowGraph): string[] {
   return [...graph.nodes.keys()].filter((id) => !sources.has(id));
 }
 
-/** True if a node has multiple incoming edges from distinct sources. */
+/**
+ * True if a node is a parallel fan-in (and-join) — i.e. it has multiple
+ * incoming edges from distinct sources AND all those edges are unlabeled.
+ *
+ * Labeled edges indicate conditional routing (or-join): any one token fires
+ * the node immediately. Only unlabeled edges represent parallel branches that
+ * must all complete before the node is ready.
+ */
 export function isMergeNode(graph: FlowGraph, nodeId: string): boolean {
   const incoming = getIncomingEdges(graph, nodeId);
+  if (incoming.length < 2) return false;
+  const allUnlabeled = incoming.every((e) => !e.label);
+  if (!allUnlabeled) return false;
   const uniqueSources = new Set(incoming.map((e) => e.from));
   return uniqueSources.size > 1;
 }

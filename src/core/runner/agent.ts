@@ -1,11 +1,18 @@
 import { spawn } from "node:child_process";
-import type { StepDefinition, StepResult, StepOutput, MarkflowConfig } from "../types.js";
+import type {
+  StepDefinition,
+  StepResult,
+  StepOutput,
+  MarkflowConfig,
+  StepOutputHandler,
+} from "../types.js";
 
 export function assembleAgentPrompt(
   step: StepDefinition,
   context: StepResult[],
   outgoingEdgeLabels: string[],
   workspacePath: string,
+  resolvedInputs: Record<string, string> = {},
 ): string {
   const contextLines = context
     .map((r) => `- ${r.node} (${r.type}): ${r.summary}`)
@@ -16,7 +23,13 @@ export function assembleAgentPrompt(
       ? `If there is only one outgoing edge, use: done`
       : `Valid edge values: ${outgoingEdgeLabels.join(", ")}`;
 
-  return `## Workflow Context
+  const inputEntries = Object.entries(resolvedInputs);
+  const inputsSection =
+    inputEntries.length > 0
+      ? `## Workflow Inputs\n\n${inputEntries.map(([k, v]) => `- ${k}: ${v}`).join("\n")}\n\n---\n\n`
+      : "";
+
+  return `${inputsSection}## Workflow Context
 
 Completed steps:
 ${contextLines || "(none)"}
@@ -44,27 +57,45 @@ export async function runAgent(
   outgoingEdgeLabels: string[],
   workspacePath: string,
   config: MarkflowConfig,
+  resolvedInputs: Record<string, string> = {},
+  onOutput?: StepOutputHandler,
 ): Promise<StepOutput> {
   const prompt = assembleAgentPrompt(
     step,
     context,
     outgoingEdgeLabels,
     workspacePath,
+    resolvedInputs,
   );
 
+  // Per-step config overrides global: step agent wins, step flags append to global flags
+  const effectiveAgent = step.agentConfig?.agent ?? config.agent;
+  const effectiveFlags = [
+    ...config.agentFlags,
+    ...(step.agentConfig?.flags ?? []),
+  ];
+
   return new Promise<StepOutput>((resolve) => {
-    const args = [...config.agentFlags, "--prompt", prompt];
-    const child = spawn(config.agent, args, {
+    const child = spawn(effectiveAgent, effectiveFlags, {
       cwd: workspacePath,
       env: process.env,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
     });
+
+    child.stdin.write(prompt);
+    child.stdin.end();
 
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
 
-    child.stdout.on("data", (chunk: Buffer) => stdoutChunks.push(chunk));
-    child.stderr.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdoutChunks.push(chunk);
+      if (onOutput) onOutput("stdout", chunk.toString("utf-8"));
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderrChunks.push(chunk);
+      if (onOutput) onOutput("stderr", chunk.toString("utf-8"));
+    });
 
     child.on("close", (code) => {
       const stdout = Buffer.concat(stdoutChunks).toString("utf-8");
@@ -80,7 +111,7 @@ export async function runAgent(
       resolve({
         exitCode: 1,
         stdout: "",
-        stderr: `Failed to invoke agent "${config.agent}": ${err.message}`,
+        stderr: `Failed to invoke agent "${effectiveAgent}": ${err.message}`,
         parsedResult: undefined,
       });
     });

@@ -1,8 +1,16 @@
 // ---- Workflow definition (parse output) ----
 
+export interface InputDeclaration {
+  name: string;
+  required: boolean;
+  default?: string;
+  description: string;
+}
+
 export interface WorkflowDefinition {
   name: string;
   description: string;
+  inputs: InputDeclaration[];
   graph: FlowGraph;
   steps: Map<string, StepDefinition>;
   sourceFile: string;
@@ -42,11 +50,17 @@ export const SUPPORTED_LANGS: readonly string[] = [
   "javascript",
 ];
 
+export interface StepAgentConfig {
+  agent?: string;
+  flags?: string[];
+}
+
 export interface StepDefinition {
   id: string;
   type: StepType;
   lang?: ScriptLang;
   content: string;
+  agentConfig?: StepAgentConfig;
 }
 
 // ---- Validation ----
@@ -114,6 +128,12 @@ export interface StepOutput {
 
 export type EngineEvent =
   | { type: "step:start"; nodeId: string; tokenId: string }
+  | {
+      type: "step:output";
+      nodeId: string;
+      stream: "stdout" | "stderr";
+      chunk: string;
+    }
   | { type: "step:complete"; nodeId: string; result: StepResult }
   | { type: "route"; from: string; to: string; edge?: string }
   | {
@@ -128,3 +148,41 @@ export type EngineEvent =
   | { type: "workflow:error"; error: string };
 
 export type EngineEventHandler = (event: EngineEvent) => void;
+
+// ---- Step interception (debugger / test harness) ----
+
+export interface BeforeStepContext {
+  nodeId: string;
+  step: StepDefinition;
+  /** 1-indexed; pre-incremented before the hook fires */
+  callCount: number;
+  /** Full environment passed to the step */
+  env: Record<string, string>;
+  /** Workflow inputs only (subset of env) */
+  resolvedInputs: Record<string, string>;
+  outgoingEdges: FlowEdge[];
+  completedResults: StepResult[];
+  /** Pre-assembled prompt for agent steps; undefined for scripts */
+  prompt?: string;
+}
+
+/**
+ * Return void to run the step normally. Return a mock directive to
+ * short-circuit execution and synthesize the StepResult directly.
+ */
+export type BeforeStepDirective =
+  | void
+  | {
+      edge: string;
+      summary?: string;
+      exitCode?: number;
+    };
+
+export type BeforeStepHook = (
+  ctx: BeforeStepContext,
+) => Promise<BeforeStepDirective> | BeforeStepDirective;
+
+export type StepOutputHandler = (
+  stream: "stdout" | "stderr",
+  chunk: string,
+) => void;

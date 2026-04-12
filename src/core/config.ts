@@ -4,7 +4,7 @@ import type { MarkflowConfig } from "./types.js";
 
 export const DEFAULT_CONFIG: MarkflowConfig = {
   agent: "claude",
-  agentFlags: [],
+  agentFlags: ["-p"],
   parallel: true,
 };
 

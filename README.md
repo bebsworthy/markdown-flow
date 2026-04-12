@@ -1,21 +1,32 @@
 # markflow
 
-A workflow engine that uses a single Markdown file as both human-readable documentation and executable specification. Define your workflow topology as a Mermaid flowchart, implement steps as shell scripts or AI agent prompts, and let the engine handle routing, retries, and parallel execution.
+A workflow engine that uses a single Markdown file as both human-readable documentation and executable specification. Define your workflow topology as a Mermaid flowchart, implement steps as shell scripts or AI agent prompts, and let the engine handle routing, retries, parallel execution, and run history.
 
 ## Quick Start
 
 ```bash
-npx markflow start workflow.md
+# Run a workflow — auto-creates a ./<workflow-name>/ workspace on first use
+npx markflow run workflow.md
+
+# Pass inputs on the command line
+npx markflow run workflow.md --input ISSUE_ID=abc --input PROJECT_ID=xyz
 ```
+
+On first run, markflow scaffolds a workspace directory (`./<workflow-name>/`) containing an `.env` file prefilled with any declared inputs, plus a `runs/` subdirectory that accumulates JSONL logs of every run.
 
 ## Writing a Workflow
 
-A workflow is a `.md` file with three sections:
+A workflow is a `.md` file with up to four sections:
 
 ````markdown
 # CI Pipeline
 
 Runs lint and tests, then deploys on success.
+
+# Inputs
+
+- `DEPLOY_TARGET` (required): Deploy target environment
+- `SLACK_CHANNEL` (default: `#deploys`): Where to notify
 
 # Flow
 
@@ -50,7 +61,7 @@ and fix the source code so the tests pass.
 ## deploy
 
 ```bash
-./scripts/deploy.sh
+./scripts/deploy.sh "$DEPLOY_TARGET"
 ```
 
 ## abort
@@ -69,6 +80,19 @@ exit 1
 | ` ```python ` | Script | `python3` |
 | ` ```js ` or ` ```javascript ` | Script | `node` |
 | Plain prose (no code block) | Agent | Configured agent CLI |
+
+### Inputs
+
+The optional `# Inputs` section declares workflow-level parameters:
+
+```markdown
+- `NAME` (required): description
+- `NAME` (optional): description
+- `NAME` (default: "value"): description
+- `NAME` (default: `value`): description
+```
+
+At runtime inputs are resolved from (highest priority first): `--input` flags, `--env <file>`, the workspace's `.env`, process environment, declared defaults. Required inputs with no value abort the run. All declared inputs are exported as environment variables to script steps and listed in the prompt for agent steps.
 
 ### Edge Annotations
 
@@ -96,19 +120,45 @@ flowchart TD
 ## CLI
 
 ```bash
-# Parse, validate, and execute a workflow
-markflow start <file> [--dry-run] [--no-parallel] [--agent <cli>] [--runs-dir <path>]
+# Create or update a workspace for a workflow
+markflow init <workflow.md> [--workspace <dir>] [--input KEY=VAL] [--force] [--remove]
 
-# List past runs
-markflow ls [--runs-dir <path>] [--json]
+# Execute a workflow (auto-inits the workspace if needed)
+markflow run <workflow.md | workspace-dir> [options]
+    --workspace <dir>       # override default workspace location
+    --env <file>            # extra env file
+    --input KEY=VAL         # repeatable input override
+    --dry-run               # validate only
+    --no-parallel           # run fan-outs sequentially
+    --agent <cli>           # override the agent CLI
+    --verbose / -v          # stream each step's stdout/stderr to the console
+    --debug                 # pause before each step for interactive inspection
+    --break-on <step>       # run until the named step, then pause (implies --debug)
+
+# List past runs in a workspace
+markflow ls <workspace-dir> [--json]
 
 # Show details of a specific run
-markflow run <id> [--runs-dir <path>] [--json]
+markflow show <run-id> [--workspace <dir>] [--json]
+
+# Execute a workflow directly without a workspace (advanced)
+markflow start <workflow.md> [--runs-dir <path>] ...
 ```
 
-Use `--dry-run` to validate a workflow without executing it.
+### Debugger
+
+`markflow run <workflow> --debug` pauses before each step and prints the node, inputs, outgoing edges, and prior step. At the prompt:
+
+- **[c]ontinue** — run the step normally
+- **[i]nspect** — dump the script body or the assembled agent prompt
+- **[s]kip** — short-circuit with a synthetic edge + summary (validated against outgoing edge labels)
+- **[q]uit** — abort the run
+
+`--break-on <step>` runs freely until it reaches the named step, then pauses there. Debug mode forces sequential execution (parallel + interactive stdin deadlocks).
 
 ## Library Usage
+
+### Running workflows programmatically
 
 ```typescript
 import {
@@ -126,30 +176,77 @@ if (diagnostics.some(d => d.severity === "error")) {
 }
 
 const runInfo = await executeWorkflow(definition, {
+  inputs: { DEPLOY_TARGET: "staging" },
   onEvent: (event) => console.log(event),
 });
 ```
 
+### Testing workflows
+
+The `markflow/testing` entry point provides `WorkflowTest`, a harness that injects synthetic step results through the `beforeStep` hook so tests run fast with no network or agent calls.
+
+```typescript
+import { WorkflowTest } from "markflow/testing";
+
+const wft = await WorkflowTest.fromFile("./ci.md");
+
+// Single mock — every call to this node returns the same result
+wft.mock("fetch-ticket", { edge: "pass", summary: "Fetched TKT-123" });
+
+// Sequential — each call consumes the next entry; last entry repeats
+wft.mock("test", [{ edge: "fail" }, { edge: "fail" }, { edge: "pass" }]);
+
+const result = await wft.run({
+  inputs: { DEPLOY_TARGET: "staging" },
+  // Optional: prepare the run workspace before execution (for fixture files)
+  workspaceSetup: async (dir) => {
+    await writeFile(join(dir, "ticket.json"), JSON.stringify(fixture));
+  },
+});
+
+expect(result.status).toBe("complete");
+expect(result.callCount("test")).toBe(3);
+expect(result.edgeTaken("test", 1)).toBe("fail");
+expect(result.edgeTaken("test", 3)).toBe("pass");
+expect(result.events.filter(e => e.type === "retry:increment")).toHaveLength(2);
+```
+
+Unmocked steps run for real — mock only the steps you need to isolate.
+
 ## How It Works
 
-- **Parser** extracts the workflow name, Mermaid flowchart, and step definitions from the `.md` file.
-- **Validator** checks structural correctness before execution: node-step matching, retry handler completeness, edge label uniqueness.
-- **Engine** uses a token-based execution model that supports linear flows, branching, parallel fan-out/fan-in, cycles, and retry logic.
-- **Routing** maps script exit codes to edges (`0` = pass/ok/success/done, non-zero = fail/error/retry). Scripts and agents can also emit `RESULT: {"edge": "...", "summary": "..."}` as the last stdout line for explicit control.
-- **Run history** is logged as JSONL in `runs/<timestamp>/context.jsonl`.
+- **Parser** extracts name, declared inputs, Mermaid topology, and step definitions.
+- **Validator** checks structural correctness: node-step matching, retry handler completeness, edge label uniqueness.
+- **Engine** runs a token-based execution loop — linear flows, branching, parallel fan-out/fan-in, cycles, and retry budgets.
+- **Routing** maps script exit codes to edges (`0` → pass/ok/success/done, non-zero → fail/error/retry). Scripts and agents can also emit `RESULT: {"edge": "...", "summary": "..."}` as the final stdout line for explicit control.
+- **Run history** is persisted as JSONL in `<workspace>/runs/<timestamp>/context.jsonl`.
 
 ## Configuration
 
-Place a `.workflow.json` next to your workflow file to override defaults:
+Place a `.workflow.json` next to your workflow `.md` file to override defaults:
 
 ```json
 {
   "agent": "claude",
-  "agent_flags": ["--dangerously-skip-permissions"],
+  "agent_flags": ["-p"],
   "max_retries_default": 3,
   "parallel": true
 }
 ```
+
+The assembled prompt is piped to the agent's stdin; argv contains only the flags in `agent_flags`. Set `agent_flags` to whatever puts your CLI into non-interactive mode — e.g. `["-p"]` for `claude` and `gemini`, or `["exec", "-"]` for `codex`. The default is `["-p"]`.
+
+Per-step overrides live in a fenced config block inside the step body:
+
+````markdown
+## analyze-ticket
+
+```json
+{ "agent": "gemini", "flags": ["-p"] }
+```
+
+You are a ticket analyst. …
+````
 
 ## Development
 
@@ -173,6 +270,10 @@ src/
     validator.ts  # Structural validation
     run-manager.ts
     context-logger.ts
-  cli/            # CLI wrapper (yargs)
-    commands/     # start, ls, run
+    env.ts        # Layered input resolution
+  cli/
+    commands/     # init, run, show, ls, start
+    debug.ts      # Interactive debugger hook
+    workspace.ts  # Workspace resolution helpers
+  testing/        # WorkflowTest harness (markflow/testing entry)
 ```

@@ -6,12 +6,15 @@ import {
   executeWorkflow,
   type EngineEvent,
 } from "../../core/index.js";
+import { parseInputFlags } from "../workspace.js";
 
 export interface StartOptions {
   dryRun?: boolean;
   parallel?: boolean;
   agent?: string;
   runsDir?: string;
+  envFile?: string;
+  input?: string[];
 }
 
 export async function startCommand(
@@ -77,9 +80,20 @@ export async function startCommand(
   if (options.parallel !== undefined) configOverrides.parallel = options.parallel;
   if (options.agent) configOverrides.agent = options.agent;
 
+  // Parse --input KEY=VALUE entries into a record
+  let inputs: Record<string, string>;
+  try {
+    inputs = parseInputFlags(options.input);
+  } catch (err) {
+    console.error(chalk.red((err as Error).message));
+    process.exit(1);
+  }
+
   const runInfo = await executeWorkflow(definition, {
     config: configOverrides,
     runsDir: options.runsDir,
+    envFile: options.envFile,
+    inputs,
     onEvent: printEvent,
   });
 

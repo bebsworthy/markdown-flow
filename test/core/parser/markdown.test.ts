@@ -50,6 +50,91 @@ describe("parseMarkdownSections", () => {
     expect(() => parseMarkdownSections(source)).toThrow("# Steps");
   });
 
+  it("parses an Inputs section", () => {
+    const source = `# My Workflow
+
+# Inputs
+
+- \`ISSUE_NUMBER\` (required): The GitHub issue number
+- \`REPO\` (default: \`owner/repo\`): Repository in owner/repo format
+- \`LABEL\` (optional): Filter by label
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  A --> B
+\`\`\`
+
+# Steps
+
+## A
+
+\`\`\`bash
+echo hi
+\`\`\`
+
+## B
+
+\`\`\`bash
+echo done
+\`\`\``;
+
+    const sections = parseMarkdownSections(source);
+    expect(sections.inputs).toHaveLength(3);
+
+    const [req, def, opt] = sections.inputs;
+    expect(req).toEqual({ name: "ISSUE_NUMBER", required: true, description: "The GitHub issue number" });
+    expect(def).toEqual({ name: "REPO", required: false, default: "owner/repo", description: "Repository in owner/repo format" });
+    expect(opt).toEqual({ name: "LABEL", required: false, description: "Filter by label" });
+  });
+
+  it("returns empty inputs array when no Inputs section exists", () => {
+    const source = readFileSync(join(FIXTURES, "linear.md"), "utf-8");
+    const sections = parseMarkdownSections(source);
+    expect(sections.inputs).toEqual([]);
+  });
+
+  it("parses a config block in an agent step", () => {
+    const source = `# My Workflow
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  A --> B
+\`\`\`
+
+# Steps
+
+## A
+
+\`\`\`config
+agent: gpt4
+flags:
+  - --temperature
+  - "0.2"
+\`\`\`
+
+Analyze the issue and summarize.
+
+## B
+
+\`\`\`bash
+echo done
+\`\`\``;
+
+    const sections = parseMarkdownSections(source);
+    const stepA = sections.steps.find((s) => s.id === "A")!;
+    expect(stepA.type).toBe("agent");
+    expect(stepA.content).toContain("Analyze the issue");
+    expect(stepA.agentConfig).toEqual({ agent: "gpt4", flags: ["--temperature", '"0.2"'] });
+
+    const stepB = sections.steps.find((s) => s.id === "B")!;
+    expect(stepB.type).toBe("script");
+    expect(stepB.agentConfig).toBeUndefined();
+  });
+
   it("throws on unsupported code block language", () => {
     const source = `# Test
 

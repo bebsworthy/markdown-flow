@@ -7,6 +7,7 @@ import {
   parseWorkflowFromString,
   executeWorkflow,
   type EngineEvent,
+  type BeforeStepContext,
 } from "../../src/core/index.js";
 
 const FIXTURES = join(import.meta.dirname, "../fixtures");
@@ -64,6 +65,261 @@ describe("WorkflowEngine", () => {
     // merge should be last
     const lastStep = runInfo.steps[runInfo.steps.length - 1];
     expect(lastStep.node).toBe("merge");
+  });
+
+  it("throws on missing required inputs", async () => {
+    const source = `# Test Workflow
+
+# Inputs
+
+- \`ISSUE_NUMBER\` (required): The issue number
+- \`REPO\` (default: "owner/repo"): The repo
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  step --> done
+\`\`\`
+
+# Steps
+
+## step
+
+\`\`\`bash
+echo "issue: $ISSUE_NUMBER repo: $REPO"
+\`\`\`
+
+## done
+
+\`\`\`bash
+echo ok
+\`\`\``;
+
+    const def = parseWorkflowFromString(source);
+
+    // No inputs provided — ISSUE_NUMBER is required
+    await expect(
+      executeWorkflow(def, { runsDir: tempRunsDir }),
+    ).rejects.toThrow("Missing required workflow inputs: ISSUE_NUMBER");
+  });
+
+  it("resolves inputs: injects defaults and provided values into script env", async () => {
+    const source = `# Test Workflow
+
+# Inputs
+
+- \`GREETING\` (required): A greeting word
+- \`NAME\` (default: "World"): A name
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  greet --> done
+\`\`\`
+
+# Steps
+
+## greet
+
+\`\`\`bash
+echo "$GREETING $NAME"
+\`\`\`
+
+## done
+
+\`\`\`bash
+echo ok
+\`\`\``;
+
+    const def = parseWorkflowFromString(source);
+    const runInfo = await executeWorkflow(def, {
+      runsDir: tempRunsDir,
+      inputs: { GREETING: "Hello" },
+    });
+
+    expect(runInfo.status).toBe("complete");
+    const greetStep = runInfo.steps.find((s) => s.node === "greet")!;
+    expect(greetStep.summary).toContain("Hello World");
+  });
+
+  describe("beforeStep hook", () => {
+    const RETRY_WITH_START = `# Retry Loop
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  start --> check
+  check -->|pass| done
+  check -->|fail max:3| check
+  check -->|fail:max| abort
+\`\`\`
+
+# Steps
+
+## start
+\`\`\`bash
+echo "begin"
+\`\`\`
+
+## check
+\`\`\`bash
+echo "check"
+\`\`\`
+
+## done
+\`\`\`bash
+echo "done"
+\`\`\`
+
+## abort
+\`\`\`bash
+echo "abort" >&2
+\`\`\`
+`;
+
+    it("fires with correct context for each step", async () => {
+      const source = readFileSync(join(FIXTURES, "linear.md"), "utf-8");
+      const def = parseWorkflowFromString(source);
+      const contexts: BeforeStepContext[] = [];
+
+      await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        beforeStep: (ctx) => {
+          contexts.push(ctx);
+        },
+      });
+
+      expect(contexts.map((c) => c.nodeId)).toEqual(["setup", "build", "report"]);
+      for (const ctx of contexts) {
+        expect(ctx.callCount).toBe(1);
+        expect(ctx.step).toBeDefined();
+        expect(ctx.env.WORKFLOW_WORKSPACE).toBeDefined();
+        expect(Array.isArray(ctx.outgoingEdges)).toBe(true);
+      }
+    });
+
+    it("void directive lets the step run normally", async () => {
+      const source = readFileSync(join(FIXTURES, "linear.md"), "utf-8");
+      const def = parseWorkflowFromString(source);
+
+      const runInfo = await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        beforeStep: () => {
+          return; // void
+        },
+      });
+
+      expect(runInfo.status).toBe("complete");
+      // Real script execution produces exit_code 0
+      for (const step of runInfo.steps) {
+        expect(step.exit_code).toBe(0);
+      }
+    });
+
+    it("mock directive short-circuits execution", async () => {
+      const source = readFileSync(join(FIXTURES, "branch.md"), "utf-8");
+      const def = parseWorkflowFromString(source);
+
+      const runInfo = await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        beforeStep: (ctx) => {
+          if (ctx.nodeId === "check") {
+            return { edge: "fail", summary: "mocked-fail" };
+          }
+          return;
+        },
+      });
+
+      expect(runInfo.status).toBe("complete");
+      const checkStep = runInfo.steps.find((s) => s.node === "check")!;
+      expect(checkStep.edge).toBe("fail");
+      expect(checkStep.summary).toBe("mocked-fail");
+      expect(checkStep.exit_code).toBe(1); // script + edge="fail" default
+      // fail routes to notify, not deploy
+      expect(runInfo.steps.map((s) => s.node)).toContain("notify");
+    });
+
+    it("callCount increments across multiple invocations", async () => {
+      const def = parseWorkflowFromString(RETRY_WITH_START);
+      const counts: number[] = [];
+      let n = 0;
+
+      await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        beforeStep: (ctx) => {
+          if (ctx.nodeId === "check") {
+            counts.push(ctx.callCount);
+            n++;
+            return n < 3 ? { edge: "fail" } : { edge: "pass" };
+          }
+          return;
+        },
+      });
+
+      expect(counts).toEqual([1, 2, 3]);
+    });
+
+    it("emits retry:increment events during retry loop", async () => {
+      const def = parseWorkflowFromString(RETRY_WITH_START);
+      const events: EngineEvent[] = [];
+      let n = 0;
+
+      await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        onEvent: (e) => events.push(e),
+        beforeStep: (ctx) => {
+          if (ctx.nodeId === "check") {
+            n++;
+            return n < 3 ? { edge: "fail" } : { edge: "pass" };
+          }
+          return;
+        },
+      });
+
+      const retryEvents = events.filter((e) => e.type === "retry:increment");
+      expect(retryEvents).toHaveLength(2);
+    });
+
+    it("pre-assembles prompt for agent steps", async () => {
+      const source = `# Agent Workflow
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  think --> done
+\`\`\`
+
+# Steps
+
+## think
+
+Analyze the situation and return a decision.
+
+## done
+
+\`\`\`bash
+echo ok
+\`\`\`
+`;
+      const def = parseWorkflowFromString(source);
+      const captured: Record<string, string | undefined> = {};
+
+      await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        beforeStep: (ctx) => {
+          captured[ctx.nodeId] = ctx.prompt;
+          return { edge: ctx.step.type === "agent" ? "done" : "pass" };
+        },
+      });
+
+      expect(captured.think).toBeDefined();
+      expect(captured.think).toContain("Analyze");
+      expect(captured.done).toBeUndefined();
+    });
   });
 
   it("routes correctly based on exit code", async () => {
