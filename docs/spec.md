@@ -258,7 +258,7 @@ The engine streams stdout, intercepting three sentinel prefixes on their own lin
 
 - `STATE: {...}` — shallow-merged into this step's `state` (accumulates across multiple lines).
 - `GLOBAL: {...}` — shallow-merged into the workflow-wide `global` context (visible to every subsequent step via `$GLOBAL` / `$STEPS`).
-- `RESULT: {"edge": "...", "summary": "..."}` — the terminal routing decision. Must appear exactly once. Including `state` or `global` keys inside RESULT is an error and fails the step.
+- `RESULT: {"edge": "...", "summary": "..."}` — the terminal routing decision. Optional: when omitted (or emitted without an `edge` key), the engine defaults to `edge: "next"` on exit 0 and `edge: "fail"` on non-zero exit — the same rule for script and agent steps. May appear at most once. Including `state` or `global` keys inside RESULT is an error and fails the step.
 
 Everything else in stdout is logged unchanged and ignored by the engine. Sentinel-looking lines whose JSON is malformed are treated as prose.
 
@@ -291,7 +291,7 @@ After each step completes the engine records a result object in `context.json`:
 }
 ```
 
-For agent steps, `edge` and `summary` come from the parsed `RESULT:` JSON. For script steps, `summary` is set to stdout of the process (truncated to 500 chars). `edge` is derived from the exit code and routing rules.
+`edge` and `summary` come from the parsed `RESULT:` JSON for both step types. When RESULT is missing or has no `edge` key, `edge` defaults to `"next"` on exit 0 and `"fail"` on non-zero exit. For script steps, `summary` falls back to the step's stdout (truncated to 500 chars) when not explicitly provided.
 
 ---
 
@@ -299,22 +299,14 @@ For agent steps, `edge` and `summary` come from the parsed `RESULT:` JSON. For s
 
 ### Edge Resolution
 
-Given the set of outgoing edges from a completed node and its result, the engine selects the next node as follows:
+Given the set of outgoing edges from a completed node and its `result.edge`, the engine selects the next node as follows:
 
-1. If the node has exactly one outgoing edge, follow it regardless of label.
-2. If the node has multiple outgoing edges, match the result edge label to an outgoing edge label.
-3. If no matching edge is found, halt the workflow with a routing error.
-
-### Exit Code to Edge Mapping for Scripts
-
-If a script step has labelled outgoing edges, the engine maps exit codes as follows:
-
-| Exit code | Edge followed |
-|---|---|
-| `0` | First edge labelled `pass`, `ok`, `success`, or `done`. If none, the single unlabelled edge. |
-| Non-zero | First edge labelled `fail`, `error`, or `retry`. If none, halt with error. |
-
-If a script needs fine-grained edge control it can emit `RESULT: {"edge": "..."}` as its last stdout line, which takes precedence over exit code mapping.
+1. **Single outgoing edge** — follow it regardless of label.
+2. **Fan-out** — if all outgoing edges are unlabelled and point to distinct targets, run them in parallel.
+3. **Exact label match** — find an outgoing edge whose label equals `result.edge`.
+4. **Synonym groups** — treat `next` / `pass` / `ok` / `success` / `done` as interchangeable success signals, and `fail` / `error` / `retry` as interchangeable failure signals. A step that emits (or defaults to) `edge: "next"` therefore routes to an existing `pass`-labelled edge.
+5. **Unlabelled catch-all** — if one of the outgoing edges has no label, it catches any result that didn't match above. This lets you write `A -->|classified| B` next to `A --> fallback` and get an explicit `else` branch without enumerating every possible label.
+6. **No match** — halt the workflow with a routing error.
 
 ### Retry Accounting
 

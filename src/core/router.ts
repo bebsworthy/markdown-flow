@@ -17,8 +17,12 @@ export interface RouteDecision {
   retryIncrement?: { label: string; count: number; max: number };
 }
 
-const SUCCESS_LABELS = ["pass", "ok", "success", "done"];
+const SUCCESS_LABELS = ["next", "pass", "ok", "success", "done"];
 const FAILURE_LABELS = ["fail", "error", "retry"];
+
+function inGroup(label: string | undefined, group: string[]): boolean {
+  return typeof label === "string" && group.includes(label);
+}
 
 /**
  * Resolve which edge(s) to follow after a node completes.
@@ -63,28 +67,26 @@ export function resolveRoute(
     // Single outgoing edge — follow it regardless of label
     matchedEdge = normalEdges[0];
   } else {
-    // Multiple outgoing edges — match by result edge label
+    // 1. Exact label match
     const edgeLabel = result.edge;
     matchedEdge = normalEdges.find((e) => e.label === edgeLabel);
 
-    // If no match and step is a script, try exit code mapping
-    if (!matchedEdge && result.type === "script" && result.exit_code !== null) {
-      if (result.exit_code === 0) {
-        matchedEdge = normalEdges.find(
-          (e) => e.label && SUCCESS_LABELS.includes(e.label),
-        );
-      } else {
-        matchedEdge = normalEdges.find(
-          (e) => e.label && FAILURE_LABELS.includes(e.label),
-        );
+    // 2. Synonym group match — `next`/`pass`/`ok`/`success`/`done` are
+    //    treated as interchangeable success signals; `fail`/`error`/`retry`
+    //    as interchangeable failure signals. Lets silent exit-0 steps
+    //    (default edge "next") route to an existing `pass` branch, and
+    //    keeps pre-existing `pass`/`done` flows working unchanged.
+    if (!matchedEdge) {
+      if (inGroup(edgeLabel, SUCCESS_LABELS)) {
+        matchedEdge = normalEdges.find((e) => inGroup(e.label, SUCCESS_LABELS));
+      } else if (inGroup(edgeLabel, FAILURE_LABELS)) {
+        matchedEdge = normalEdges.find((e) => inGroup(e.label, FAILURE_LABELS));
       }
     }
 
-    // Last resort: if there's exactly one unlabelled edge, use it
-    if (!matchedEdge) {
-      if (unlabelled.length === 1) {
-        matchedEdge = unlabelled[0];
-      }
+    // 3. Unlabelled edge as catch-all
+    if (!matchedEdge && unlabelled.length > 0) {
+      matchedEdge = unlabelled[0];
     }
   }
 

@@ -48,7 +48,7 @@ describe("resolveRoute", () => {
     expect(decision.targets[0].nodeId).toBe("C");
   });
 
-  it("maps exit code 0 to success labels", () => {
+  it("treats `next` as a synonym for `pass` / `ok` / `success` / `done`", () => {
     const graph: FlowGraph = {
       nodes: new Map([
         ["A", { id: "A" }],
@@ -60,12 +60,12 @@ describe("resolveRoute", () => {
         { from: "A", to: "C", label: "fail", annotations: {} },
       ],
     };
-    const result = makeResult({ node: "A", edge: "nomatch", exit_code: 0 });
+    const result = makeResult({ node: "A", edge: "next", exit_code: 0 });
     const decision = resolveRoute(graph, "A", result, createRetryState(), DEFAULT_CONFIG);
     expect(decision.targets[0].nodeId).toBe("B");
   });
 
-  it("maps non-zero exit code to failure labels", () => {
+  it("treats `error` as a synonym for `fail` / `retry`", () => {
     const graph: FlowGraph = {
       nodes: new Map([
         ["A", { id: "A" }],
@@ -77,9 +77,43 @@ describe("resolveRoute", () => {
         { from: "A", to: "C", label: "fail", annotations: {} },
       ],
     };
-    const result = makeResult({ node: "A", edge: "nomatch", exit_code: 1 });
+    const result = makeResult({ node: "A", edge: "error", exit_code: 1 });
     const decision = resolveRoute(graph, "A", result, createRetryState(), DEFAULT_CONFIG);
     expect(decision.targets[0].nodeId).toBe("C");
+  });
+
+  it("falls back to unlabelled edge as catch-all when no label matches", () => {
+    const graph: FlowGraph = {
+      nodes: new Map([
+        ["A", { id: "A" }],
+        ["B", { id: "B" }],
+        ["C", { id: "C" }],
+      ]),
+      edges: [
+        { from: "A", to: "B", label: "classified", annotations: {} },
+        { from: "A", to: "C", annotations: {} }, // unlabelled catch-all
+      ],
+    };
+    const result = makeResult({ node: "A", edge: "anything-else" });
+    const decision = resolveRoute(graph, "A", result, createRetryState(), DEFAULT_CONFIG);
+    expect(decision.targets[0].nodeId).toBe("C");
+  });
+
+  it("prefers exact label match over unlabelled catch-all", () => {
+    const graph: FlowGraph = {
+      nodes: new Map([
+        ["A", { id: "A" }],
+        ["B", { id: "B" }],
+        ["C", { id: "C" }],
+      ]),
+      edges: [
+        { from: "A", to: "B", label: "classified", annotations: {} },
+        { from: "A", to: "C", annotations: {} },
+      ],
+    };
+    const result = makeResult({ node: "A", edge: "classified" });
+    const decision = resolveRoute(graph, "A", result, createRetryState(), DEFAULT_CONFIG);
+    expect(decision.targets[0].nodeId).toBe("B");
   });
 
   it("respects retry budget and follows exhaustion handler", () => {

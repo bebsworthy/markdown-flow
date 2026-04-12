@@ -33,7 +33,6 @@ via `${GLOBAL.labels_markdown}`.
 LABELS=$(gh label list --json name,description)
 MD=$(jq -r '.[] | "- `\(.name)` — \(if .description == "" then "(no description)" else .description end)"' <<< "$LABELS")
 echo "GLOBAL: $(jo labels_markdown="$MD")"
-echo "RESULT: $(jo edge=pass)"
 ```
 
 ## emit
@@ -90,7 +89,6 @@ agent: claude
 flags:
   - --model
   - haiku
-  - -p
 ```
 
 Classify this GitHub issue into exactly one label.

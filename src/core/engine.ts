@@ -315,13 +315,13 @@ export class WorkflowEngine {
     if (output.parsedResult?.edge) {
       edge = output.parsedResult.edge;
       summary = output.parsedResult.summary ?? "";
-    } else if (step.type === "script") {
-      // Derive edge from exit code — will be resolved by router
-      edge = output.exitCode === 0 ? "pass" : "fail";
-      summary = output.stdout.slice(0, 500).trim();
     } else {
-      edge = "done";
-      summary = "";
+      // No explicit edge → unified default: exit 0 → "next", otherwise "fail".
+      // Applies equally to script and agent steps (agent execution errors such
+      // as CLI-not-found or stream parse errors force a non-zero exit code in
+      // runner/agent.ts, so they land on "fail" here).
+      edge = output.exitCode === 0 ? "next" : "fail";
+      summary = step.type === "script" ? output.stdout.slice(0, 500).trim() : output.parsedResult?.summary ?? "";
     }
 
     const result: StepResult = {
