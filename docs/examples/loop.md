@@ -99,9 +99,8 @@ Classify this GitHub issue into exactly one label from the list below.
 
 Pick exactly one from:
 
-{% for l in GLOBAL.labels -%}
-- `{{ l.name }}` — {{ l.description | default: "(no description)" }}
-{% endfor %}
+{{ GLOBAL.labels | list: "name,description" }}
+
 Emit `STATE: {"label": "<choice>"}` so the next step can pick it up.
 
 ## apply

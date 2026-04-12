@@ -1,4 +1,5 @@
 import { Liquid, LiquidError } from "liquidjs";
+import { registerMarkdownFilters } from "./template-filters.js";
 
 export interface TemplateContext {
   /** Flat string variables (inputs, MARKFLOW_*, STATE/GLOBAL JSON strings). */
@@ -12,6 +13,7 @@ const engine = new Liquid({
   strictVariables: true,
   strictFilters: true,
 });
+registerMarkdownFilters(engine);
 
 const TEMPLATE_HINT_RE = /\{\{|\{%/;
 

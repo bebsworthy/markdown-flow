@@ -210,8 +210,24 @@ The prompt body is **verbatim** — everything between the optional ` ```config 
 | `{{ STEPS.<node>.summary }}` / `{{ STEPS.<node>.edge }}` | Prior step's summary or routing edge. |
 | `{% for x in GLOBAL.items %}...{% endfor %}` | Iterate over arrays — keeps producer steps free of consumer-specific formatting. |
 | `{% if ... %}...{% endif %}` | Conditional sections. |
-| `{{ value \| default: "..." }}` | Filters — `default`, `upcase`, `size`, `escape`, `join` are the officially supported set. |
+| `{{ value \| default: "..." }}` | Built-in Liquid filters — `default`, `upcase`, `size`, `escape`, `join` are the officially supported set. |
 | `{% raw %}{{ VAR }}{% endraw %}` | Escape — emits the literal `{{ VAR }}` with no substitution. |
+
+**Markdown filters.** The engine also registers a set of custom filters tuned for producing markdown inside agent prompts:
+
+| Filter | Example | Output |
+|---|---|---|
+| `json` | `{{ obj \| json }}` | Pretty-printed JSON (2-space indent). |
+| `json: "a,b"` | `{{ obj \| json: "name,age" }}` | JSON, filtered to the named fields (applies per-element for arrays). |
+| `yaml` / `yaml: "a,b"` | `{{ obj \| yaml }}` | YAML representation, with optional field filter. |
+| `list` | `{{ xs \| list: "name,description" }}` | Bullet list. First field becomes `` `code` `` header; remaining fields join with ` — `. Primitives render as `- value`. |
+| `table` | `{{ xs \| table: "name,age" }}` | Markdown table; nested object cells become JSON; `\|` is escaped. At least one field is required. |
+| `code` | `{{ text \| code: "json" }}` | Wraps in a fenced code block. Language argument is optional (empty fence by default). Composes cleanly: `{{ obj \| json \| code: "json" }}`. |
+| `heading: N` | `{{ title \| heading: 2 }}` | Prefixes `N` `#` characters (clamped to 1–6). |
+| `quote` | `{{ text \| quote }}` | Prefixes every line with `> `. |
+| `indent: N` | `{{ text \| indent: 4 }}` | Pads every line with `N` spaces. |
+| `pluck: "field"` | `{{ xs \| pluck: "name" \| join: ", " }}` | Extracts one field from each object in an array. |
+| `keys` / `values` | `{{ obj \| keys \| join: "," }}` | Object introspection. |
 
 If a referenced variable, namespace, or dotted path does not resolve, the step fails with an error naming the missing reference and the step id. There is no silent fallback — authors get a loud signal that context they expected isn't there.
 
@@ -234,9 +250,8 @@ Classify this issue into exactly one label.
 **Body:** {{ GLOBAL.item.body | default: "(no body)" }}
 
 Pick one of:
-{% for l in GLOBAL.labels -%}
-- `{{ l.name }}` — {{ l.description | default: "(no description)" }}
-{% endfor %}
+
+{{ GLOBAL.labels | list: "name,description" }}
 ```
 
 **Trailing protocol block.** After the rendered body the engine appends a short fixed block describing the sentinel protocol:
