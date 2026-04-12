@@ -25,14 +25,14 @@ flowchart TD
 
 ## labels
 
-Fetch the repo's label catalogue once and stash a markdown-formatted list on
-the workflow-wide global context so the classifier prompt can splice it in
-via `${GLOBAL.labels_markdown}`.
+Fetch the repo's label catalogue once and publish the raw array on the
+workflow-wide global context. The classifier prompt iterates over it inline
+via Liquid, so producer and consumer stay decoupled — this step doesn't need
+to know how the labels are presented.
 
 ```bash
 LABELS=$(gh label list --json name,description)
-MD=$(jq -r '.[] | "- `\(.name)` — \(if .description == "" then "(no description)" else .description end)"' <<< "$LABELS")
-echo "GLOBAL: $(jo labels_markdown="$MD")"
+echo "GLOBAL: $(jq -nc --argjson labels "$LABELS" '{labels: $labels}')"
 ```
 
 ## emit
@@ -92,15 +92,16 @@ flags:
 
 Classify this GitHub issue into exactly one label from the list below.
 
-**Title:** ${GLOBAL.item.title}
+**Title:** {{ GLOBAL.item.title }}
 
 **Body:**
-${GLOBAL.item.body}
+{{ GLOBAL.item.body | default: "(no body)" }}
 
 Pick exactly one from:
 
-${GLOBAL.labels_markdown}
-
+{% for l in GLOBAL.labels -%}
+- `{{ l.name }}` — {{ l.description | default: "(no description)" }}
+{% endfor %}
 Emit `STATE: {"label": "<choice>"}` so the next step can pick it up.
 
 ## apply

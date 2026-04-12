@@ -200,35 +200,43 @@ Environment variables injected by the engine:
 
 The prompt body is **verbatim** — everything between the optional ` ```config ` block and the next `## <step>` heading is used as-is, including lists, sub-headings, nested fenced blocks, and blockquotes. The engine does **not** inject a "Workflow Context" section or auto-list completed steps. The author decides exactly what context a step needs by referencing it explicitly through template substitution.
 
-**Template substitution.** Before the body is sent to the agent CLI, the engine rewrites these forms (see `$STEPS` / `$STATE` / `$GLOBAL` shapes in the env-var table above):
+**Template substitution.** Before the body is sent to the agent CLI, the engine renders it as a [Liquid](https://liquidjs.com/) template (strict mode — undefined references hard-fail). The following forms are available (see `$STEPS` / `$STATE` / `$GLOBAL` shapes in the env-var table above):
 
 | Form | Meaning |
 |---|---|
-| `${NAME}` | Flat variable (inputs, `MARKFLOW_*`, etc.). First identifier must be uppercase. |
-| `${GLOBAL.path.to.key}` | Dotted path into the workflow-wide global context. |
-| `${STEPS.<node>.state.<key>}` | State value emitted by an earlier step. |
-| `${STEPS.<node>.summary}` / `${STEPS.<node>.edge}` | Prior step's summary or routing edge. |
-| `$${NAME}` | Escape — emits the literal `${NAME}` with no substitution. |
+| `{{ NAME }}` | Flat variable (inputs, `MARKFLOW_*`, etc.). |
+| `{{ GLOBAL.path.to.key }}` | Dotted path into the workflow-wide global context. |
+| `{{ STEPS.<node>.state.<key> }}` | State value emitted by an earlier step. |
+| `{{ STEPS.<node>.summary }}` / `{{ STEPS.<node>.edge }}` | Prior step's summary or routing edge. |
+| `{% for x in GLOBAL.items %}...{% endfor %}` | Iterate over arrays — keeps producer steps free of consumer-specific formatting. |
+| `{% if ... %}...{% endif %}` | Conditional sections. |
+| `{{ value \| default: "..." }}` | Filters — `default`, `upcase`, `size`, `escape`, `join` are the officially supported set. |
+| `{% raw %}{{ VAR }}{% endraw %}` | Escape — emits the literal `{{ VAR }}` with no substitution. |
 
-If a referenced variable, namespace, or dotted path does not resolve, the step fails with an error naming the missing reference. There is no silent fallback — authors get a loud signal that context they expected isn't there.
+If a referenced variable, namespace, or dotted path does not resolve, the step fails with an error naming the missing reference and the step id. There is no silent fallback — authors get a loud signal that context they expected isn't there.
 
-Example — a classifier that pulls only the fields it needs:
+> **Whitespace.** Liquid preserves newlines around tags by default. Use the trim markers `{%-` and `-%}` (or `{{-` / `-}}`) when iterating inline to avoid stray blank lines in the rendered prompt.
+
+Example — a classifier that iterates over a raw list emitted by an earlier step:
 
 ```markdown
 ## classify
 
 \`\`\`config
 agent: claude
-flags: [--model, haiku, -p]
+flags: [--model, haiku]
 \`\`\`
 
 Classify this issue into exactly one label.
 
-**Title:** ${STEPS.emit.state.item.title}
+**Title:** {{ GLOBAL.item.title }}
 
-**Body:** ${STEPS.emit.state.item.body}
+**Body:** {{ GLOBAL.item.body | default: "(no body)" }}
 
-Pick one of: `Bug`, `Improvement`, `Maintenance`, `Other`.
+Pick one of:
+{% for l in GLOBAL.labels -%}
+- `{{ l.name }}` — {{ l.description | default: "(no description)" }}
+{% endfor %}
 ```
 
 **Trailing protocol block.** After the rendered body the engine appends a short fixed block describing the sentinel protocol:
@@ -240,8 +248,8 @@ The last line of your response MUST be exactly:
 RESULT: {"edge": "<label>", "summary": "<one sentence>"}
 
 You MAY emit zero or more STATE/GLOBAL lines anywhere before that:
-STATE:  {...}   merges into this step's own state (visible as ${STEPS.<id>.state.*} to later steps)
-GLOBAL: {...}   merges into the workflow-wide global (visible as ${GLOBAL.*} to later steps)
+STATE:  {...}   merges into this step's own state (visible as {{ STEPS.<id>.state.* }} to later steps)
+GLOBAL: {...}   merges into the workflow-wide global (visible as {{ GLOBAL.* }} to later steps)
 
 Multiple STATE or GLOBAL lines shallow-merge (later keys win). Do NOT put "state" or "global" keys inside RESULT.
 ```

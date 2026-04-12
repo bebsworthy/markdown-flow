@@ -6,67 +6,89 @@ describe("hasTemplateVars", () => {
     expect(hasTemplateVars("no variables here")).toBe(false);
   });
 
-  it("returns true when ${VAR} is present", () => {
-    expect(hasTemplateVars("hello ${NAME}")).toBe(true);
+  it("returns true when {{ VAR }} is present", () => {
+    expect(hasTemplateVars("hello {{ NAME }}")).toBe(true);
   });
 
-  it("returns true for escaped $${VAR} (still counts as template syntax)", () => {
-    expect(hasTemplateVars("literal $${VAR}")).toBe(true);
+  it("returns true when a Liquid tag is present", () => {
+    expect(hasTemplateVars("{% for x in items %}{{ x }}{% endfor %}")).toBe(true);
   });
 
-  it("ignores lowercase ${var}", () => {
-    expect(hasTemplateVars("hello ${name}")).toBe(false);
+  it("ignores shell-style ${VAR}", () => {
+    expect(hasTemplateVars("hello ${NAME}")).toBe(false);
   });
 });
 
 describe("renderTemplate", () => {
   it("substitutes a single variable", () => {
-    expect(renderTemplate("hello ${NAME}", { NAME: "world" }, "s1")).toBe(
+    expect(renderTemplate("hello {{ NAME }}", { NAME: "world" }, "s1")).toBe(
       "hello world",
     );
   });
 
   it("substitutes multiple variables", () => {
     const result = renderTemplate(
-      "Review ${REPO} for ${CRITERIA}",
+      "Review {{ REPO }} for {{ CRITERIA }}",
       { REPO: "my-app", CRITERIA: "security" },
       "s1",
     );
     expect(result).toBe("Review my-app for security");
   });
 
-  it("substitutes the same variable multiple times", () => {
-    expect(
-      renderTemplate("${X} and ${X}", { X: "ok" }, "s1"),
-    ).toBe("ok and ok");
-  });
-
-  it("handles variables with underscores and numbers", () => {
-    expect(
-      renderTemplate("${MY_VAR_2}", { MY_VAR_2: "val" }, "s1"),
-    ).toBe("val");
-  });
-
-  it("substitutes to empty string for empty values", () => {
-    expect(renderTemplate("a${X}b", { X: "" }, "s1")).toBe("ab");
-  });
-
-  it("throws on undefined variable with helpful message", () => {
-    expect(() => renderTemplate("${MISSING}", { OTHER: "x" }, "review")).toThrow(
-      'Template variable "${MISSING}" in step "review" is not defined. Available: OTHER',
+  it("resolves dotted-path references via namespaces", () => {
+    const result = renderTemplate(
+      "Title: {{ GLOBAL.item.title }}",
+      { vars: {}, namespaces: { GLOBAL: { item: { title: "My ticket" } } } },
+      "s1",
     );
+    expect(result).toBe("Title: My ticket");
   });
 
-  it("escapes $${VAR} to literal ${VAR}", () => {
-    expect(renderTemplate("use $${VAR} syntax", {}, "s1")).toBe(
-      "use ${VAR} syntax",
+  it("iterates over arrays with {% for %}", () => {
+    const result = renderTemplate(
+      "{% for l in GLOBAL.labels %}- {{ l.name }}\n{% endfor %}",
+      {
+        vars: {},
+        namespaces: {
+          GLOBAL: {
+            labels: [{ name: "Bug" }, { name: "Feature" }, { name: "Docs" }],
+          },
+        },
+      },
+      "s1",
     );
+    expect(result).toBe("- Bug\n- Feature\n- Docs\n");
   });
 
-  it("does not recurse into substituted values", () => {
+  it("supports the `default` filter", () => {
+    const result = renderTemplate(
+      "Body: {{ GLOBAL.item.body | default: '(empty)' }}",
+      { vars: {}, namespaces: { GLOBAL: { item: { body: "" } } } },
+      "s1",
+    );
+    expect(result).toBe("Body: (empty)");
+  });
+
+  it("throws on undefined variable with step-scoped message", () => {
+    expect(() =>
+      renderTemplate("{{ MISSING }}", { OTHER: "x" }, "review"),
+    ).toThrow(/Template error in step "review"/);
+  });
+
+  it("throws on undefined dotted path", () => {
+    expect(() =>
+      renderTemplate(
+        "{{ STEPS.ghost.state.x }}",
+        { vars: {}, namespaces: { STEPS: {} } },
+        "review",
+      ),
+    ).toThrow(/Template error in step "review"/);
+  });
+
+  it("{% raw %} preserves literal Liquid-looking text", () => {
     expect(
-      renderTemplate("${A}", { A: "${B}", B: "nope" }, "s1"),
-    ).toBe("${B}");
+      renderTemplate("use {% raw %}{{ VAR }}{% endraw %} syntax", {}, "s1"),
+    ).toBe("use {{ VAR }} syntax");
   });
 
   it("leaves text unchanged when no template vars present", () => {

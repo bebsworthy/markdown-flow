@@ -58,11 +58,11 @@ describe("runAgent prompt delivery", () => {
 });
 
 describe("assembleAgentPrompt templating", () => {
-  it("substitutes ${VAR} references in agent prompt", () => {
+  it("substitutes {{ VAR }} references in agent prompt", () => {
     const templatedStep: StepDefinition = {
       id: "review",
       type: "agent",
-      content: "Review ${REPO_PATH} for ${CRITERIA}.",
+      content: "Review {{ REPO_PATH }} for {{ CRITERIA }}.",
     };
     const prompt = assembleAgentPrompt(
       templatedStep,
@@ -72,8 +72,8 @@ describe("assembleAgentPrompt templating", () => {
       { REPO_PATH: "/src", CRITERIA: "security" },
     );
     expect(prompt).toContain("Review /src for security.");
-    expect(prompt).not.toContain("${REPO_PATH}");
-    expect(prompt).not.toContain("${CRITERIA}");
+    expect(prompt).not.toContain("{{ REPO_PATH }}");
+    expect(prompt).not.toContain("{{ CRITERIA }}");
   });
 
   it("does not include a Workflow Inputs section", () => {
@@ -91,7 +91,7 @@ describe("assembleAgentPrompt templating", () => {
     const prevStep: StepDefinition = {
       id: "summarize",
       type: "agent",
-      content: "Previous step said: ${MARKFLOW_PREV_SUMMARY}",
+      content: "Previous step said: {{ MARKFLOW_PREV_SUMMARY }}",
     };
     const prompt = assembleAgentPrompt(
       prevStep,

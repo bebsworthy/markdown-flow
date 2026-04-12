@@ -427,12 +427,12 @@ describe("Agent prompt template access to prior step state", () => {
     expect(prompt).not.toContain("Workflow Context");
   });
 
-  it("substitutes ${STEPS.<id>.state.*} paths in the prompt body", () => {
+  it("substitutes {{ STEPS.<id>.state.* }} paths in the prompt body", () => {
     const prompt = assembleAgentPrompt(
       {
         id: "review",
         type: "agent",
-        content: "There are ${STEPS.fetch.state.count} issues from ${STEPS.fetch.state.source}.",
+        content: "There are {{ STEPS.fetch.state.count }} issues from {{ STEPS.fetch.state.source }}.",
       },
       context,
       ["pass", "fail"],
@@ -441,12 +441,12 @@ describe("Agent prompt template access to prior step state", () => {
     expect(prompt).toContain("There are 3 issues from github.");
   });
 
-  it("substitutes ${STEPS.<id>.summary} and ${STEPS.<id>.edge}", () => {
+  it("substitutes {{ STEPS.<id>.summary }} and {{ STEPS.<id>.edge }}", () => {
     const prompt = assembleAgentPrompt(
       {
         id: "review",
         type: "agent",
-        content: "Fetch said '${STEPS.fetch.summary}' and took edge ${STEPS.fetch.edge}.",
+        content: "Fetch said '{{ STEPS.fetch.summary }}' and took edge {{ STEPS.fetch.edge }}.",
       },
       context,
       ["pass", "fail"],
@@ -455,12 +455,12 @@ describe("Agent prompt template access to prior step state", () => {
     expect(prompt).toContain("Fetch said 'fetched 3 issues' and took edge pass.");
   });
 
-  it("substitutes ${GLOBAL.*} paths", () => {
+  it("substitutes {{ GLOBAL.* }} paths", () => {
     const prompt = assembleAgentPrompt(
       {
         id: "review",
         type: "agent",
-        content: "Using ${GLOBAL.api_base}",
+        content: "Using {{ GLOBAL.api_base }}",
       },
       context,
       ["pass"],
@@ -471,18 +471,45 @@ describe("Agent prompt template access to prior step state", () => {
     expect(prompt).toContain("Using https://example.com");
   });
 
+  it("iterates over a STEPS.<id>.state.* array with {% for %}", () => {
+    const ctxWithArray: StepResult[] = [
+      {
+        node: "fetch",
+        type: "script",
+        edge: "pass",
+        summary: "",
+        state: { labels: [{ name: "Bug" }, { name: "Feature" }] },
+        started_at: "",
+        completed_at: "",
+        exit_code: 0,
+      },
+    ];
+    const prompt = assembleAgentPrompt(
+      {
+        id: "review",
+        type: "agent",
+        content:
+          "Labels:\n{% for l in STEPS.fetch.state.labels %}- {{ l.name }}\n{% endfor %}",
+      },
+      ctxWithArray,
+      ["pass"],
+      "/tmp/workdir",
+    );
+    expect(prompt).toContain("- Bug\n- Feature\n");
+  });
+
   it("errors on unresolved STEPS path", () => {
     expect(() =>
       assembleAgentPrompt(
         {
           id: "review",
           type: "agent",
-          content: "${STEPS.nonexistent.state.x}",
+          content: "{{ STEPS.nonexistent.state.x }}",
         },
         context,
         ["pass"],
         "/tmp/workdir",
       ),
-    ).toThrow(/nonexistent/);
+    ).toThrow(/STEPS\.nonexistent/);
   });
 });
