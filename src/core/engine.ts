@@ -195,16 +195,17 @@ export class WorkflowEngine {
     // Build environment variables for script steps
     const env: Record<string, string> = {
       ...this.resolvedInputs,
-      WORKFLOW_RUN_DIR: this.runDir.path,
-      WORKFLOW_WORKSPACE: this.runDir.workspacePath,
+      MARKFLOW_STEP: token.nodeId,
+      MARKFLOW_RUNDIR: this.runDir.path,
+      MARKFLOW_WORKDIR: this.runDir.workdirPath,
+      ...(this.options.workspaceDir ? { MARKFLOW_WORKSPACE: this.options.workspaceDir } : {}),
     };
 
-    // Find the last result that routed to this node for PREV_ vars
     const prevResult = this.findPreviousResult(token.nodeId);
     if (prevResult) {
-      env.PREV_NODE = prevResult.node;
-      env.PREV_EDGE = prevResult.edge;
-      env.PREV_SUMMARY = prevResult.summary;
+      env.MARKFLOW_PREV_STEP = prevResult.node;
+      env.MARKFLOW_PREV_EDGE = prevResult.edge;
+      env.MARKFLOW_PREV_SUMMARY = prevResult.summary;
     }
 
     // Get outgoing edge labels for agent prompt
@@ -233,8 +234,8 @@ export class WorkflowEngine {
                 step,
                 this.completedResults,
                 edgeLabels,
-                this.runDir.workspacePath,
-                this.resolvedInputs,
+                this.runDir.workdirPath,
+                env,
               )
             : undefined,
       };
@@ -263,11 +264,10 @@ export class WorkflowEngine {
         step,
         this.completedResults,
         edgeLabels,
-        this.runDir.workspacePath,
+        this.runDir.workdirPath,
         env,
         this.runDir.path,
         this.config,
-        this.resolvedInputs,
         (stream, chunk) =>
           this.emit({ type: "step:output", nodeId: token.nodeId, stream, chunk }),
       );

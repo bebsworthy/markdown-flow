@@ -121,7 +121,7 @@ test/
 3. **Token model** for execution — supports cycles via `generation` counter; merge nodes wait for current generation only
 4. **Event callback** for engine observability — `onEvent: (event: EngineEvent) => void` — CLI formats for humans, library consumers do whatever they want
 5. **Script materialization** — write step code to temp file before execution (debuggable, works with all interpreters)
-6. **Environment variables** injected into script steps: `WORKFLOW_RUN_DIR`, `WORKFLOW_WORKSPACE`, `PREV_NODE`, `PREV_EDGE`, `PREV_SUMMARY`
+6. **Environment variables** injected into script steps: `MARKFLOW_STEP`, `MARKFLOW_RUNDIR`, `MARKFLOW_WORKDIR`, `MARKFLOW_PREV_STEP`, `MARKFLOW_PREV_EDGE`, `MARKFLOW_PREV_SUMMARY`
 
 ---
 

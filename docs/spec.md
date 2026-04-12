@@ -170,11 +170,13 @@ Environment variables injected by the engine:
 
 | Variable | Value |
 |---|---|
-| `WORKFLOW_RUN_DIR` | Absolute path to the run directory |
-| `WORKFLOW_WORKSPACE` | Absolute path to `workspace/` |
-| `PREV_NODE` | ID of the previous node |
-| `PREV_EDGE` | Edge label that led to this node |
-| `PREV_SUMMARY` | Summary from the previous node result |
+| `MARKFLOW_RUNDIR` | Absolute path to the run directory |
+| `MARKFLOW_WORKDIR` | Absolute path to the per-run working directory |
+| `MARKFLOW_WORKSPACE` | Absolute path to the persistent workspace (if available) |
+| `MARKFLOW_STEP` | ID of the current step |
+| `MARKFLOW_PREV_STEP` | ID of the previous step |
+| `MARKFLOW_PREV_EDGE` | Edge label that led to this step |
+| `MARKFLOW_PREV_SUMMARY` | Summary from the previous step result |
 
 #### Agent Steps
 

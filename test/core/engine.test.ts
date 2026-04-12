@@ -196,9 +196,60 @@ echo "abort" >&2
       for (const ctx of contexts) {
         expect(ctx.callCount).toBe(1);
         expect(ctx.step).toBeDefined();
-        expect(ctx.env.WORKFLOW_WORKSPACE).toBeDefined();
         expect(Array.isArray(ctx.outgoingEdges)).toBe(true);
       }
+    });
+
+    it("injects MARKFLOW_ env vars with correct values", async () => {
+      const source = readFileSync(join(FIXTURES, "linear.md"), "utf-8");
+      const def = parseWorkflowFromString(source);
+      const contexts: BeforeStepContext[] = [];
+
+      await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        workspaceDir: "/tmp/fake-workspace",
+        beforeStep: (ctx) => {
+          contexts.push(ctx);
+        },
+      });
+
+      // First step: setup
+      const setup = contexts[0];
+      expect(setup.env.MARKFLOW_STEP).toBe("setup");
+      expect(setup.env.MARKFLOW_RUNDIR).toContain(tempRunsDir);
+      expect(setup.env.MARKFLOW_WORKDIR).toContain("workdir");
+      expect(setup.env.MARKFLOW_WORKSPACE).toBe("/tmp/fake-workspace");
+      expect(setup.env.MARKFLOW_PREV_STEP).toBeUndefined();
+      expect(setup.env.MARKFLOW_PREV_EDGE).toBeUndefined();
+      expect(setup.env.MARKFLOW_PREV_SUMMARY).toBeUndefined();
+
+      // Second step: build — has PREV_ vars from setup
+      const build = contexts[1];
+      expect(build.env.MARKFLOW_STEP).toBe("build");
+      expect(build.env.MARKFLOW_PREV_STEP).toBe("setup");
+      expect(build.env.MARKFLOW_PREV_EDGE).toBeDefined();
+      expect(build.env.MARKFLOW_PREV_SUMMARY).toBeDefined();
+
+      // Third step: report — has PREV_ vars from build
+      const report = contexts[2];
+      expect(report.env.MARKFLOW_STEP).toBe("report");
+      expect(report.env.MARKFLOW_PREV_STEP).toBe("build");
+    });
+
+    it("omits MARKFLOW_WORKSPACE when no workspaceDir provided", async () => {
+      const source = readFileSync(join(FIXTURES, "linear.md"), "utf-8");
+      const def = parseWorkflowFromString(source);
+      let env: Record<string, string> | undefined;
+
+      await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        beforeStep: (ctx) => {
+          if (!env) env = ctx.env;
+        },
+      });
+
+      expect(env!.MARKFLOW_WORKSPACE).toBeUndefined();
+      expect(env!.MARKFLOW_WORKDIR).toBeDefined();
     });
 
     it("void directive lets the step run normally", async () => {

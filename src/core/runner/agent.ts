@@ -6,13 +6,14 @@ import type {
   MarkflowConfig,
   StepOutputHandler,
 } from "../types.js";
+import { renderTemplate } from "../template.js";
 
 export function assembleAgentPrompt(
   step: StepDefinition,
   context: StepResult[],
   outgoingEdgeLabels: string[],
-  workspacePath: string,
-  resolvedInputs: Record<string, string> = {},
+  workdirPath: string,
+  env: Record<string, string> = {},
 ): string {
   const contextLines = context
     .map((r) => `- ${r.node} (${r.type}): ${r.summary}`)
@@ -23,24 +24,20 @@ export function assembleAgentPrompt(
       ? `If there is only one outgoing edge, use: done`
       : `Valid edge values: ${outgoingEdgeLabels.join(", ")}`;
 
-  const inputEntries = Object.entries(resolvedInputs);
-  const inputsSection =
-    inputEntries.length > 0
-      ? `## Workflow Inputs\n\n${inputEntries.map(([k, v]) => `- ${k}: ${v}`).join("\n")}\n\n---\n\n`
-      : "";
+  const renderedContent = renderTemplate(step.content, env, step.id);
 
-  return `${inputsSection}## Workflow Context
+  return `## Workflow Context
 
 Completed steps:
 ${contextLines || "(none)"}
 
-Current working directory: ${workspacePath}
+Current working directory: ${workdirPath}
 
 ---
 
 ## Your Task
 
-${step.content}
+${renderedContent}
 
 ---
 
@@ -55,17 +52,17 @@ export async function runAgent(
   step: StepDefinition,
   context: StepResult[],
   outgoingEdgeLabels: string[],
-  workspacePath: string,
+  workdirPath: string,
   config: MarkflowConfig,
-  resolvedInputs: Record<string, string> = {},
+  env: Record<string, string> = {},
   onOutput?: StepOutputHandler,
 ): Promise<StepOutput> {
   const prompt = assembleAgentPrompt(
     step,
     context,
     outgoingEdgeLabels,
-    workspacePath,
-    resolvedInputs,
+    workdirPath,
+    env,
   );
 
   // Per-step config overrides global: step agent wins, step flags append to global flags
@@ -77,7 +74,7 @@ export async function runAgent(
 
   return new Promise<StepOutput>((resolve) => {
     const child = spawn(effectiveAgent, effectiveFlags, {
-      cwd: workspacePath,
+      cwd: workdirPath,
       env: process.env,
       stdio: ["pipe", "pipe", "pipe"],
     });

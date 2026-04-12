@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runAgent } from "../../../src/core/runner/agent.js";
+import { runAgent, assembleAgentPrompt } from "../../../src/core/runner/agent.js";
 import type { StepDefinition, MarkflowConfig } from "../../../src/core/types.js";
 
 const config: MarkflowConfig = {
@@ -54,5 +54,52 @@ describe("runAgent prompt delivery", () => {
     } finally {
       await rm(workspace, { recursive: true, force: true });
     }
+  });
+});
+
+describe("assembleAgentPrompt templating", () => {
+  it("substitutes ${VAR} references in agent prompt", () => {
+    const templatedStep: StepDefinition = {
+      id: "review",
+      type: "agent",
+      content: "Review ${REPO_PATH} for ${CRITERIA}.",
+    };
+    const prompt = assembleAgentPrompt(
+      templatedStep,
+      [],
+      ["done"],
+      "/workspace",
+      { REPO_PATH: "/src", CRITERIA: "security" },
+    );
+    expect(prompt).toContain("Review /src for security.");
+    expect(prompt).not.toContain("${REPO_PATH}");
+    expect(prompt).not.toContain("${CRITERIA}");
+  });
+
+  it("does not include a Workflow Inputs section", () => {
+    const prompt = assembleAgentPrompt(
+      step,
+      [],
+      ["done"],
+      "/workspace",
+      { FOO: "bar", BAZ: "qux" },
+    );
+    expect(prompt).not.toContain("Workflow Inputs");
+  });
+
+  it("includes MARKFLOW_PREV_ variables when referenced", () => {
+    const prevStep: StepDefinition = {
+      id: "summarize",
+      type: "agent",
+      content: "Previous step said: ${MARKFLOW_PREV_SUMMARY}",
+    };
+    const prompt = assembleAgentPrompt(
+      prevStep,
+      [],
+      ["done"],
+      "/workspace",
+      { MARKFLOW_PREV_SUMMARY: "built successfully", MARKFLOW_PREV_STEP: "build", MARKFLOW_PREV_EDGE: "done" },
+    );
+    expect(prompt).toContain("Previous step said: built successfully");
   });
 });

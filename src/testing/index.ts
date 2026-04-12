@@ -22,8 +22,8 @@ export interface MockResult {
 
 export interface WorkflowTestRunOptions {
   inputs?: Record<string, string>;
-  /** Called once after the run workspace directory is created, before execution. */
-  workspaceSetup?: (workspaceDir: string) => Promise<void> | void;
+  /** Called once after the per-run working directory is created, before execution. */
+  workdirSetup?: (workdirPath: string) => Promise<void> | void;
   /** If true, the temp runsDir is not removed after the run. Path is surfaced on the result. */
   keepRunsDir?: boolean;
   parallel?: boolean;
@@ -72,7 +72,7 @@ export class WorkflowTestResult {
  * run fast without network or agent calls.
  *
  * Unmocked steps run for real. When an upstream script writes files that a
- * downstream step reads, seed the run workspace via `run({ workspaceSetup })`.
+ * downstream step reads, seed the run workdir via `run({ workdirSetup })`.
  */
 export class WorkflowTest {
   private mocks = new Map<string, MockResult[]>();
@@ -127,13 +127,10 @@ export class WorkflowTest {
             : { parallel: options.parallel },
         onEvent: (e) => events.push(e),
         beforeStep: async (ctx) => {
-          // Fire workspaceSetup once, on the first hook call — the workspace
-          // directory exists now (engine creates it before any step runs).
           if (!setupFired) {
             setupFired = true;
-            if (options.workspaceSetup) {
-              const workspaceDir = ctx.env.WORKFLOW_WORKSPACE;
-              await options.workspaceSetup(workspaceDir);
+            if (options.workdirSetup) {
+              await options.workdirSetup(ctx.env.MARKFLOW_WORKDIR);
             }
           }
 

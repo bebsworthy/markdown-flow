@@ -12,23 +12,22 @@ export async function runStep(
   step: StepDefinition,
   context: StepResult[],
   outgoingEdgeLabels: string[],
-  workspacePath: string,
+  workdirPath: string,
   env: Record<string, string>,
   runDir: string,
   config: MarkflowConfig,
-  resolvedInputs: Record<string, string> = {},
   onOutput?: StepOutputHandler,
 ): Promise<StepOutput> {
   if (step.type === "script") {
-    return runScript(step, env, workspacePath, runDir, onOutput);
+    return runScript(step, env, workdirPath, runDir, onOutput);
   }
   return runAgent(
     step,
     context,
     outgoingEdgeLabels,
-    workspacePath,
+    workdirPath,
     config,
-    resolvedInputs,
+    env,
     onOutput,
   );
 }

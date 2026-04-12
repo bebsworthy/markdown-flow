@@ -55,8 +55,8 @@ npm test
 
 ## fix
 
-You are a coding agent. Review the test failures in context
-and fix the source code so the tests pass.
+You are a coding agent. The deploy target is ${DEPLOY_TARGET}.
+Review the test failures in context and fix the source code so the tests pass.
 
 ## deploy
 
@@ -92,7 +92,29 @@ The optional `# Inputs` section declares workflow-level parameters:
 - `NAME` (default: `value`): description
 ```
 
-At runtime inputs are resolved from (highest priority first): `--input` flags, `--env <file>`, the workspace's `.env`, process environment, declared defaults. Required inputs with no value abort the run. All declared inputs are exported as environment variables to script steps and listed in the prompt for agent steps.
+At runtime inputs are resolved from (highest priority first): `--input` flags, `--env <file>`, the workspace's `.env`, process environment, declared defaults. Required inputs with no value abort the run. All declared inputs are exported as environment variables to script steps.
+
+#### Variable Templating in Agent Prompts
+
+Agent prompts use `${VAR}` syntax to reference workflow inputs and runtime context. Only explicitly referenced variables appear in the prompt — nothing is injected automatically.
+
+```markdown
+## review
+
+You are a code reviewer. The repository is at ${MARKFLOW_WORKDIR}.
+The previous step reported: ${MARKFLOW_PREV_SUMMARY}
+Review the code for ${REVIEW_CRITERIA}.
+```
+
+Available variables:
+- Any declared workflow input (e.g. `${DEPLOY_TARGET}`)
+- `${MARKFLOW_STEP}` — current step name
+- `${MARKFLOW_PREV_STEP}`, `${MARKFLOW_PREV_EDGE}`, `${MARKFLOW_PREV_SUMMARY}` — context from the previous step
+- `${MARKFLOW_WORKDIR}` — per-run working directory (cwd for scripts and agents)
+- `${MARKFLOW_WORKSPACE}` — persistent workspace directory (contains `.env` and `runs/`)
+- `${MARKFLOW_RUNDIR}` — run log directory
+
+Undefined variables cause the run to fail with a descriptive error. To include a literal `${VAR}` in your prompt, escape it as `$${VAR}`.
 
 ### Edge Annotations
 
@@ -198,8 +220,8 @@ wft.mock("test", [{ edge: "fail" }, { edge: "fail" }, { edge: "pass" }]);
 
 const result = await wft.run({
   inputs: { DEPLOY_TARGET: "staging" },
-  // Optional: prepare the run workspace before execution (for fixture files)
-  workspaceSetup: async (dir) => {
+  // Optional: seed the per-run working directory before execution
+  workdirSetup: async (dir) => {
     await writeFile(join(dir, "ticket.json"), JSON.stringify(fixture));
   },
 });

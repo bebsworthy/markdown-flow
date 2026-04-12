@@ -106,12 +106,12 @@ describe("WorkflowTest", () => {
     expect(exhausted).toHaveLength(1);
   });
 
-  it("workspaceSetup seeds files before first step", async () => {
+  it("workdirSetup seeds files before first step", async () => {
     const def = await loadDef("linear.md");
     const wft = new WorkflowTest(def);
     let seededDir: string | undefined;
     await wft.run({
-      workspaceSetup: async (dir) => {
+      workdirSetup: async (dir) => {
         seededDir = dir;
       },
     });

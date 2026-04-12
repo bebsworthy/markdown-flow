@@ -6,7 +6,7 @@ import type { RunInfo, RunStatus, WorkflowDefinition } from "./types.js";
 export interface RunDirectory {
   id: string;
   path: string;
-  workspacePath: string;
+  workdirPath: string;
   logger: ContextLogger;
 }
 
@@ -33,9 +33,9 @@ export function createRunManager(runsDir = "./runs"): RunManager {
         .replace(/:/g, "-")
         .replace(/\./g, "-");
       const runPath = join(runsDir, id);
-      const workspacePath = join(runPath, "workspace");
+      const workdirPath = join(runPath, "workdir");
 
-      await mkdir(workspacePath, { recursive: true });
+      await mkdir(workdirPath, { recursive: true });
 
       const meta: RunMeta = {
         workflowName: workflowDef.name,
@@ -53,7 +53,7 @@ export function createRunManager(runsDir = "./runs"): RunManager {
       await writeFile(join(runPath, "context.jsonl"), "", "utf-8");
 
       const logger = createContextLogger(runPath);
-      return { id, path: runPath, workspacePath, logger };
+      return { id, path: runPath, workdirPath, logger };
     },
 
     async listRuns(): Promise<RunInfo[]> {

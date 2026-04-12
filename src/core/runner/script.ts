@@ -22,7 +22,7 @@ const LANG_TO_EXT: Record<string, string> = {
 export async function runScript(
   step: StepDefinition,
   env: Record<string, string>,
-  workspacePath: string,
+  workdirPath: string,
   runDir: string,
   onOutput?: StepOutputHandler,
 ): Promise<StepOutput> {
@@ -38,7 +38,7 @@ export async function runScript(
 
   return new Promise<StepOutput>((resolve) => {
     const child = spawn(interpreter, [scriptPath], {
-      cwd: workspacePath,
+      cwd: workdirPath,
       env: { ...process.env, ...env },
       stdio: ["ignore", "pipe", "pipe"],
     });
