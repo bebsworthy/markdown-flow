@@ -8,6 +8,8 @@ comment on the ticket.
 section and either a `## Steps to Reproduce` section (bugs) or an
 `## Acceptance Criteria` section (features/improvements).
 
+Requires `curl`, `jq`, and `jo` on `PATH`.
+
 # Inputs
 
 - `PLANE_URL` (default: `https://api.plane.so`): Base URL of your Plane instance's API
@@ -38,30 +40,27 @@ Fetch the issue from the Plane API and save it to `ticket.json` in the
 working directory so subsequent steps can read it.
 
 ```bash
+set -euo pipefail
+
 ISSUE_URL="${PLANE_URL}/api/v1/workspaces/${WORKSPACE_SLUG}/projects/${PROJECT_ID}/work-items/${ISSUE_ID}/"
 
 echo "Fetching ticket from Plane API: ${ISSUE_URL}"
 
 HTTP_CODE=$(curl -s \
-  -o "${MARKFLOW_WORKDIR}/ticket.json" \
+  -o ticket.json \
   -w "%{http_code}" \
   -H "X-API-Key: ${PLANE_API_KEY}" \
   -H "Accept: application/json" \
   "${ISSUE_URL}")
 
 if [ "${HTTP_CODE}" != "200" ]; then
-  BODY=$(cat "${MARKFLOW_WORKDIR}/ticket.json" 2>/dev/null || echo "(no response body)")
-  echo "RESULT: {\"edge\": \"fail\", \"summary\": \"Plane API returned HTTP ${HTTP_CODE}: ${BODY}\"}"
+  BODY=$(cat ticket.json 2>/dev/null || echo "(no response body)")
+  echo "RESULT: $(jo summary="Plane API returned HTTP ${HTTP_CODE}: ${BODY}")"
   exit 1
 fi
 
-TITLE=$(python3 -c "
-import json
-d = json.load(open('${MARKFLOW_WORKDIR}/ticket.json'))
-print(d.get('name', '(no title)'))
-" 2>/dev/null || echo "(unknown title)")
-
-echo "RESULT: {\"edge\": \"pass\", \"summary\": \"Fetched: ${TITLE}\"}"
+TITLE=$(jq -r '.name // "(no title)"' ticket.json)
+echo "RESULT: $(jo summary="Fetched: ${TITLE}")"
 ```
 
 ## analyze-ticket
@@ -74,8 +73,8 @@ flags:
   - --dangerously-skip-permissions
 ```
 
-Read the file `ticket.json` in ${MARKFLOW_WORKDIR}. It contains a Plane
-issue as JSON. Extract the `name` (title) and `description` fields.
+Read the file `ticket.json` in the current working directory. It contains
+a Plane issue as JSON. Extract the `name` (title) and `description` fields.
 
 Evaluate the description against this format rule:
 
@@ -105,9 +104,8 @@ using this exact template:
 if PASS: "Ticket meets the format requirements.">
 ```
 
-Once you have written `analysis.md`, output:
-
-RESULT: {"edge": "done", "summary": "<PASS or FAIL> — <one sentence from your Summary field>"}
+Once you have written `analysis.md`, emit a one-sentence summary in your
+RESULT line: `<PASS or FAIL> — <summary field>`.
 
 ## post-comment
 
@@ -117,25 +115,29 @@ Plane issue.
 ```bash
 set -euo pipefail
 
-ANALYSIS=$(cat "${MARKFLOW_WORKDIR}/analysis.md")
-
 COMMENT_URL="${PLANE_URL}/api/v1/workspaces/${WORKSPACE_SLUG}/projects/${PROJECT_ID}/work-items/${ISSUE_ID}/comments/"
 
+# Wrap the analysis in a whitespace-preserving div so Plane renders the
+# markdown line structure without the monospace look of <pre>. Build the
+# JSON payload with jq so ticket/file content is never interpolated
+# through the shell.
+jq -Rs --arg prefix '<div style="white-space: pre-wrap">' \
+       --arg suffix '</div>' \
+       '{comment_html: ($prefix + . + $suffix)}' \
+       analysis.md > comment-payload.json
+
 HTTP_CODE=$(curl -s \
-  -o "${MARKFLOW_WORKDIR}/comment.json" \
+  -o comment.json \
   -w "%{http_code}" \
   -X POST \
   -H "X-API-Key: ${PLANE_API_KEY}" \
   -H "Content-Type: application/json" \
-  --data-binary "$(python3 -c "
-import json, sys
-analysis = open('${MARKFLOW_WORKDIR}/analysis.md').read()
-print(json.dumps({'comment_html': '<pre>' + analysis + '</pre>'}))
-")" \
+  --data-binary @comment-payload.json \
   "${COMMENT_URL}")
 
 if [ "${HTTP_CODE}" != "201" ]; then
   echo "Failed to post comment: HTTP ${HTTP_CODE}" >&2
+  cat comment.json >&2 || true
   exit 1
 fi
 

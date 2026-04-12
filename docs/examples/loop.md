@@ -63,7 +63,6 @@ ITEM=$(jq -c ".[$NEXT]" issues.json)
 echo "[$((NEXT + 1))/$TOTAL] #$(jq -r ".[$NEXT].number" issues.json) — $(jq -r ".[$NEXT].title" issues.json)"
 echo "STATE: $(jo cursor=$NEXT)"
 echo "GLOBAL: $(jo item="$ITEM")"
-echo "RESULT: $(jo edge=next)"
 ```
 
 ## check
@@ -91,7 +90,7 @@ flags:
   - haiku
 ```
 
-Classify this GitHub issue into exactly one label.
+Classify this GitHub issue into exactly one label from the list below.
 
 **Title:** ${GLOBAL.item.title}
 
@@ -102,12 +101,7 @@ Pick exactly one from:
 
 ${GLOBAL.labels_markdown}
 
-Emit one STATE line carrying the chosen label, then the terminal RESULT:
-
-```
-STATE: {"label": "<choice>"}
-RESULT: {"edge": "done", "summary": "<why>"}
-```
+Emit `STATE: {"label": "<choice>"}` so the next step can pick it up.
 
 ## apply
 
