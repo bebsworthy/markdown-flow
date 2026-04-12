@@ -79,7 +79,7 @@ export async function runScript(
       const parsedResult: StepOutput["parsedResult"] = {
         edge: parsed.result?.edge,
         summary: parsed.result?.summary,
-        state: Object.keys(parsed.state).length > 0 ? parsed.state : undefined,
+        local: Object.keys(parsed.local).length > 0 ? parsed.local : undefined,
         global: Object.keys(parsed.global).length > 0 ? parsed.global : undefined,
         errors: hasErrors ? parsed.errors : undefined,
       };

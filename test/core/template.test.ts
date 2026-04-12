@@ -78,7 +78,7 @@ describe("renderTemplate", () => {
   it("throws on undefined dotted path", () => {
     expect(() =>
       renderTemplate(
-        "{{ STEPS.ghost.state.x }}",
+        "{{ STEPS.ghost.local.x }}",
         { vars: {}, namespaces: { STEPS: {} } },
         "review",
       ),

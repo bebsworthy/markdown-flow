@@ -17,12 +17,12 @@ export function assembleAgentPrompt(
   env: Record<string, string> = {},
   globalContext: Record<string, unknown> = {},
 ): string {
-  const stepsMap: Record<string, { edge: string; summary: string; state?: unknown }> = {};
+  const stepsMap: Record<string, { edge: string; summary: string; local?: unknown }> = {};
   for (const r of context) {
     stepsMap[r.node] = {
       edge: r.edge,
       summary: r.summary,
-      ...(r.state ? { state: r.state } : {}),
+      ...(r.local ? { local: r.local } : {}),
     };
   }
 
@@ -47,11 +47,11 @@ export function assembleAgentPrompt(
 The last line of your response MUST be exactly:
 RESULT: {"edge": "<label>", "summary": "<one sentence>"}
 
-You MAY emit zero or more STATE/GLOBAL lines anywhere before that:
-STATE:  {...}   merges into this step's own state (visible as \${STEPS.<id>.state.*} to later steps)
-GLOBAL: {...}   merges into the workflow-wide global (visible as \${GLOBAL.*} to later steps)
+You MAY emit zero or more LOCAL/GLOBAL lines anywhere before that:
+LOCAL:  {...}   merges into this step's own local state (visible as {{ STEPS.<id>.local.* }} to later steps)
+GLOBAL: {...}   merges into the workflow-wide global (visible as {{ GLOBAL.* }} to later steps)
 
-Multiple STATE or GLOBAL lines shallow-merge (later keys win). Do NOT put "state" or "global" keys inside RESULT.${edgeHint}`;
+Multiple LOCAL or GLOBAL lines shallow-merge (later keys win). Do NOT put "local" or "global" keys inside RESULT.${edgeHint}`;
 }
 
 export async function runAgent(
@@ -121,7 +121,7 @@ export async function runAgent(
       const parsedResult: StepOutput["parsedResult"] = {
         edge: parsed.result?.edge,
         summary: parsed.result?.summary,
-        state: Object.keys(parsed.state).length > 0 ? parsed.state : undefined,
+        local: Object.keys(parsed.local).length > 0 ? parsed.local : undefined,
         global: Object.keys(parsed.global).length > 0 ? parsed.global : undefined,
         errors: hasErrors ? parsed.errors : undefined,
       };

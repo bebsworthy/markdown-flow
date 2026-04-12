@@ -2,7 +2,7 @@ import { Liquid, LiquidError } from "liquidjs";
 import { registerMarkdownFilters } from "./template-filters.js";
 
 export interface TemplateContext {
-  /** Flat string variables (inputs, MARKFLOW_*, STATE/GLOBAL JSON strings). */
+  /** Flat string variables (inputs, MARKFLOW_*, LOCAL/GLOBAL JSON strings). */
   vars: Record<string, string>;
   /** Namespaced structured values exposed at the top of the Liquid scope
    * alongside flat vars — e.g. `GLOBAL`, `STEPS`. */

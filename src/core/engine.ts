@@ -221,7 +221,7 @@ export class WorkflowEngine {
         break;
       }
     }
-    env.STATE = JSON.stringify(selfPrior?.state ?? {});
+    env.LOCAL = JSON.stringify(selfPrior?.local ?? {});
     env.GLOBAL = JSON.stringify(this.globalContext);
 
     // Get outgoing edge labels for agent prompt
@@ -246,7 +246,7 @@ export class WorkflowEngine {
       }
     }
 
-    let mockDirective: { edge: string; summary?: string; exitCode?: number; state?: Record<string, unknown>; global?: Record<string, unknown> } | undefined;
+    let mockDirective: { edge: string; summary?: string; exitCode?: number; local?: Record<string, unknown>; global?: Record<string, unknown> } | undefined;
     if (this.options.beforeStep) {
       const ctx: BeforeStepContext = {
         nodeId: token.nodeId,
@@ -288,7 +288,7 @@ export class WorkflowEngine {
         parsedResult: {
           edge: mockDirective.edge,
           summary: mockDirective.summary ?? "",
-          state: mockDirective.state,
+          local: mockDirective.local,
           global: mockDirective.global,
         },
       };
@@ -329,7 +329,7 @@ export class WorkflowEngine {
       type: step.type,
       edge,
       summary,
-      state: output.parsedResult?.state,
+      local: output.parsedResult?.local,
       started_at: startedAt,
       completed_at: completedAt,
       exit_code:
@@ -492,10 +492,10 @@ export class WorkflowEngine {
     return resolved;
   }
 
-  private buildStepsMap(): Record<string, { edge: string; summary: string; state?: Record<string, unknown> }> {
-    const map: Record<string, { edge: string; summary: string; state?: Record<string, unknown> }> = {};
+  private buildStepsMap(): Record<string, { edge: string; summary: string; local?: Record<string, unknown> }> {
+    const map: Record<string, { edge: string; summary: string; local?: Record<string, unknown> }> = {};
     for (const r of this.completedResults) {
-      map[r.node] = { edge: r.edge, summary: r.summary, state: r.state };
+      map[r.node] = { edge: r.edge, summary: r.summary, local: r.local };
     }
     return map;
   }

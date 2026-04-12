@@ -192,21 +192,23 @@ Environment variables injected by the engine:
 | `MARKFLOW_PREV_STEP` | ID of the previous step |
 | `MARKFLOW_PREV_EDGE` | Edge label that led to this step |
 | `MARKFLOW_PREV_SUMMARY` | Summary from the previous step result |
-| `STEPS` | JSON object `{ <node>: { edge, summary, state? } }` for every completed step |
-| `STATE` | JSON string of this step's own accumulated state from its prior invocation; `{}` on first entry |
+| `STEPS` | JSON object `{ <node>: { edge, summary, local? } }` for every completed step |
+| `LOCAL` | JSON string of this step's own accumulated local state from its prior invocation; `{}` on first entry |
 | `GLOBAL` | JSON string of the current workflow-wide global context |
+
+> `LOCAL` and `GLOBAL` are the two step-accessible context surfaces — the former is step-private (survives across a step's own re-entries, e.g. via a back-edge loop), the latter is workflow-wide. Both are unrelated to the internal token-state machine described later.
 
 #### Agent Steps
 
 The prompt body is **verbatim** — everything between the optional ` ```config ` block and the next `## <step>` heading is used as-is, including lists, sub-headings, nested fenced blocks, and blockquotes. The engine does **not** inject a "Workflow Context" section or auto-list completed steps. The author decides exactly what context a step needs by referencing it explicitly through template substitution.
 
-**Template substitution.** Before the body is sent to the agent CLI, the engine renders it as a [Liquid](https://liquidjs.com/) template (strict mode — undefined references hard-fail). The following forms are available (see `$STEPS` / `$STATE` / `$GLOBAL` shapes in the env-var table above):
+**Template substitution.** Before the body is sent to the agent CLI, the engine renders it as a [Liquid](https://liquidjs.com/) template (strict mode — undefined references hard-fail). The following forms are available (see `$STEPS` / `$LOCAL` / `$GLOBAL` shapes in the env-var table above):
 
 | Form | Meaning |
 |---|---|
 | `{{ NAME }}` | Flat variable (inputs, `MARKFLOW_*`, etc.). |
 | `{{ GLOBAL.path.to.key }}` | Dotted path into the workflow-wide global context. |
-| `{{ STEPS.<node>.state.<key> }}` | State value emitted by an earlier step. |
+| `{{ STEPS.<node>.local.<key> }}` | Local-state value emitted by an earlier step. |
 | `{{ STEPS.<node>.summary }}` / `{{ STEPS.<node>.edge }}` | Prior step's summary or routing edge. |
 | `{% for x in GLOBAL.items %}...{% endfor %}` | Iterate over arrays — keeps producer steps free of consumer-specific formatting. |
 | `{% if ... %}...{% endif %}` | Conditional sections. |
@@ -262,11 +264,11 @@ Pick one of:
 The last line of your response MUST be exactly:
 RESULT: {"edge": "<label>", "summary": "<one sentence>"}
 
-You MAY emit zero or more STATE/GLOBAL lines anywhere before that:
-STATE:  {...}   merges into this step's own state (visible as {{ STEPS.<id>.state.* }} to later steps)
+You MAY emit zero or more LOCAL/GLOBAL lines anywhere before that:
+LOCAL:  {...}   merges into this step's own local state (visible as {{ STEPS.<id>.local.* }} to later steps)
 GLOBAL: {...}   merges into the workflow-wide global (visible as {{ GLOBAL.* }} to later steps)
 
-Multiple STATE or GLOBAL lines shallow-merge (later keys win). Do NOT put "state" or "global" keys inside RESULT.
+Multiple LOCAL or GLOBAL lines shallow-merge (later keys win). Do NOT put "local" or "global" keys inside RESULT.
 ```
 
 When the step has 2+ outgoing edges, an additional line is appended:
@@ -279,9 +281,9 @@ Single-edge steps get no edge hint — the routing is unambiguous and `"edge": "
 
 The engine streams stdout, intercepting three sentinel prefixes on their own lines:
 
-- `STATE: {...}` — shallow-merged into this step's `state` (accumulates across multiple lines).
+- `LOCAL: {...}` — shallow-merged into this step's own `local` state (accumulates across multiple lines).
 - `GLOBAL: {...}` — shallow-merged into the workflow-wide `global` context (visible to every subsequent step via `$GLOBAL` / `$STEPS`).
-- `RESULT: {"edge": "...", "summary": "..."}` — the terminal routing decision. Optional: when omitted (or emitted without an `edge` key), the engine defaults to `edge: "next"` on exit 0 and `edge: "fail"` on non-zero exit — the same rule for script and agent steps. May appear at most once. Including `state` or `global` keys inside RESULT is an error and fails the step.
+- `RESULT: {"edge": "...", "summary": "..."}` — the terminal routing decision. Optional: when omitted (or emitted without an `edge` key), the engine defaults to `edge: "next"` on exit 0 and `edge: "fail"` on non-zero exit — the same rule for script and agent steps. May appear at most once. Including `local` or `global` keys inside RESULT is an error and fails the step.
 
 Everything else in stdout is logged unchanged and ignored by the engine. Sentinel-looking lines whose JSON is malformed are treated as prose.
 
@@ -307,7 +309,7 @@ After each step completes the engine records a result object in `context.json`:
   "type": "script",
   "edge": "fail",
   "summary": "3 of 47 tests failed in auth module.",
-  "state": { "failed": 3, "total": 47 },
+  "local": { "failed": 3, "total": 47 },
   "started_at": "2026-04-09T10:23:01Z",
   "completed_at": "2026-04-09T10:23:04Z",
   "exit_code": 1

@@ -101,7 +101,7 @@ export interface StepResult {
   type: StepType;
   edge: string;
   summary: string;
-  state?: Record<string, unknown>;
+  local?: Record<string, unknown>;
   started_at: string;
   completed_at: string;
   exit_code: number | null;
@@ -126,7 +126,7 @@ export interface StepOutput {
   parsedResult?: {
     edge?: string;
     summary?: string;
-    state?: Record<string, unknown>;
+    local?: Record<string, unknown>;
     global?: Record<string, unknown>;
     errors?: string[];
   };
@@ -187,7 +187,7 @@ export type BeforeStepDirective =
       edge: string;
       summary?: string;
       exitCode?: number;
-      state?: Record<string, unknown>;
+      local?: Record<string, unknown>;
       global?: Record<string, unknown>;
     };
 

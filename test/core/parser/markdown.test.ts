@@ -192,7 +192,7 @@ Pick exactly one label:
 Emit:
 
 \`\`\`
-STATE: {"label": "<choice>"}
+LOCAL: {"label": "<choice>"}
 \`\`\`
 
 > Note: avoid guessing.
@@ -210,7 +210,7 @@ echo done
     expect(classify.content).toContain("- `Bug` — something is broken");
     expect(classify.content).toContain("- `Improvement` — feature request");
     expect(classify.content).toContain("### Output format");
-    expect(classify.content).toContain('STATE: {"label": "<choice>"}');
+    expect(classify.content).toContain('LOCAL: {"label": "<choice>"}');
     expect(classify.content).toContain("> Note: avoid guessing.");
     // The config block itself must not leak into the prompt body.
     expect(classify.content).not.toContain("agent: claude");

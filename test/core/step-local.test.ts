@@ -4,7 +4,7 @@ import { parseWorkflowFromString } from "../../src/core/index.js";
 import { assembleAgentPrompt } from "../../src/core/runner/agent.js";
 import type { BeforeStepContext, StepResult } from "../../src/core/types.js";
 
-const LINEAR_WORKFLOW = `# State Passing
+const LINEAR_WORKFLOW = `# Local/Global Passing
 
 # Flow
 
@@ -67,18 +67,18 @@ echo "finish"
 \`\`\`
 `;
 
-describe("Step state", () => {
-  it("emits and persists step state", async () => {
+describe("Step-local state", () => {
+  it("emits and persists step-local state", async () => {
     const def = parseWorkflowFromString(LINEAR_WORKFLOW);
     const wft = new WorkflowTest(def);
-    wft.mock("step_a", { edge: "pass", state: { items: [1, 2, 3], cursor: 0 } });
+    wft.mock("step_a", { edge: "pass", local: { items: [1, 2, 3], cursor: 0 } });
     wft.mock("step_b", { edge: "pass" });
     wft.mock("step_c", { edge: "pass" });
 
     const result = await wft.run();
     expect(result.status).toBe("complete");
-    expect(result.stepState("step_a")).toEqual({ items: [1, 2, 3], cursor: 0 });
-    expect(result.stepState("step_b")).toBeUndefined();
+    expect(result.stepLocal("step_a")).toEqual({ items: [1, 2, 3], cursor: 0 });
+    expect(result.stepLocal("step_b")).toBeUndefined();
   });
 
   it("provides $STEPS to downstream steps", async () => {
@@ -96,7 +96,7 @@ describe("Step state", () => {
       beforeStep: (ctx: BeforeStepContext) => {
         captured.push({ ...ctx.env });
         if (ctx.nodeId === "step_a") {
-          return { edge: "pass", state: { color: "blue" } };
+          return { edge: "pass", local: { color: "blue" } };
         }
         return { edge: "pass" };
       },
@@ -105,10 +105,10 @@ describe("Step state", () => {
     const stepBEnv = captured.find((e) => e.MARKFLOW_STEP === "step_b");
     expect(stepBEnv).toBeDefined();
     const stepsJson = JSON.parse(stepBEnv!.STEPS);
-    expect(stepsJson.step_a.state).toEqual({ color: "blue" });
+    expect(stepsJson.step_a.local).toEqual({ color: "blue" });
 
     expect(stepBEnv!.MARKFLOW_DATA_STEP_A_COLOR).toBeUndefined();
-    expect(stepBEnv!.STATE).toBe("{}");
+    expect(stepBEnv!.LOCAL).toBe("{}");
   });
 });
 
@@ -184,18 +184,18 @@ describe("Global context", () => {
   });
 });
 
-describe("Back-edge loop with step state", () => {
-  it("iterates through items using state cursor", async () => {
+describe("Back-edge loop with step-local state", () => {
+  it("iterates through items using local cursor", async () => {
     const def = parseWorkflowFromString(LOOP_WORKFLOW);
     const wft = new WorkflowTest(def);
     const items = ["issue-1", "issue-2", "issue-3"];
 
-    wft.mock("fetch", { edge: "pass", state: { issues: items } });
+    wft.mock("fetch", { edge: "pass", local: { issues: items } });
     wft.mock("review", { edge: "pass" });
     wft.mock("post", [
-      { edge: "remaining", state: { cursor: 1 } },
-      { edge: "remaining", state: { cursor: 2 } },
-      { edge: "done", state: { cursor: 3 } },
+      { edge: "remaining", local: { cursor: 1 } },
+      { edge: "remaining", local: { cursor: 2 } },
+      { edge: "done", local: { cursor: 3 } },
     ]);
     wft.mock("finish", { edge: "pass" });
 
@@ -205,12 +205,12 @@ describe("Back-edge loop with step state", () => {
     expect(result.callCount("post")).toBe(3);
     expect(result.callCount("finish")).toBe(1);
 
-    expect(result.stepState("post", 1)).toEqual({ cursor: 1 });
-    expect(result.stepState("post", 2)).toEqual({ cursor: 2 });
-    expect(result.stepState("post", 3)).toEqual({ cursor: 3 });
+    expect(result.stepLocal("post", 1)).toEqual({ cursor: 1 });
+    expect(result.stepLocal("post", 2)).toEqual({ cursor: 2 });
+    expect(result.stepLocal("post", 3)).toEqual({ cursor: 3 });
   });
 
-  it("injects $STATE with prior state on self-reentry", async () => {
+  it("injects $LOCAL with prior local state on self-reentry", async () => {
     const def = parseWorkflowFromString(LOOP_WORKFLOW);
     const capturedEnvs: Record<string, Record<string, string>> = {};
 
@@ -229,20 +229,20 @@ describe("Back-edge loop with step state", () => {
           postCount++;
           capturedEnvs[`post_${postCount}`] = { ...ctx.env };
           if (postCount < 3) {
-            return { edge: "remaining", state: { cursor: postCount } };
+            return { edge: "remaining", local: { cursor: postCount } };
           }
-          return { edge: "done", state: { cursor: postCount } };
+          return { edge: "done", local: { cursor: postCount } };
         }
         if (ctx.nodeId === "fetch") {
-          return { edge: "pass", state: { issues: ["a", "b", "c"] } };
+          return { edge: "pass", local: { issues: ["a", "b", "c"] } };
         }
         return { edge: "pass" };
       },
     });
 
-    expect(capturedEnvs.post_1.STATE).toBe("{}");
-    expect(JSON.parse(capturedEnvs.post_2.STATE)).toEqual({ cursor: 1 });
-    expect(JSON.parse(capturedEnvs.post_3.STATE)).toEqual({ cursor: 2 });
+    expect(capturedEnvs.post_1.LOCAL).toBe("{}");
+    expect(JSON.parse(capturedEnvs.post_2.LOCAL)).toEqual({ cursor: 1 });
+    expect(JSON.parse(capturedEnvs.post_3.LOCAL)).toEqual({ cursor: 2 });
   });
 
   it("exposes loop state via $STEPS", async () => {
@@ -262,7 +262,7 @@ describe("Back-edge loop with step state", () => {
       runsDir,
       beforeStep: (ctx: BeforeStepContext) => {
         if (ctx.nodeId === "fetch") {
-          return { edge: "pass", state: { issues: ["a", "b"] } };
+          return { edge: "pass", local: { issues: ["a", "b"] } };
         }
         if (ctx.nodeId === "review") {
           reviewCount++;
@@ -272,21 +272,21 @@ describe("Back-edge loop with step state", () => {
         if (ctx.nodeId === "post") {
           postCount++;
           if (postCount < 2) {
-            return { edge: "remaining", state: { cursor: postCount } };
+            return { edge: "remaining", local: { cursor: postCount } };
           }
-          return { edge: "done", state: { cursor: postCount } };
+          return { edge: "done", local: { cursor: postCount } };
         }
         return { edge: "pass" };
       },
     });
 
     const stepsJson = JSON.parse(capturedEnvs.review_2.STEPS);
-    expect(stepsJson.post.state).toEqual({ cursor: 1 });
-    expect(stepsJson.fetch.state).toEqual({ issues: ["a", "b"] });
+    expect(stepsJson.post.local).toEqual({ cursor: 1 });
+    expect(stepsJson.fetch.local).toEqual({ issues: ["a", "b"] });
   });
 });
 
-describe("Streaming STATE/GLOBAL via script stdout", () => {
+describe("Streaming LOCAL/GLOBAL via script stdout", () => {
   const MERGE_WORKFLOW = `# Merge
 
 # Flow
@@ -300,9 +300,9 @@ flowchart TD
 
 ## emit
 \`\`\`bash
-echo 'STATE: {"a": 1}'
-echo 'STATE: {"b": 2}'
-echo 'STATE: {"a": "x", "c": 3}'
+echo 'LOCAL: {"a": 1}'
+echo 'LOCAL: {"b": 2}'
+echo 'LOCAL: {"a": "x", "c": 3}'
 echo 'GLOBAL: {"region": "eu"}'
 echo 'GLOBAL: {"tier": "pro"}'
 echo 'RESULT: {"edge": "pass"}'
@@ -314,12 +314,12 @@ echo "done"
 \`\`\`
 `;
 
-  it("shallow-merges multiple STATE lines (later keys win)", async () => {
+  it("shallow-merges multiple LOCAL lines (later keys win)", async () => {
     const def = parseWorkflowFromString(MERGE_WORKFLOW);
     const wft = new WorkflowTest(def);
     const result = await wft.run();
     expect(result.status).toBe("complete");
-    expect(result.stepState("emit")).toEqual({ a: "x", b: 2, c: 3 });
+    expect(result.stepLocal("emit")).toEqual({ a: "x", b: 2, c: 3 });
   });
 
   it("propagates GLOBAL to subsequent steps via $GLOBAL", async () => {
@@ -372,7 +372,7 @@ echo "done"
     });
   });
 
-  it("hard-errors when RESULT carries a state key", async () => {
+  it("hard-errors when RESULT carries a local key", async () => {
     const ERR_WORKFLOW = `# Bad
 
 # Flow
@@ -386,7 +386,7 @@ flowchart TD
 
 ## emit
 \`\`\`bash
-echo 'RESULT: {"edge": "pass", "state": {"x": 1}}'
+echo 'RESULT: {"edge": "pass", "local": {"x": 1}}'
 \`\`\`
 
 ## done
@@ -402,14 +402,14 @@ echo "done"
   });
 });
 
-describe("Agent prompt template access to prior step state", () => {
+describe("Agent prompt template access to prior step-local state", () => {
   const context: StepResult[] = [
     {
       node: "fetch",
       type: "script",
       edge: "pass",
       summary: "fetched 3 issues",
-      state: { count: 3, source: "github" },
+      local: { count: 3, source: "github" },
       started_at: "2024-01-01T00:00:00Z",
       completed_at: "2024-01-01T00:00:01Z",
       exit_code: 0,
@@ -427,12 +427,12 @@ describe("Agent prompt template access to prior step state", () => {
     expect(prompt).not.toContain("Workflow Context");
   });
 
-  it("substitutes {{ STEPS.<id>.state.* }} paths in the prompt body", () => {
+  it("substitutes {{ STEPS.<id>.local.* }} paths in the prompt body", () => {
     const prompt = assembleAgentPrompt(
       {
         id: "review",
         type: "agent",
-        content: "There are {{ STEPS.fetch.state.count }} issues from {{ STEPS.fetch.state.source }}.",
+        content: "There are {{ STEPS.fetch.local.count }} issues from {{ STEPS.fetch.local.source }}.",
       },
       context,
       ["pass", "fail"],
@@ -471,14 +471,14 @@ describe("Agent prompt template access to prior step state", () => {
     expect(prompt).toContain("Using https://example.com");
   });
 
-  it("iterates over a STEPS.<id>.state.* array with {% for %}", () => {
+  it("iterates over a STEPS.<id>.local.* array with {% for %}", () => {
     const ctxWithArray: StepResult[] = [
       {
         node: "fetch",
         type: "script",
         edge: "pass",
         summary: "",
-        state: { labels: [{ name: "Bug" }, { name: "Feature" }] },
+        local: { labels: [{ name: "Bug" }, { name: "Feature" }] },
         started_at: "",
         completed_at: "",
         exit_code: 0,
@@ -489,7 +489,7 @@ describe("Agent prompt template access to prior step state", () => {
         id: "review",
         type: "agent",
         content:
-          "Labels:\n{% for l in STEPS.fetch.state.labels %}- {{ l.name }}\n{% endfor %}",
+          "Labels:\n{% for l in STEPS.fetch.local.labels %}- {{ l.name }}\n{% endfor %}",
       },
       ctxWithArray,
       ["pass"],
@@ -504,7 +504,7 @@ describe("Agent prompt template access to prior step state", () => {
         {
           id: "review",
           type: "agent",
-          content: "{{ STEPS.nonexistent.state.x }}",
+          content: "{{ STEPS.nonexistent.local.x }}",
         },
         context,
         ["pass"],

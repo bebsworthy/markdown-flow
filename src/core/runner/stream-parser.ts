@@ -1,7 +1,7 @@
-const SENTINEL_RE = /^(STATE|GLOBAL|RESULT):\s*(\{.*\})\s*$/;
+const SENTINEL_RE = /^(LOCAL|GLOBAL|RESULT):\s*(\{.*\})\s*$/;
 
 export interface ParsedStream {
-  state: Record<string, unknown>;
+  local: Record<string, unknown>;
   global: Record<string, unknown>;
   result?: { edge?: string; summary?: string };
   errors: string[];
@@ -13,7 +13,7 @@ export interface StreamParser {
 }
 
 export function createStreamParser(): StreamParser {
-  const state: Record<string, unknown> = {};
+  const local: Record<string, unknown> = {};
   const global: Record<string, unknown> = {};
   const errors: string[] = [];
   let result: { edge?: string; summary?: string } | undefined;
@@ -30,7 +30,7 @@ export function createStreamParser(): StreamParser {
     } catch {
       // Malformed JSON on a sentinel-looking line is silently ignored —
       // treat the line as prose (prompts, docs, agent chatter may echo
-      // "STATE: {...}" style text without meaning to emit).
+      // "LOCAL: {...}" style text without meaning to emit).
       return;
     }
 
@@ -40,14 +40,14 @@ export function createStreamParser(): StreamParser {
 
     const obj = parsed as Record<string, unknown>;
 
-    if (kind === "STATE") {
-      Object.assign(state, obj);
+    if (kind === "LOCAL") {
+      Object.assign(local, obj);
     } else if (kind === "GLOBAL") {
       Object.assign(global, obj);
     } else {
-      if ("state" in obj) {
+      if ("local" in obj) {
         errors.push(
-          `RESULT must not contain "state" — emit a separate STATE: line instead.`,
+          `RESULT must not contain "local" — emit a separate LOCAL: line instead.`,
         );
       }
       if ("global" in obj) {
@@ -81,7 +81,7 @@ export function createStreamParser(): StreamParser {
         handleLine(buffer.replace(/\r$/, ""));
         buffer = "";
       }
-      return { state, global, result, errors };
+      return { local, global, result, errors };
     },
   };
 }

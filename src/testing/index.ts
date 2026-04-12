@@ -18,7 +18,7 @@ export interface MockResult {
   edge?: string;
   summary?: string;
   exitCode?: number;
-  state?: Record<string, unknown>;
+  local?: Record<string, unknown>;
   global?: Record<string, unknown>;
 }
 
@@ -68,8 +68,8 @@ export class WorkflowTestResult {
     return match[nth - 1];
   }
 
-  stepState(nodeId: string, nth = 1): Record<string, unknown> | undefined {
-    return this.stepResult(nodeId, nth).state;
+  stepLocal(nodeId: string, nth = 1): Record<string, unknown> | undefined {
+    return this.stepResult(nodeId, nth).local;
   }
 }
 
@@ -151,7 +151,7 @@ export class WorkflowTest {
             edge: spec.edge ?? (ctx.step.type === "agent" ? "done" : "pass"),
             summary: spec.summary,
             exitCode: spec.exitCode,
-            state: spec.state,
+            local: spec.local,
             global: spec.global,
           };
           return directive;
