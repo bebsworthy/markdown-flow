@@ -5,7 +5,6 @@ import { initCommand } from "./commands/init.js";
 import { runCommand } from "./commands/run.js";
 import { showCommand } from "./commands/show.js";
 import { lsCommand } from "./commands/ls.js";
-import { startCommand } from "./commands/start.js";
 
 yargs(hideBin(process.argv))
   .scriptName("markflow")
@@ -165,35 +164,6 @@ yargs(hideBin(process.argv))
         }),
     async (argv) => {
       await showCommand(argv.id!, { workspace: argv.workspace, json: argv.json });
-    },
-  )
-
-  // ── start (kept for backward compat / advanced use) ───────────────────────
-  .command(
-    "start <file>",
-    "Execute a workflow directly (no workspace)",
-    (y) =>
-      y
-        .positional("file", {
-          type: "string",
-          describe: "Path to the workflow .md file",
-          demandOption: true,
-        })
-        .option("dry-run", { type: "boolean", default: false })
-        .option("parallel", { type: "boolean", default: true })
-        .option("agent", { type: "string" })
-        .option("runs-dir", { type: "string", default: "./runs" })
-        .option("env", { type: "string" })
-        .option("input", { type: "string", array: true }),
-    async (argv) => {
-      await startCommand(argv.file!, {
-        dryRun: argv.dryRun,
-        parallel: argv.parallel,
-        agent: argv.agent,
-        runsDir: argv.runsDir,
-        envFile: argv.env,
-        input: argv.input,
-      });
     },
   )
 

@@ -218,6 +218,18 @@ export class WorkflowEngine {
     const callCount = (this.nodeCalls.get(token.nodeId) ?? 0) + 1;
     this.nodeCalls.set(token.nodeId, callCount);
 
+    const retryBudgets: BeforeStepContext["retryBudgets"] = [];
+    const nodeRetries = this.retryState.counters.get(token.nodeId);
+    for (const edge of outgoing) {
+      if (edge.annotations.maxRetries !== undefined && edge.label) {
+        retryBudgets.push({
+          label: edge.label,
+          count: nodeRetries?.get(edge.label) ?? 0,
+          max: edge.annotations.maxRetries,
+        });
+      }
+    }
+
     let mockDirective: { edge: string; summary?: string; exitCode?: number } | undefined;
     if (this.options.beforeStep) {
       const ctx: BeforeStepContext = {
@@ -227,6 +239,7 @@ export class WorkflowEngine {
         env,
         resolvedInputs: this.resolvedInputs,
         outgoingEdges: outgoing,
+        retryBudgets,
         completedResults: this.completedResults,
         prompt:
           step.type === "agent"

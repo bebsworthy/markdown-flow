@@ -41,7 +41,7 @@ The engine uses a **token-based model**: tokens flow through graph nodes with st
 | `src/core/runner/` | `runStep()` dispatcher → `script.ts` (bash/python/js) or `agent.ts` (prose prompts) |
 | `src/core/run-manager.ts` | Persist run history as JSONL logs in run directories |
 | `src/core/types.ts` | All shared types: `Token`, `StepResult`, `RunInfo`, `EngineEvent`, etc. |
-| `src/cli/` | yargs CLI with three commands: `start`, `ls`, `run` |
+| `src/cli/` | yargs CLI with commands: `init`, `run`, `ls`, `show` |
 
 ### Public API (library consumers)
 

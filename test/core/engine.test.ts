@@ -313,6 +313,51 @@ echo "abort" >&2
       expect(counts).toEqual([1, 2, 3]);
     });
 
+    it("exposes retryBudgets with correct counts across retries", async () => {
+      const def = parseWorkflowFromString(RETRY_WITH_START);
+      const budgets: Array<BeforeStepContext["retryBudgets"]> = [];
+      let n = 0;
+
+      await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        beforeStep: (ctx) => {
+          if (ctx.nodeId === "check") {
+            budgets.push(ctx.retryBudgets);
+            n++;
+            return n < 3 ? { edge: "fail" } : { edge: "pass" };
+          }
+          return;
+        },
+      });
+
+      // check has "fail max:3" edge — budget should appear
+      expect(budgets).toHaveLength(3);
+
+      // First call: no retries consumed yet
+      expect(budgets[0]).toEqual([{ label: "fail", count: 0, max: 3 }]);
+      // Second call: 1 retry consumed
+      expect(budgets[1]).toEqual([{ label: "fail", count: 1, max: 3 }]);
+      // Third call: 2 retries consumed
+      expect(budgets[2]).toEqual([{ label: "fail", count: 2, max: 3 }]);
+    });
+
+    it("retryBudgets is empty for nodes without retry edges", async () => {
+      const source = readFileSync(join(FIXTURES, "linear.md"), "utf-8");
+      const def = parseWorkflowFromString(source);
+      const allBudgets: Array<BeforeStepContext["retryBudgets"]> = [];
+
+      await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        beforeStep: (ctx) => {
+          allBudgets.push(ctx.retryBudgets);
+        },
+      });
+
+      for (const budgets of allBudgets) {
+        expect(budgets).toEqual([]);
+      }
+    });
+
     it("emits retry:increment events during retry loop", async () => {
       const def = parseWorkflowFromString(RETRY_WITH_START);
       const events: EngineEvent[] = [];

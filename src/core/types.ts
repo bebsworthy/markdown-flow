@@ -161,6 +161,8 @@ export interface BeforeStepContext {
   /** Workflow inputs only (subset of env) */
   resolvedInputs: Record<string, string>;
   outgoingEdges: FlowEdge[];
+  /** Retry counts for edges with budgets. count = retries already consumed before this invocation. */
+  retryBudgets: Array<{ label: string; count: number; max: number }>;
   completedResults: StepResult[];
   /** Pre-assembled prompt for agent steps; undefined for scripts */
   prompt?: string;

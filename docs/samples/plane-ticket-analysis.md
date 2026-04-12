@@ -35,7 +35,7 @@ flowchart TD
 ## fetch-ticket
 
 Fetch the issue from the Plane API and save it to `ticket.json` in the
-workspace so subsequent steps can read it.
+working directory so subsequent steps can read it.
 
 ```bash
 ISSUE_URL="${PLANE_URL}/api/v1/workspaces/${WORKSPACE_SLUG}/projects/${PROJECT_ID}/work-items/${ISSUE_ID}/"
@@ -111,8 +111,8 @@ RESULT: {"edge": "done", "summary": "<PASS or FAIL> — <one sentence from your 
 
 ## post-comment
 
-Read `analysis.md` from the workspace and post it as a comment on the Plane
-issue.
+Read `analysis.md` from the working directory and post it as a comment on the
+Plane issue.
 
 ```bash
 set -euo pipefail

@@ -162,9 +162,6 @@ markflow ls <workspace-dir> [--json]
 
 # Show details of a specific run
 markflow show <run-id> [--workspace <dir>] [--json]
-
-# Execute a workflow directly without a workspace (advanced)
-markflow start <workflow.md> [--runs-dir <path>] ...
 ```
 
 ### Debugger
@@ -294,7 +291,7 @@ src/
     context-logger.ts
     env.ts        # Layered input resolution
   cli/
-    commands/     # init, run, show, ls, start
+    commands/     # init, run, show, ls
     debug.ts      # Interactive debugger hook
     workspace.ts  # Workspace resolution helpers
   testing/        # WorkflowTest harness (markflow/testing entry)
