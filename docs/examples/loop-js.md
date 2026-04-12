@@ -32,7 +32,7 @@ workflow-wide global context. The classifier prompt iterates over it inline
 via Liquid, so producer and consumer stay decoupled.
 
 ```js
-const { execFileSync } = require("node:child_process");
+import { execFileSync } from "node:child_process";
 
 const raw = execFileSync("gh", ["label", "list", "--json", "name,description"], {
   encoding: "utf-8",
@@ -50,8 +50,8 @@ back-edge, `$LOCAL` (injected by the engine as a JSON string) carries the
 prior cursor.
 
 ```js
-const { execFileSync } = require("node:child_process");
-const { existsSync, readFileSync, writeFileSync } = require("node:fs");
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 if (!existsSync("issues.json")) {
   const out = execFileSync(
@@ -133,7 +133,7 @@ Apply the classifier's label back to the issue. The issue number comes from
 state via the cross-step `$STEPS` map.
 
 ```js
-const { execFileSync } = require("node:child_process");
+import { execFileSync } from "node:child_process";
 
 const global = JSON.parse(process.env.GLOBAL || "{}");
 const steps = JSON.parse(process.env.STEPS || "{}");
