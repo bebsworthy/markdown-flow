@@ -273,7 +273,7 @@ Unmocked steps run for real — mock only the steps you need to isolate.
 ## How It Works
 
 - **Parser** extracts name, declared inputs, Mermaid topology (via `@emily/mermaid-ast`, a full-fidelity JISON-based parser), and step definitions. All standard Mermaid flowchart node shapes, edge types, and subgraphs are supported.
-- **Validator** checks structural correctness: node-step matching, retry handler completeness, edge label uniqueness.
+- **Validator** checks structural correctness: node–step matching, single start node enforcement, retry handler completeness, edge label uniqueness, mixed labelled/unlabelled edge detection, unreachable node detection, and duplicate input/step name detection. Diagnostics include source file, line numbers, and actionable suggestions.
 - **Engine** runs a token-based execution loop — linear flows, branching, parallel fan-out/fan-in, cycles, and retry budgets.
 - **Routing** maps script exit codes to edges (`0` → pass/ok/success/done, non-zero → fail/error/retry). Scripts and agents can also emit `RESULT: {"edge": "...", "summary": "..."}` as the final stdout line for explicit control, plus zero or more `LOCAL: {...}` / `GLOBAL: {...}` lines to publish state to later steps.
 - **Run history** is persisted as JSONL in `<workspace>/runs/<timestamp>/context.jsonl`.

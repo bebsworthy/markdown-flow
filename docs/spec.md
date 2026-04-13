@@ -428,13 +428,25 @@ The merge node waits for all upstream nodes to reach `complete` or `skipped` in 
 
 ## Parse-Time Validation
 
-The parser validates the following before execution begins:
+The parser and validator check the following before execution begins. Diagnostics include source file path, line numbers (where available), and actionable suggestions.
+
+**Errors** (block execution):
 
 - All node IDs referenced in the flow exist as `##` headings in Steps.
-- All `##` headings in Steps are referenced in the flow (warning only).
-- Every `max:N` edge has a corresponding `:max` handler edge from the same node.
+- Every `max:N` edge has a corresponding `:max` handler edge from the same node (and vice versa).
 - No node has two outgoing edges with the same label (excluding `:max` edges).
+- Exactly one start node — either explicitly marked with stadium shape `([...])` or the sole node with no incoming edges. Multiple entry points are not allowed; use a single start node that fans out.
+- No duplicate `## step` headings (first definition's line is reported).
+- No duplicate input names in `# Inputs`.
 - Script code blocks use a supported language.
+- The `# Flow` mermaid block is not empty.
+
+**Warnings** (do not block execution):
+
+- `##` headings in Steps not referenced in the flow (orphan steps).
+- Nodes unreachable from the start node (dead code in the graph).
+- Nodes with both labelled and unlabelled outgoing edges (ambiguous routing — the unlabelled edge acts as an implicit catch-all).
+- Steps with no content (empty code block or no prose).
 
 ---
 

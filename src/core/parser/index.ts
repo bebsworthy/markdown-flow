@@ -19,6 +19,7 @@ export function parseWorkflowFromString(
     graph,
     steps,
     sourceFile: filePath,
+    parserDiagnostics: sections.parserDiagnostics.length > 0 ? sections.parserDiagnostics : undefined,
   };
 }
 

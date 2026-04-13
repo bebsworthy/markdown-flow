@@ -1,7 +1,7 @@
 import { unified } from "unified";
 import remarkParse from "remark-parse";
 import type { Root, Heading, Code, List } from "mdast";
-import type { StepDefinition, ScriptLang, InputDeclaration, StepAgentConfig } from "../types.js";
+import type { StepDefinition, ScriptLang, InputDeclaration, StepAgentConfig, ValidationDiagnostic } from "../types.js";
 import { SUPPORTED_LANGS } from "../types.js";
 import { ParseError } from "../errors.js";
 
@@ -11,6 +11,7 @@ export interface RawSections {
   inputs: InputDeclaration[];
   mermaidSource: string;
   steps: StepDefinition[];
+  parserDiagnostics: ValidationDiagnostic[];
 }
 
 /**
@@ -58,12 +59,15 @@ export function parseMarkdownSections(source: string): RawSections {
     throw new ParseError("# Flow section must contain a ```mermaid code block");
   }
   const mermaidSource = mermaidBlock.value;
+  if (!mermaidSource.trim()) {
+    throw new ParseError("# Flow mermaid block is empty — add a flowchart definition");
+  }
 
   // Extract steps from the Steps section
   const stepsEnd = findNextH1(children, stepsIndex + 1);
-  const steps = extractSteps(source, children, stepsIndex, stepsEnd);
+  const { steps, diagnostics: stepDiagnostics } = extractSteps(source, children, stepsIndex, stepsEnd);
 
-  return { name, description, inputs, mermaidSource, steps };
+  return { name, description, inputs, mermaidSource, steps, parserDiagnostics: stepDiagnostics };
 }
 
 function extractHeadingText(heading: Heading): string {
@@ -141,37 +145,75 @@ function extractSteps(
   children: Root["children"],
   stepsStart: number,
   stepsEnd: number,
-): StepDefinition[] {
+): { steps: StepDefinition[]; diagnostics: ValidationDiagnostic[] } {
   const steps: StepDefinition[] = [];
+  const diagnostics: ValidationDiagnostic[] = [];
+  const seenIds = new Map<string, number>();
   let currentId: string | null = null;
+  let currentLine: number | undefined;
   let currentNodes: Root["children"] = [];
 
   for (let i = stepsStart + 1; i < stepsEnd; i++) {
     const node = children[i];
     if (node.type === "heading" && (node as Heading).depth === 2) {
-      // Flush previous step
       if (currentId) {
-        steps.push(buildStep(source, currentId, currentNodes));
+        const step = buildStep(source, currentId, currentNodes, currentLine);
+        steps.push(step);
+        if (!step.content.trim()) {
+          diagnostics.push({
+            severity: "warning",
+            message: `Step "${currentId}" has no content`,
+            nodeId: currentId,
+            line: currentLine,
+            suggestion: "Add a script code block or agent prompt to this step",
+          });
+        }
       }
       currentId = extractHeadingText(node as Heading).trim();
+      currentLine = (node as Heading).position?.start?.line;
       currentNodes = [];
+
+      if (currentId) {
+        const prevLine = seenIds.get(currentId);
+        if (prevLine !== undefined) {
+          diagnostics.push({
+            severity: "error",
+            message: `Duplicate step definition "${currentId}" (first defined on line ${prevLine})`,
+            nodeId: currentId,
+            line: currentLine,
+            suggestion: `Rename one of the "## ${currentId}" headings`,
+          });
+        } else {
+          seenIds.set(currentId, currentLine ?? 0);
+        }
+      }
     } else if (currentId) {
       currentNodes.push(node);
     }
   }
 
-  // Flush last step
   if (currentId) {
-    steps.push(buildStep(source, currentId, currentNodes));
+    const step = buildStep(source, currentId, currentNodes, currentLine);
+    steps.push(step);
+    if (!step.content.trim()) {
+      diagnostics.push({
+        severity: "warning",
+        message: `Step "${currentId}" has no content`,
+        nodeId: currentId,
+        line: currentLine,
+        suggestion: "Add a script code block or agent prompt to this step",
+      });
+    }
   }
 
-  return steps;
+  return { steps, diagnostics };
 }
 
 function buildStep(
   source: string,
   id: string,
   nodes: Root["children"],
+  line?: number,
 ): StepDefinition {
   // If the first code block has lang "config", extract it as per-step agent config
   const firstCode = nodes.find((n) => n.type === "code") as Code | undefined;
@@ -189,7 +231,7 @@ function buildStep(
   // code fences survive intact.
   if (agentConfig !== undefined) {
     const prose = sliceRemainingSource(source, firstCode, remainingNodes);
-    return { id, type: "agent", content: prose, agentConfig };
+    return { id, type: "agent", content: prose, agentConfig, line };
   }
 
   // No config block: look for a script code block to determine step type.
@@ -207,12 +249,13 @@ function buildStep(
       type: "script",
       lang: lang as ScriptLang,
       content: codeBlock.value,
+      line,
     };
   }
 
   // No code block — pure prose agent step. Slice from source verbatim.
   const prose = sliceRemainingSource(source, undefined, remainingNodes);
-  return { id, type: "agent", content: prose };
+  return { id, type: "agent", content: prose, line };
 }
 
 /**

@@ -217,6 +217,51 @@ echo done
     expect(classify.content).not.toContain("```config");
   });
 
+  it("populates line numbers on steps", () => {
+    const source = readFileSync(join(FIXTURES, "linear.md"), "utf-8");
+    const sections = parseMarkdownSections(source);
+
+    for (const step of sections.steps) {
+      expect(step.line).toBeTypeOf("number");
+      expect(step.line).toBeGreaterThan(0);
+    }
+  });
+
+  it("detects duplicate step names", () => {
+    const source = readFileSync(
+      join(FIXTURES, "invalid/duplicate-step.md"),
+      "utf-8",
+    );
+    const sections = parseMarkdownSections(source);
+    expect(sections.parserDiagnostics.length).toBeGreaterThan(0);
+    const dup = sections.parserDiagnostics.find((d) => d.severity === "error");
+    expect(dup).toBeDefined();
+    expect(dup!.message).toContain("Duplicate");
+    expect(dup!.message).toContain("deploy");
+    expect(dup!.line).toBeTypeOf("number");
+    expect(dup!.suggestion).toContain("Rename");
+  });
+
+  it("warns on empty step content", () => {
+    const source = readFileSync(
+      join(FIXTURES, "invalid/empty-step.md"),
+      "utf-8",
+    );
+    const sections = parseMarkdownSections(source);
+    const warnings = sections.parserDiagnostics.filter((d) => d.severity === "warning");
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings[0].message).toContain("deploy");
+    expect(warnings[0].message).toContain("no content");
+  });
+
+  it("throws on empty mermaid block", () => {
+    const source = readFileSync(
+      join(FIXTURES, "invalid/empty-mermaid.md"),
+      "utf-8",
+    );
+    expect(() => parseMarkdownSections(source)).toThrow("empty");
+  });
+
   it("preserves prose agent step (no config block) verbatim", () => {
     const source = `# T
 

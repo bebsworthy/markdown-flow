@@ -88,7 +88,7 @@ test/
 2. `parser/markdown.ts` — uses remark-parse to extract 3 sections (name, flow mermaid block, steps)
 3. `parser/steps.ts` — determines type from content (code block → script with lang, prose → agent)
 4. `parser/index.ts` — orchestrates: `parseWorkflow(filePath) → WorkflowDefinition`
-5. `validator.ts` — 5 rules: node-step matching, orphan steps (warn), retry handler pairs, edge label uniqueness, supported languages
+5. `validator.ts` — structural validation: node-step matching, single start node, retry handler pairs, edge label uniqueness, mixed edge detection, unreachable nodes, duplicate inputs/steps, empty step content
 6. `graph.ts` — adjacency helpers: `getOutgoingEdges`, `getStartNodes`, `isMergeNode`, `getFanOutTargets`
 
 ### Phase 3: Execution Engine

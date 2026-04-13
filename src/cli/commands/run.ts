@@ -1,10 +1,11 @@
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import chalk from "chalk";
 import {
   parseWorkflow,
   validateWorkflow,
   executeWorkflow,
   type EngineEvent,
+  type ValidationDiagnostic,
   WorkflowAbortError,
 } from "../../core/index.js";
 import {
@@ -79,8 +80,8 @@ export async function runCommand(
   const errors = diagnostics.filter((d) => d.severity === "error");
   const warnings = diagnostics.filter((d) => d.severity === "warning");
   if (!jsonMode) {
-    for (const w of warnings) console.warn(chalk.yellow(`  warning: ${w.message}`));
-    for (const e of errors) console.error(chalk.red(`  error: ${e.message}`));
+    for (const w of warnings) console.warn(chalk.yellow(`  ${formatDiagnostic(w)}`));
+    for (const e of errors) console.error(chalk.red(`  ${formatDiagnostic(e)}`));
   }
   if (errors.length > 0) {
     if (!jsonMode) console.error(chalk.red(`\n${errors.length} error(s) found. Workflow cannot run.`));
@@ -166,6 +167,17 @@ export async function runCommand(
     process.off("SIGTERM", onSignal);
     debugger_?.close();
   }
+}
+
+function formatDiagnostic(d: ValidationDiagnostic): string {
+  const loc = d.source && d.line
+    ? `${basename(d.source)}:${d.line}: `
+    : d.line
+      ? `line ${d.line}: `
+      : "";
+  const prefix = d.severity === "error" ? "error" : "warning";
+  const msg = `${loc}${prefix}: ${d.message}`;
+  return d.suggestion ? `${msg}\n    suggestion: ${d.suggestion}` : msg;
 }
 
 function printEvent(event: EngineEvent, verbose = false): void {

@@ -14,6 +14,7 @@ export interface WorkflowDefinition {
   graph: FlowGraph;
   steps: Map<string, StepDefinition>;
   sourceFile: string;
+  parserDiagnostics?: ValidationDiagnostic[];
 }
 
 export interface FlowGraph {
@@ -63,6 +64,7 @@ export interface StepDefinition {
   lang?: ScriptLang;
   content: string;
   agentConfig?: StepAgentConfig;
+  line?: number;
 }
 
 // ---- Validation ----
@@ -73,6 +75,9 @@ export interface ValidationDiagnostic {
   severity: Severity;
   message: string;
   nodeId?: string;
+  line?: number;
+  source?: string;
+  suggestion?: string;
 }
 
 // ---- Configuration ----
