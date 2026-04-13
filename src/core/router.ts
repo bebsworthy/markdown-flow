@@ -26,6 +26,31 @@ function inGroup(label: string | undefined, group: string[]): boolean {
 }
 
 /**
+ * Effective retry budget for an edge: explicit `max:N` wins; otherwise
+ * `config.maxRetriesDefault` applies only when the edge has a failure-group
+ * label AND a corresponding `:max` exhaustion handler exists. Without a
+ * handler the default is ignored — silently enabling retries on a flow that
+ * has no exhaustion branch would just turn into an ExecutionError at budget
+ * time.
+ */
+export function effectiveMaxRetries(
+  edge: FlowEdge,
+  graph: FlowGraph,
+  nodeId: string,
+  config: MarkflowConfig,
+): number | undefined {
+  if (edge.annotations.maxRetries !== undefined) return edge.annotations.maxRetries;
+  if (config.maxRetriesDefault === undefined) return undefined;
+  if (!edge.label || !FAILURE_LABELS.includes(edge.label)) return undefined;
+  const hasHandler = getOutgoingEdges(graph, nodeId).some(
+    (e) =>
+      e.annotations.isExhaustionHandler &&
+      e.annotations.exhaustionLabel === edge.label,
+  );
+  return hasHandler ? config.maxRetriesDefault : undefined;
+}
+
+/**
  * Resolve which edge(s) to follow after a node completes.
  */
 export function resolveRoute(
@@ -33,7 +58,7 @@ export function resolveRoute(
   nodeId: string,
   result: StepResult,
   retryState: RetryState,
-  _config: MarkflowConfig,
+  config: MarkflowConfig,
 ): RouteDecision {
   const outgoing = getOutgoingEdges(graph, nodeId);
 
@@ -99,9 +124,9 @@ export function resolveRoute(
 
   // Check retry budget
   let retryIncrement: RouteDecision["retryIncrement"];
-  if (matchedEdge.annotations.maxRetries !== undefined && matchedEdge.label) {
+  const max = effectiveMaxRetries(matchedEdge, graph, nodeId, config);
+  if (max !== undefined && matchedEdge.label) {
     const count = incrementRetry(retryState, nodeId, matchedEdge.label);
-    const max = matchedEdge.annotations.maxRetries;
     retryIncrement = { label: matchedEdge.label, count, max };
 
     if (count > max) {

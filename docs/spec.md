@@ -552,5 +552,5 @@ A `.workflow.json` file in the same directory as the workflow file can override 
 |---|---|---|
 | `agent` | `claude` | Agent CLI to use (`claude`, `codex`) |
 | `agent_flags` | `[]` | Extra flags passed to the agent CLI |
-| `max_retries_default` | none | Global retry limit if no `max:N` is specified |
+| `max_retries_default` | none | Default retry budget applied to `fail`/`error`/`retry`-group edges when `max:N` is absent — only when a matching `:max` handler is present on the same node. Ignored otherwise. |
 | `parallel` | `true` | Enable parallel execution of fan-out nodes |

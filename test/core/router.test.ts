@@ -194,3 +194,100 @@ describe("resolveRoute", () => {
     ).toThrow("Routing error");
   });
 });
+
+describe("resolveRoute — maxRetriesDefault", () => {
+  const configWithDefault = { ...DEFAULT_CONFIG, maxRetriesDefault: 2 };
+
+  function retryGraph(): FlowGraph {
+    return {
+      nodes: new Map([
+        ["A", { id: "A" }],
+        ["B", { id: "B" }],
+        ["C", { id: "C" }],
+      ]),
+      edges: [
+        { from: "A", to: "B", label: "fail", annotations: {} },
+        {
+          from: "A",
+          to: "C",
+          label: "fail:max",
+          annotations: { isExhaustionHandler: true, exhaustionLabel: "fail" },
+        },
+      ],
+    };
+  }
+
+  it("applies default retry budget to fail edge when :max handler exists", () => {
+    const retry = createRetryState();
+    const result = makeResult({ node: "A", edge: "fail", exit_code: 1 });
+
+    const d1 = resolveRoute(retryGraph(), "A", result, retry, configWithDefault);
+    expect(d1.targets[0].nodeId).toBe("B");
+    expect(d1.retryIncrement).toEqual({ label: "fail", count: 1, max: 2 });
+
+    const d2 = resolveRoute(retryGraph(), "A", result, retry, configWithDefault);
+    expect(d2.retryIncrement).toEqual({ label: "fail", count: 2, max: 2 });
+
+    const d3 = resolveRoute(retryGraph(), "A", result, retry, configWithDefault);
+    expect(d3.exhausted).toBe(true);
+    expect(d3.targets[0].nodeId).toBe("C");
+  });
+
+  it("explicit max:N on the edge overrides maxRetriesDefault", () => {
+    const graph: FlowGraph = {
+      nodes: new Map([
+        ["A", { id: "A" }],
+        ["B", { id: "B" }],
+        ["C", { id: "C" }],
+      ]),
+      edges: [
+        { from: "A", to: "B", label: "fail", annotations: { maxRetries: 5 } },
+        {
+          from: "A",
+          to: "C",
+          label: "fail:max",
+          annotations: { isExhaustionHandler: true, exhaustionLabel: "fail" },
+        },
+      ],
+    };
+    const result = makeResult({ node: "A", edge: "fail", exit_code: 1 });
+    const d = resolveRoute(graph, "A", result, createRetryState(), configWithDefault);
+    expect(d.retryIncrement?.max).toBe(5);
+  });
+
+  it("default does not apply to success-group labels", () => {
+    const graph: FlowGraph = {
+      nodes: new Map([
+        ["A", { id: "A" }],
+        ["B", { id: "B" }],
+        ["C", { id: "C" }],
+      ]),
+      edges: [
+        { from: "A", to: "B", label: "pass", annotations: {} },
+        {
+          from: "A",
+          to: "C",
+          label: "pass:max",
+          annotations: { isExhaustionHandler: true, exhaustionLabel: "pass" },
+        },
+      ],
+    };
+    const result = makeResult({ node: "A", edge: "pass" });
+    const d = resolveRoute(graph, "A", result, createRetryState(), configWithDefault);
+    expect(d.retryIncrement).toBeUndefined();
+  });
+
+  it("default is ignored when no :max handler exists", () => {
+    const graph: FlowGraph = {
+      nodes: new Map([
+        ["A", { id: "A" }],
+        ["B", { id: "B" }],
+      ]),
+      edges: [{ from: "A", to: "B", label: "fail", annotations: {} }],
+    };
+    const result = makeResult({ node: "A", edge: "fail", exit_code: 1 });
+    const d = resolveRoute(graph, "A", result, createRetryState(), configWithDefault);
+    expect(d.retryIncrement).toBeUndefined();
+    expect(d.targets[0].nodeId).toBe("B");
+  });
+});

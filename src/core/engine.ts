@@ -10,7 +10,7 @@ import type {
   StepOutput,
 } from "./types.js";
 import { getOutgoingEdges, getStartNodes, getUpstreamNodes, isMergeNode } from "./graph.js";
-import { resolveRoute, createRetryState, type RetryState } from "./router.js";
+import { resolveRoute, createRetryState, effectiveMaxRetries, type RetryState } from "./router.js";
 import { runStep } from "./runner/index.js";
 import { assembleAgentPrompt } from "./runner/agent.js";
 import { createRunManager, type RunDirectory } from "./run-manager.js";
@@ -262,11 +262,12 @@ export class WorkflowEngine {
     const retryBudgets: BeforeStepContext["retryBudgets"] = [];
     const nodeRetries = this.retryState.counters.get(token.nodeId);
     for (const edge of outgoing) {
-      if (edge.annotations.maxRetries !== undefined && edge.label) {
+      const max = effectiveMaxRetries(edge, this.def.graph, token.nodeId, this.config);
+      if (max !== undefined && edge.label) {
         retryBudgets.push({
           label: edge.label,
           count: nodeRetries?.get(edge.label) ?? 0,
-          max: edge.annotations.maxRetries,
+          max,
         });
       }
     }
