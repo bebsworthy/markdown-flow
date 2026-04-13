@@ -59,9 +59,26 @@ export interface StepAgentConfig {
   flags?: string[];
 }
 
+export type BackoffKind = "fixed" | "linear" | "exponential";
+
+export interface RetryConfig {
+  /** Maximum additional attempts after the initial run (total attempts = max + 1). */
+  max: number;
+  /** Base delay between attempts (duration string). Defaults to 0 (no delay). */
+  delay?: string;
+  /** Backoff curve. Defaults to "fixed". */
+  backoff?: BackoffKind;
+  /** Upper bound on a single computed delay. */
+  maxDelay?: string;
+  /** Jitter fraction in [0, 1]. 0 disables jitter. */
+  jitter?: number;
+}
+
 export interface StepConfig {
   /** Human-readable duration (e.g. "30s", "5m", "1h30m") for this step's per-attempt timeout. */
   timeout?: string;
+  /** Intrinsic retry policy applied when the step's resolved edge is "fail". */
+  retry?: RetryConfig;
 }
 
 export interface StepDefinition {
@@ -174,6 +191,15 @@ export type EngineEvent =
       max: number;
     }
   | { type: "retry:exhausted"; nodeId: string; label: string }
+  | {
+      type: "step:retry";
+      nodeId: string;
+      tokenId: string;
+      /** 1-indexed attempt number that will run after the delay. */
+      attempt: number;
+      delayMs: number;
+      reason: "fail" | "timeout";
+    }
   | { type: "workflow:complete"; results: StepResult[] }
   | { type: "workflow:error"; error: string };
 

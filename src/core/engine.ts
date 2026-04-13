@@ -17,6 +17,7 @@ import { createRunManager, type RunDirectory } from "./run-manager.js";
 import { loadConfig, DEFAULT_CONFIG } from "./config.js";
 import { loadEnvFile } from "./env.js";
 import { parseDuration } from "./duration.js";
+import { computeRetryDelay, abortableSleep } from "./retry.js";
 import { ExecutionError, ConfigError } from "./errors.js";
 import { join, dirname } from "node:path";
 import { access } from "node:fs/promises";
@@ -303,7 +304,10 @@ export class WorkflowEngine {
       }
     }
 
-    // Either synthesize a StepOutput from the mock directive, or run the step
+    // Either synthesize a StepOutput from the mock directive, or run the step.
+    // Step-level retry (stepConfig.retry) wraps the real-execution path: on
+    // failure, sleep per the backoff and re-run in place. Mock directives
+    // bypass retry — the test harness controls attempts via callCount.
     let output: StepOutput;
     if (mockDirective) {
       const defaultExit =
@@ -320,62 +324,87 @@ export class WorkflowEngine {
         },
       };
     } else {
-      const limitStr = step.stepConfig?.timeout ?? this.config.timeoutDefault;
-      const limitMs = limitStr ? parseDuration(limitStr) : undefined;
-      const startMs = Date.now();
+      const retryPolicy = step.stepConfig?.retry;
+      let retryAttempt = 0;
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const limitStr = step.stepConfig?.timeout ?? this.config.timeoutDefault;
+        const limitMs = limitStr ? parseDuration(limitStr) : undefined;
+        const startMs = Date.now();
 
-      const timeoutSignal = limitMs !== undefined ? AbortSignal.timeout(limitMs) : undefined;
-      const signals = [this.options.signal, timeoutSignal].filter(
-        (s): s is AbortSignal => s !== undefined,
-      );
-      const composed =
-        signals.length === 0
-          ? undefined
-          : signals.length === 1
-            ? signals[0]
-            : AbortSignal.any(signals);
+        const timeoutSignal = limitMs !== undefined ? AbortSignal.timeout(limitMs) : undefined;
+        const signals = [this.options.signal, timeoutSignal].filter(
+          (s): s is AbortSignal => s !== undefined,
+        );
+        const composed =
+          signals.length === 0
+            ? undefined
+            : signals.length === 1
+              ? signals[0]
+              : AbortSignal.any(signals);
 
-      output = await runStep(
-        step,
-        this.completedResults,
-        edgeLabels,
-        this.runDir.workdirPath,
-        env,
-        this.runDir.path,
-        this.config,
-        this.globalContext,
-        (stream, chunk) =>
-          this.emit({ type: "step:output", nodeId: token.nodeId, stream, chunk }),
-        composed,
-      );
+        output = await runStep(
+          step,
+          this.completedResults,
+          edgeLabels,
+          this.runDir.workdirPath,
+          env,
+          this.runDir.path,
+          this.config,
+          this.globalContext,
+          (stream, chunk) =>
+            this.emit({ type: "step:output", nodeId: token.nodeId, stream, chunk }),
+          composed,
+        );
 
-      // Distinguish our timeout from a user abort: only the timeoutSignal
-      // should have fired. If both fire (user aborted just as timeout hit),
-      // prefer user-abort semantics and skip the timeout event.
-      if (
-        timeoutSignal?.aborted &&
-        !this.options.signal?.aborted &&
-        limitMs !== undefined
-      ) {
-        const elapsedMs = Date.now() - startMs;
+        let timedOut = false;
+        // Distinguish our timeout from a user abort: only the timeoutSignal
+        // should have fired. If both fire (user aborted just as timeout hit),
+        // prefer user-abort semantics and skip the timeout event.
+        if (
+          timeoutSignal?.aborted &&
+          !this.options.signal?.aborted &&
+          limitMs !== undefined
+        ) {
+          const elapsedMs = Date.now() - startMs;
+          this.emit({
+            type: "step:timeout",
+            nodeId: token.nodeId,
+            tokenId: token.id,
+            elapsedMs,
+            limitMs,
+          });
+          output = {
+            exitCode: 124,
+            stdout: output.stdout,
+            stderr:
+              (output.stderr && !output.stderr.endsWith("\n") ? output.stderr + "\n" : output.stderr) +
+              `[markflow] step "${token.nodeId}" timed out after ${limitStr}\n`,
+            parsedResult: {
+              edge: "fail",
+              summary: `timeout after ${limitStr}`,
+            },
+          };
+          timedOut = true;
+        }
+
+        const attemptEdge =
+          output.parsedResult?.edge ?? (output.exitCode === 0 ? "next" : "fail");
+        const failed = attemptEdge === "fail";
+
+        if (!failed || !retryPolicy || retryAttempt >= retryPolicy.max) break;
+
+        const delayMs = computeRetryDelay(retryPolicy, retryAttempt);
         this.emit({
-          type: "step:timeout",
+          type: "step:retry",
           nodeId: token.nodeId,
           tokenId: token.id,
-          elapsedMs,
-          limitMs,
+          attempt: retryAttempt + 1,
+          delayMs,
+          reason: timedOut ? "timeout" : "fail",
         });
-        output = {
-          exitCode: 124,
-          stdout: output.stdout,
-          stderr:
-            (output.stderr && !output.stderr.endsWith("\n") ? output.stderr + "\n" : output.stderr) +
-            `[markflow] step "${token.nodeId}" timed out after ${limitStr}\n`,
-          parsedResult: {
-            edge: "fail",
-            summary: `timeout after ${limitStr}`,
-          },
-        };
+        await abortableSleep(delayMs, this.options.signal);
+        retryAttempt++;
       }
     }
 

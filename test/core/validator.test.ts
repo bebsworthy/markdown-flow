@@ -266,4 +266,41 @@ echo c
     expect(errors.length).toBeGreaterThan(0);
     expect(errors[0].message).toContain("pass");
   });
+
+  it("warns when a step has both `retry` config and edge-level `max:N`", () => {
+    const source = `# Dual Retry
+# Flow
+\`\`\`mermaid
+flowchart TD
+  tryit([tryit]) --> done
+  tryit -->|fail max:3| tryit
+  tryit -->|fail:max| handler
+\`\`\`
+# Steps
+## tryit
+\`\`\`config
+retry:
+  max: 5
+\`\`\`
+\`\`\`bash
+exit 1
+\`\`\`
+## done
+\`\`\`bash
+echo ok
+\`\`\`
+## handler
+\`\`\`bash
+echo handled
+\`\`\`
+`;
+    const def = parseWorkflowFromString(source);
+    const diagnostics = validateWorkflow(def);
+    const warnings = diagnostics.filter((d) => d.severity === "warning");
+    const dualWarning = warnings.find((d) =>
+      d.message.includes("both a `retry` config"),
+    );
+    expect(dualWarning).toBeDefined();
+    expect(dualWarning!.nodeId).toBe("tryit");
+  });
 });

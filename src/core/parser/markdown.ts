@@ -1,7 +1,7 @@
 import { unified } from "unified";
 import remarkParse from "remark-parse";
 import type { Root, Heading, Code, List } from "mdast";
-import type { StepDefinition, ScriptLang, InputDeclaration, StepAgentConfig, StepConfig, ValidationDiagnostic, MarkflowConfig } from "../types.js";
+import type { StepDefinition, ScriptLang, InputDeclaration, StepAgentConfig, StepConfig, RetryConfig, BackoffKind, ValidationDiagnostic, MarkflowConfig } from "../types.js";
 import { SUPPORTED_LANGS } from "../types.js";
 import { ParseError } from "../errors.js";
 
@@ -233,7 +233,7 @@ function buildStep(
     if (parsed.agent.agent !== undefined || parsed.agent.flags !== undefined) {
       agentConfig = parsed.agent;
     }
-    if (parsed.step.timeout !== undefined) {
+    if (parsed.step.timeout !== undefined || parsed.step.retry !== undefined) {
       stepConfig = parsed.step;
     }
     remainingNodes = nodes.filter((n) => n !== firstCode);
@@ -435,6 +435,8 @@ function parseStepConfig(yaml: string): { agent: StepAgentConfig; step: StepConf
   const step: StepConfig = {};
   const lines = yaml.split("\n");
   let inFlags = false;
+  let inRetry = false;
+  let retry: RetryConfig | undefined;
 
   for (const rawLine of lines) {
     const line = rawLine.trimEnd();
@@ -444,12 +446,14 @@ function parseStepConfig(yaml: string): { agent: StepAgentConfig; step: StepConf
     if (agentMatch) {
       agent.agent = agentMatch[1].trim();
       inFlags = false;
+      inRetry = false;
       continue;
     }
 
     if (/^flags:\s*$/.test(line)) {
       agent.flags = [];
       inFlags = true;
+      inRetry = false;
       continue;
     }
 
@@ -462,12 +466,46 @@ function parseStepConfig(yaml: string): { agent: StepAgentConfig; step: StepConf
       if (!/^\s/.test(line)) inFlags = false;
     }
 
+    if (/^retry:\s*$/.test(line)) {
+      retry = { max: 0 };
+      inRetry = true;
+      inFlags = false;
+      continue;
+    }
+
+    if (inRetry) {
+      const indented = line.match(/^\s+(\w+):\s*(.+)$/);
+      if (indented) {
+        const key = indented[1];
+        const val = indented[2].trim();
+        if (key === "max") {
+          retry!.max = Number(val);
+        } else if (key === "delay") {
+          retry!.delay = val;
+        } else if (key === "backoff") {
+          retry!.backoff = val as BackoffKind;
+        } else if (key === "maxDelay") {
+          retry!.maxDelay = val;
+        } else if (key === "jitter") {
+          retry!.jitter = Number(val);
+        }
+        continue;
+      }
+      // Non-indented line → retry block ended
+      inRetry = false;
+    }
+
     const timeoutMatch = line.match(/^timeout:\s*(.+)$/);
     if (timeoutMatch) {
       step.timeout = timeoutMatch[1].trim();
       inFlags = false;
+      inRetry = false;
       continue;
     }
+  }
+
+  if (retry && retry.max > 0) {
+    step.retry = retry;
   }
 
   return { agent, step };

@@ -661,4 +661,156 @@ echo done
       expect(timeoutEvent).toBeUndefined();
     }, 15_000);
   });
+
+  describe("step-level retry", () => {
+    it("retries in place and succeeds after N failures", async () => {
+      const source = readFileSync(join(FIXTURES, "retry-step-config.md"), "utf-8");
+      const def = parseWorkflowFromString(source);
+      const events: EngineEvent[] = [];
+
+      const runInfo = await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        onEvent: (e) => events.push(e),
+      });
+
+      expect(runInfo.status).toBe("complete");
+      // Only one final StepResult for flaky — retries happen in place.
+      const flakyResults = runInfo.steps.filter((s) => s.node === "flaky");
+      expect(flakyResults).toHaveLength(1);
+      expect(flakyResults[0].edge).toBe("next");
+
+      const retryEvents = events.filter((e) => e.type === "step:retry");
+      expect(retryEvents).toHaveLength(2);
+      expect(retryEvents[0]).toMatchObject({ nodeId: "flaky", attempt: 1, reason: "fail" });
+      expect(retryEvents[1]).toMatchObject({ nodeId: "flaky", attempt: 2 });
+
+      // Aborted edge should never be reached.
+      expect(runInfo.steps.some((s) => s.node === "abort")).toBe(false);
+    });
+
+    it("routes to fail edge after retries are exhausted", async () => {
+      const source = `# Always Fails
+# Flow
+\`\`\`mermaid
+flowchart TD
+  tryit([tryit]) --> done
+  tryit -->|fail| handler
+\`\`\`
+# Steps
+## tryit
+\`\`\`config
+retry:
+  max: 2
+\`\`\`
+\`\`\`bash
+exit 1
+\`\`\`
+## done
+\`\`\`bash
+echo ok
+\`\`\`
+## handler
+\`\`\`bash
+echo handled
+\`\`\`
+`;
+      const def = parseWorkflowFromString(source);
+      const events: EngineEvent[] = [];
+
+      const runInfo = await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        onEvent: (e) => events.push(e),
+      });
+
+      expect(runInfo.status).toBe("complete");
+      const tryitResults = runInfo.steps.filter((s) => s.node === "tryit");
+      expect(tryitResults).toHaveLength(1);
+      expect(tryitResults[0].edge).toBe("fail");
+      expect(runInfo.steps.some((s) => s.node === "handler")).toBe(true);
+      expect(runInfo.steps.some((s) => s.node === "done")).toBe(false);
+
+      const retryEvents = events.filter((e) => e.type === "step:retry");
+      expect(retryEvents).toHaveLength(2);
+    });
+
+    it("mock directives bypass step retry", async () => {
+      const source = `# Mock Bypass
+# Flow
+\`\`\`mermaid
+flowchart TD
+  tryit([tryit]) --> done
+  tryit -->|fail| handler
+\`\`\`
+# Steps
+## tryit
+\`\`\`config
+retry:
+  max: 5
+\`\`\`
+\`\`\`bash
+echo real
+\`\`\`
+## done
+\`\`\`bash
+echo ok
+\`\`\`
+## handler
+\`\`\`bash
+echo handled
+\`\`\`
+`;
+      const def = parseWorkflowFromString(source);
+      const events: EngineEvent[] = [];
+
+      const runInfo = await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        onEvent: (e) => events.push(e),
+        beforeStep: (ctx) => {
+          if (ctx.nodeId === "tryit") return { edge: "fail", summary: "mocked" };
+        },
+      });
+
+      expect(runInfo.status).toBe("complete");
+      const retryEvents = events.filter((e) => e.type === "step:retry");
+      expect(retryEvents).toHaveLength(0);
+      expect(runInfo.steps.some((s) => s.node === "handler")).toBe(true);
+    });
+
+    it("abort during retry sleep cancels cleanly", async () => {
+      const source = `# Long Retry
+# Flow
+\`\`\`mermaid
+flowchart TD
+  tryit([tryit]) --> done
+  tryit -->|fail| handler
+\`\`\`
+# Steps
+## tryit
+\`\`\`config
+retry:
+  max: 5
+  delay: 10s
+\`\`\`
+\`\`\`bash
+exit 1
+\`\`\`
+## done
+\`\`\`bash
+echo ok
+\`\`\`
+## handler
+\`\`\`bash
+echo handled
+\`\`\`
+`;
+      const def = parseWorkflowFromString(source);
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 100);
+      const runInfo = await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        signal: controller.signal,
+      });
+      expect(runInfo.status).toBe("error");
+    }, 5_000);
+  });
 });

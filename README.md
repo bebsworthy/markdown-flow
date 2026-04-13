@@ -343,7 +343,35 @@ You are a ticket analyst. …
 
 Per-step `flags` **append** to the workflow-level list — the per-step block doesn't replace it. Use `agent:` to swap the binary entirely.
 
-The per-step `config` block also supports `timeout: <duration>` (e.g. `30s`, `5m`, `1h30m`). This caps a single execution attempt; retries (`fail max:N`) each get a fresh window. When unset, the step inherits `timeout_default` from the workflow-level config. On timeout, the step routes via its `fail` edge with exit code 124. Works for both script and agent steps.
+The per-step `config` block also supports `timeout: <duration>` (e.g. `30s`, `5m`, `1h30m`). This caps a single execution attempt; retries each get a fresh window. When unset, the step inherits `timeout_default` from the workflow-level config. On timeout, the step routes via its `fail` edge with exit code 124. Works for both script and agent steps.
+
+### Step retry policies
+
+A step can declare an intrinsic retry policy in its `config` block. On failure the step re-executes in place; only after the retry budget is exhausted is the `fail` edge traversed.
+
+````markdown
+## api-call
+
+```config
+retry:
+  max: 3
+  delay: 10s
+  backoff: exponential   # fixed | linear | exponential (default: fixed)
+  maxDelay: 5m
+  jitter: 0.3            # 0..1 fraction (default: 0)
+```
+
+Call the upstream API and return the payload.
+````
+
+With this, the graph needs only a plain `fail` branch — no self-loop:
+
+```
+api-call --> next
+api-call -->|fail| error-handler
+```
+
+The legacy self-loop form (`A -->|fail max:3| A` plus `A -->|fail:max| handler`) still works; when both are specified on the same node, the step-level `retry` policy wins and the validator emits a warning.
 
 ## Development
 

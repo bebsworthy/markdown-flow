@@ -47,6 +47,21 @@ export function validateWorkflow(
     const retryEdges = edges.filter(
       (e) => e.annotations.maxRetries !== undefined,
     );
+
+    // Warn if the step declares an intrinsic retry policy AND the node has
+    // edge-level retry annotations. Step policy wins at runtime.
+    const step = steps.get(nodeId);
+    if (step?.stepConfig?.retry && retryEdges.length > 0) {
+      const edgeLabels = retryEdges.map((e) => `${e.label} max:${e.annotations.maxRetries}`).join(", ");
+      diagnostics.push({
+        severity: "warning",
+        message: `Step "${nodeId}" has both a \`retry\` config block and edge-level retry annotations (${edgeLabels}). The step policy will be used; edge \`max:N\` is ignored.`,
+        nodeId,
+        line: step.line,
+        source,
+        suggestion: "Remove the edge-level `max:N` annotation, or remove the step's `retry` config.",
+      });
+    }
     const exhaustionEdges = edges.filter(
       (e) => e.annotations.isExhaustionHandler,
     );
