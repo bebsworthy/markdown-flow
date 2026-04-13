@@ -473,4 +473,192 @@ echo b
       maxRetriesDefault: 2,
     });
   });
+
+  describe("step timeout", () => {
+    it("times out a slow step and routes to fail", async () => {
+      const source = `# Timeout Test
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  slow --> done
+  slow -->|fail| recover
+  recover --> done
+\`\`\`
+
+# Steps
+
+## slow
+
+\`\`\`config
+timeout: 1s
+\`\`\`
+
+\`\`\`bash
+sleep 10
+\`\`\`
+
+## recover
+
+\`\`\`bash
+echo recovered
+\`\`\`
+
+## done
+
+\`\`\`bash
+echo done
+\`\`\`
+`;
+      const def = parseWorkflowFromString(source);
+      const events: EngineEvent[] = [];
+      const runInfo = await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        onEvent: (e) => events.push(e),
+      });
+
+      expect(runInfo.status).toBe("complete");
+      const slow = runInfo.steps.find((s) => s.node === "slow")!;
+      expect(slow.edge).toBe("fail");
+      expect(slow.summary).toContain("timeout");
+
+      const timeoutEvent = events.find((e) => e.type === "step:timeout");
+      expect(timeoutEvent).toBeDefined();
+      expect(timeoutEvent).toMatchObject({
+        type: "step:timeout",
+        nodeId: "slow",
+        limitMs: 1000,
+      });
+
+      // Recovery path ran
+      expect(runInfo.steps.some((s) => s.node === "recover")).toBe(true);
+    }, 15_000);
+
+    it("applies workflow-level timeout_default when step has none", async () => {
+      const source = `# Timeout Default
+
+\`\`\`config
+timeout_default: 1s
+\`\`\`
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  slow --> done
+  slow -->|fail| done
+\`\`\`
+
+# Steps
+
+## slow
+
+\`\`\`bash
+sleep 10
+\`\`\`
+
+## done
+
+\`\`\`bash
+echo done
+\`\`\`
+`;
+      const def = parseWorkflowFromString(source);
+      const events: EngineEvent[] = [];
+      const runInfo = await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        onEvent: (e) => events.push(e),
+      });
+
+      const timeoutEvent = events.find((e) => e.type === "step:timeout");
+      expect(timeoutEvent).toBeDefined();
+      const slow = runInfo.steps.find((s) => s.node === "slow")!;
+      expect(slow.edge).toBe("fail");
+    }, 15_000);
+
+    it("per-step timeout overrides workflow default", async () => {
+      const source = `# Override
+
+\`\`\`config
+timeout_default: 1h
+\`\`\`
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  slow --> done
+  slow -->|fail| done
+\`\`\`
+
+# Steps
+
+## slow
+
+\`\`\`config
+timeout: 1s
+\`\`\`
+
+\`\`\`bash
+sleep 10
+\`\`\`
+
+## done
+
+\`\`\`bash
+echo done
+\`\`\`
+`;
+      const def = parseWorkflowFromString(source);
+      const events: EngineEvent[] = [];
+      await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        onEvent: (e) => events.push(e),
+      });
+      const timeoutEvent = events.find((e) => e.type === "step:timeout");
+      expect(timeoutEvent).toMatchObject({ nodeId: "slow", limitMs: 1000 });
+    }, 15_000);
+
+    it("does not emit step:timeout when user signal aborts", async () => {
+      const source = `# Abort
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  slow --> done
+\`\`\`
+
+# Steps
+
+## slow
+
+\`\`\`config
+timeout: 1h
+\`\`\`
+
+\`\`\`bash
+sleep 10
+\`\`\`
+
+## done
+
+\`\`\`bash
+echo done
+\`\`\`
+`;
+      const def = parseWorkflowFromString(source);
+      const controller = new AbortController();
+      const events: EngineEvent[] = [];
+      setTimeout(() => controller.abort(), 200);
+      await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        signal: controller.signal,
+        onEvent: (e) => events.push(e),
+      });
+      const timeoutEvent = events.find((e) => e.type === "step:timeout");
+      expect(timeoutEvent).toBeUndefined();
+    }, 15_000);
+  });
 });

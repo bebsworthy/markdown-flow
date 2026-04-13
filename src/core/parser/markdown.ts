@@ -1,7 +1,7 @@
 import { unified } from "unified";
 import remarkParse from "remark-parse";
 import type { Root, Heading, Code, List } from "mdast";
-import type { StepDefinition, ScriptLang, InputDeclaration, StepAgentConfig, ValidationDiagnostic, MarkflowConfig } from "../types.js";
+import type { StepDefinition, ScriptLang, InputDeclaration, StepAgentConfig, StepConfig, ValidationDiagnostic, MarkflowConfig } from "../types.js";
 import { SUPPORTED_LANGS } from "../types.js";
 import { ParseError } from "../errors.js";
 
@@ -222,47 +222,78 @@ function buildStep(
   nodes: Root["children"],
   line?: number,
 ): StepDefinition {
-  // If the first code block has lang "config", extract it as per-step agent config
+  // If the first code block has lang "config", extract agent + step config
   const firstCode = nodes.find((n) => n.type === "code") as Code | undefined;
   let agentConfig: StepAgentConfig | undefined;
+  let stepConfig: StepConfig | undefined;
   let remainingNodes = nodes;
 
   if (firstCode?.lang === "config") {
-    agentConfig = parseStepConfig(firstCode.value);
+    const parsed = parseStepConfig(firstCode.value);
+    if (parsed.agent.agent !== undefined || parsed.agent.flags !== undefined) {
+      agentConfig = parsed.agent;
+    }
+    if (parsed.step.timeout !== undefined) {
+      stepConfig = parsed.step;
+    }
     remainingNodes = nodes.filter((n) => n !== firstCode);
   }
 
-  // If a config block was present, the step is definitively an agent step —
-  // the agent prompt is EVERYTHING between the config block and the next H2,
-  // sliced verbatim from the source so lists, sub-headings, quotes, and nested
-  // code fences survive intact.
-  if (agentConfig !== undefined) {
-    const prose = sliceRemainingSource(source, firstCode, remainingNodes);
-    return { id, type: "agent", content: prose, agentConfig, line };
-  }
+  // Classify as script only when the step's body is a single runnable code
+  // block at the top (no prose before it). If a `config` block is present,
+  // "top" means immediately after it. Anything else — prose, nested fences,
+  // lists, etc. — is an agent step. This lets scripts carry a config block
+  // (e.g. `timeout`) while still preserving agent prose verbatim.
+  const firstRemaining = remainingNodes.find((n) => !isEmptyNode(n));
+  const scriptCandidate =
+    firstRemaining?.type === "code"
+      ? (firstRemaining as Code)
+      : agentConfig === undefined && stepConfig === undefined
+        ? (remainingNodes.find((n) => n.type === "code") as Code | undefined)
+        : undefined;
 
-  // No config block: look for a script code block to determine step type.
-  const codeBlock = remainingNodes.find((n) => n.type === "code") as Code | undefined;
-
-  if (codeBlock) {
-    const lang = codeBlock.lang || "";
+  if (scriptCandidate) {
+    const lang = scriptCandidate.lang || "";
     if (!SUPPORTED_LANGS.includes(lang)) {
-      throw new ParseError(
-        `Step "${id}" uses unsupported language "${lang}". Supported: ${SUPPORTED_LANGS.join(", ")}`,
-      );
+      // No config block: legacy behavior — unsupported lang is an error.
+      // With a config block present, an unsupported/empty lang is treated as
+      // embedded prose → fall through to agent classification.
+      if (agentConfig === undefined && stepConfig === undefined) {
+        throw new ParseError(
+          `Step "${id}" uses unsupported language "${lang}". Supported: ${SUPPORTED_LANGS.join(", ")}`,
+        );
+      }
+    } else {
+      if (agentConfig !== undefined) {
+        throw new ParseError(
+          `Step "${id}" has a \`config\` block with agent/flags but is a script step. ` +
+            `Agent settings apply only to agent (prose) steps.`,
+        );
+      }
+      return {
+        id,
+        type: "script",
+        lang: lang as ScriptLang,
+        content: scriptCandidate.value,
+        stepConfig,
+        line,
+      };
     }
-    return {
-      id,
-      type: "script",
-      lang: lang as ScriptLang,
-      content: codeBlock.value,
-      line,
-    };
   }
 
-  // No code block — pure prose agent step. Slice from source verbatim.
-  const prose = sliceRemainingSource(source, undefined, remainingNodes);
-  return { id, type: "agent", content: prose, line };
+  // Agent step. Prose is everything after the config block (if present)
+  // through the end of the step, sliced verbatim so lists, sub-headings,
+  // quotes, and nested code fences survive intact.
+  const prose = sliceRemainingSource(source, firstCode, remainingNodes);
+  return { id, type: "agent", content: prose, agentConfig, stepConfig, line };
+}
+
+function isEmptyNode(n: Root["children"][number]): boolean {
+  // Empty paragraph nodes can appear from blank lines; treat as non-content.
+  if (n.type === "paragraph" && (!("children" in n) || n.children.length === 0)) {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -388,13 +419,20 @@ function parseTopConfig(yaml: string): Partial<MarkflowConfig> {
       config.maxRetriesDefault = Number(retriesMatch[1]);
       continue;
     }
+
+    const timeoutMatch = line.match(/^timeout_default:\s*(.+)$/);
+    if (timeoutMatch) {
+      config.timeoutDefault = timeoutMatch[1].trim();
+      continue;
+    }
   }
 
   return config;
 }
 
-function parseStepConfig(yaml: string): StepAgentConfig {
-  const config: StepAgentConfig = {};
+function parseStepConfig(yaml: string): { agent: StepAgentConfig; step: StepConfig } {
+  const agent: StepAgentConfig = {};
+  const step: StepConfig = {};
   const lines = yaml.split("\n");
   let inFlags = false;
 
@@ -404,13 +442,13 @@ function parseStepConfig(yaml: string): StepAgentConfig {
 
     const agentMatch = line.match(/^agent:\s*(.+)$/);
     if (agentMatch) {
-      config.agent = agentMatch[1].trim();
+      agent.agent = agentMatch[1].trim();
       inFlags = false;
       continue;
     }
 
     if (/^flags:\s*$/.test(line)) {
-      config.flags = [];
+      agent.flags = [];
       inFlags = true;
       continue;
     }
@@ -418,12 +456,19 @@ function parseStepConfig(yaml: string): StepAgentConfig {
     if (inFlags) {
       const itemMatch = line.match(/^\s+-\s+(.+)$/);
       if (itemMatch) {
-        config.flags!.push(itemMatch[1].trim());
+        agent.flags!.push(itemMatch[1].trim());
         continue;
       }
       if (!/^\s/.test(line)) inFlags = false;
     }
+
+    const timeoutMatch = line.match(/^timeout:\s*(.+)$/);
+    if (timeoutMatch) {
+      step.timeout = timeoutMatch[1].trim();
+      inFlags = false;
+      continue;
+    }
   }
 
-  return config;
+  return { agent, step };
 }

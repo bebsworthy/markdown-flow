@@ -301,6 +301,7 @@ flags:
   - haiku
 parallel: true
 max_retries_default: 3
+timeout_default: 30m
 ```
 
 # Flow
@@ -314,6 +315,7 @@ max_retries_default: 3
   "agent": "claude",
   "agent_flags": ["--model", "haiku"],
   "max_retries_default": 3,
+  "timeout_default": "30m",
   "parallel": true
 }
 ```
@@ -340,6 +342,8 @@ You are a ticket analyst. …
 ````
 
 Per-step `flags` **append** to the workflow-level list — the per-step block doesn't replace it. Use `agent:` to swap the binary entirely.
+
+The per-step `config` block also supports `timeout: <duration>` (e.g. `30s`, `5m`, `1h30m`). This caps a single execution attempt; retries (`fail max:N`) each get a fresh window. When unset, the step inherits `timeout_default` from the workflow-level config. On timeout, the step routes via its `fail` edge with exit code 124. Works for both script and agent steps.
 
 ## Development
 

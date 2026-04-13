@@ -59,12 +59,18 @@ export interface StepAgentConfig {
   flags?: string[];
 }
 
+export interface StepConfig {
+  /** Human-readable duration (e.g. "30s", "5m", "1h30m") for this step's per-attempt timeout. */
+  timeout?: string;
+}
+
 export interface StepDefinition {
   id: string;
   type: StepType;
   lang?: ScriptLang;
   content: string;
   agentConfig?: StepAgentConfig;
+  stepConfig?: StepConfig;
   line?: number;
 }
 
@@ -87,6 +93,8 @@ export interface MarkflowConfig {
   agent: string;
   agentFlags: string[];
   maxRetriesDefault?: number;
+  /** Default per-attempt step timeout (human-readable duration string). Applied when a step has no `timeout` of its own. */
+  timeoutDefault?: string;
   parallel: boolean;
 }
 
@@ -150,6 +158,13 @@ export type EngineEvent =
       chunk: string;
     }
   | { type: "step:complete"; nodeId: string; result: StepResult }
+  | {
+      type: "step:timeout";
+      nodeId: string;
+      tokenId: string;
+      elapsedMs: number;
+      limitMs: number;
+    }
   | { type: "route"; from: string; to: string; edge?: string }
   | {
       type: "retry:increment";

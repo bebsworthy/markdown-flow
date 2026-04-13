@@ -21,6 +21,7 @@ export async function loadConfig(
       agent: parsed.agent ?? DEFAULT_CONFIG.agent,
       agentFlags: parsed.agent_flags ?? DEFAULT_CONFIG.agentFlags,
       maxRetriesDefault: parsed.max_retries_default,
+      timeoutDefault: parsed.timeout_default,
       parallel: parsed.parallel ?? DEFAULT_CONFIG.parallel,
     };
   } catch {

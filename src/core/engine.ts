@@ -16,6 +16,7 @@ import { assembleAgentPrompt } from "./runner/agent.js";
 import { createRunManager, type RunDirectory } from "./run-manager.js";
 import { loadConfig, DEFAULT_CONFIG } from "./config.js";
 import { loadEnvFile } from "./env.js";
+import { parseDuration } from "./duration.js";
 import { ExecutionError, ConfigError } from "./errors.js";
 import { join, dirname } from "node:path";
 import { access } from "node:fs/promises";
@@ -319,6 +320,21 @@ export class WorkflowEngine {
         },
       };
     } else {
+      const limitStr = step.stepConfig?.timeout ?? this.config.timeoutDefault;
+      const limitMs = limitStr ? parseDuration(limitStr) : undefined;
+      const startMs = Date.now();
+
+      const timeoutSignal = limitMs !== undefined ? AbortSignal.timeout(limitMs) : undefined;
+      const signals = [this.options.signal, timeoutSignal].filter(
+        (s): s is AbortSignal => s !== undefined,
+      );
+      const composed =
+        signals.length === 0
+          ? undefined
+          : signals.length === 1
+            ? signals[0]
+            : AbortSignal.any(signals);
+
       output = await runStep(
         step,
         this.completedResults,
@@ -330,8 +346,37 @@ export class WorkflowEngine {
         this.globalContext,
         (stream, chunk) =>
           this.emit({ type: "step:output", nodeId: token.nodeId, stream, chunk }),
-        this.options.signal,
+        composed,
       );
+
+      // Distinguish our timeout from a user abort: only the timeoutSignal
+      // should have fired. If both fire (user aborted just as timeout hit),
+      // prefer user-abort semantics and skip the timeout event.
+      if (
+        timeoutSignal?.aborted &&
+        !this.options.signal?.aborted &&
+        limitMs !== undefined
+      ) {
+        const elapsedMs = Date.now() - startMs;
+        this.emit({
+          type: "step:timeout",
+          nodeId: token.nodeId,
+          tokenId: token.id,
+          elapsedMs,
+          limitMs,
+        });
+        output = {
+          exitCode: 124,
+          stdout: output.stdout,
+          stderr:
+            (output.stderr && !output.stderr.endsWith("\n") ? output.stderr + "\n" : output.stderr) +
+            `[markflow] step "${token.nodeId}" timed out after ${limitStr}\n`,
+          parsedResult: {
+            edge: "fail",
+            summary: `timeout after ${limitStr}`,
+          },
+        };
+      }
     }
 
     // Build StepResult

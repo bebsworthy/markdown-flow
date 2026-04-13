@@ -135,6 +135,102 @@ echo done
     expect(stepB.agentConfig).toBeUndefined();
   });
 
+  it("parses a config block with timeout on a script step", () => {
+    const source = `# Test
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  A --> B
+\`\`\`
+
+# Steps
+
+## A
+
+\`\`\`config
+timeout: 5m
+\`\`\`
+
+\`\`\`bash
+sleep 2
+\`\`\`
+
+## B
+
+\`\`\`bash
+echo done
+\`\`\`
+`;
+    const sections = parseMarkdownSections(source);
+    const stepA = sections.steps.find((s) => s.id === "A")!;
+    expect(stepA.type).toBe("script");
+    expect(stepA.stepConfig).toEqual({ timeout: "5m" });
+    expect(stepA.agentConfig).toBeUndefined();
+    expect(stepA.content).toContain("sleep 2");
+  });
+
+  it("parses timeout_default in the top-level config block", () => {
+    const source = `# Test
+
+\`\`\`config
+timeout_default: 30m
+\`\`\`
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  A --> B
+\`\`\`
+
+# Steps
+
+## A
+\`\`\`bash
+echo a
+\`\`\`
+
+## B
+\`\`\`bash
+echo b
+\`\`\`
+`;
+    const sections = parseMarkdownSections(source);
+    expect(sections.configDefaults?.timeoutDefault).toBe("30m");
+  });
+
+  it("throws when a script step has agent/flags in its config block", () => {
+    const source = `# Test
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  A --> B
+\`\`\`
+
+# Steps
+
+## A
+
+\`\`\`config
+agent: claude
+\`\`\`
+
+\`\`\`bash
+echo a
+\`\`\`
+
+## B
+\`\`\`bash
+echo b
+\`\`\`
+`;
+    expect(() => parseMarkdownSections(source)).toThrow(/agent\/flags/);
+  });
+
   it("throws on unsupported code block language", () => {
     const source = `# Test
 
