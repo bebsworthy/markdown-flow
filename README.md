@@ -269,6 +269,7 @@ Unmocked steps run for real — mock only the steps you need to isolate.
 ## Examples
 
 - [`docs/examples/loop.md`](docs/examples/loop.md) — issue-triage loop demonstrating the **emitter pattern**: one step owns a cached list, keeps its cursor in `LOCAL`, publishes the current item into `GLOBAL`, and self-loops until exhausted. Ports in [JavaScript](docs/examples/loop-js.md) and [Python](docs/examples/loop-py.md) show the protocol is language-agnostic.
+- [`docs/examples/config-block.md`](docs/examples/config-block.md) — small haiku-generator demonstrating the **top-level config block**: a random topic flows from a script step into an agent step (inheriting workflow-level `agent` and `flags`) and back out to a formatter script.
 
 ## How It Works
 
@@ -280,7 +281,33 @@ Unmocked steps run for real — mock only the steps you need to isolate.
 
 ## Configuration
 
-Place a `.workflow.json` next to your workflow `.md` file to override defaults:
+Defaults can be set at three granularities, in ascending precedence:
+
+1. **Top-level ` ```config ` block** in the workflow `.md` — inline defaults that keep the file self-contained.
+2. **`.workflow.json` sidecar** next to the workflow `.md`.
+3. **Per-step ` ```config ` block** at the top of a step — overrides the agent or appends extra flags for that step only.
+
+Programmatic `options.config` passed to `executeWorkflow` overrides all three.
+
+### Top-level config block
+
+````markdown
+# My Workflow
+
+```config
+agent: claude
+flags:
+  - --model
+  - haiku
+parallel: true
+max_retries_default: 3
+```
+
+# Flow
+…
+````
+
+### `.workflow.json` sidecar
 
 ```json
 {
@@ -291,9 +318,13 @@ Place a `.workflow.json` next to your workflow `.md` file to override defaults:
 }
 ```
 
-The assembled prompt is piped to the agent's stdin; argv contains `agent_flags` prefixed by the agent's non-interactive invocation. markflow owns that prefix — `-p` for `claude` and `gemini`, `exec -` for `codex` — and prepends it automatically. `agent_flags` is for *extra* args (model selection, verbosity, etc.); if you list a baseline flag again it is silently deduped with a warning. For agents markflow doesn't know, `agent_flags` is passed through verbatim.
+If both a top-level block and a `.workflow.json` are present, the engine prints a warning at start — the JSON wins.
 
-Per-step overrides live in a fenced **YAML** config block (language `config`) at the top of the step body:
+### Non-interactive invocation is engine-owned
+
+The assembled prompt is piped to the agent's stdin; argv contains `agent_flags` (or `flags:`) prefixed by the agent's non-interactive invocation. markflow owns that prefix — `-p` for `claude` and `gemini`, `exec -` for `codex` — and prepends it automatically. `flags` is for *extra* args (model selection, verbosity, etc.); if you list a baseline flag again it is silently deduped with a warning. For agents markflow doesn't know, `flags` is passed through verbatim.
+
+### Per-step overrides
 
 ````markdown
 ## analyze-ticket
@@ -307,6 +338,8 @@ flags:
 
 You are a ticket analyst. …
 ````
+
+Per-step `flags` **append** to the workflow-level list — the per-step block doesn't replace it. Use `agent:` to swap the binary entirely.
 
 ## Development
 
