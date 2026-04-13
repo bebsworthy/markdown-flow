@@ -1,7 +1,7 @@
 import { unified } from "unified";
 import remarkParse from "remark-parse";
 import type { Root, Heading, Code, List } from "mdast";
-import type { StepDefinition, ScriptLang, InputDeclaration, StepAgentConfig, ValidationDiagnostic } from "../types.js";
+import type { StepDefinition, ScriptLang, InputDeclaration, StepAgentConfig, ValidationDiagnostic, MarkflowConfig } from "../types.js";
 import { SUPPORTED_LANGS } from "../types.js";
 import { ParseError } from "../errors.js";
 
@@ -11,6 +11,7 @@ export interface RawSections {
   inputs: InputDeclaration[];
   mermaidSource: string;
   steps: StepDefinition[];
+  configDefaults?: Partial<MarkflowConfig>;
   parserDiagnostics: ValidationDiagnostic[];
 }
 
@@ -45,6 +46,12 @@ export function parseMarkdownSections(source: string): RawSections {
   // Extract description: prose between the first H1 and # Flow (headings are skipped)
   const description = extractTextBetween(source, children, h1Index, flowIndex);
 
+  // Optional top-level ```config block between the H1 and # Flow
+  const topConfigBlock = findCodeBlock(children, h1Index + 1, flowIndex, "config");
+  const configDefaults = topConfigBlock
+    ? parseTopConfig(topConfigBlock.value)
+    : undefined;
+
   // Extract inputs from optional # Inputs section
   let inputs: InputDeclaration[] = [];
   if (inputsIndex !== -1) {
@@ -67,7 +74,7 @@ export function parseMarkdownSections(source: string): RawSections {
   const stepsEnd = findNextH1(children, stepsIndex + 1);
   const { steps, diagnostics: stepDiagnostics } = extractSteps(source, children, stepsIndex, stepsEnd);
 
-  return { name, description, inputs, mermaidSource, steps, parserDiagnostics: stepDiagnostics };
+  return { name, description, inputs, mermaidSource, steps, configDefaults, parserDiagnostics: stepDiagnostics };
 }
 
 function extractHeadingText(heading: Heading): string {
@@ -337,6 +344,53 @@ function parseInputLine(line: string): InputDeclaration | null {
   }
   // default: "value"
   return { name, required: false, default: defaultVal, description };
+}
+
+function parseTopConfig(yaml: string): Partial<MarkflowConfig> {
+  const config: Partial<MarkflowConfig> = {};
+  const lines = yaml.split("\n");
+  let inFlags = false;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+    if (!line.trim()) continue;
+
+    const agentMatch = line.match(/^agent:\s*(.+)$/);
+    if (agentMatch) {
+      config.agent = agentMatch[1].trim();
+      inFlags = false;
+      continue;
+    }
+
+    if (/^flags:\s*$/.test(line)) {
+      config.agentFlags = [];
+      inFlags = true;
+      continue;
+    }
+
+    if (inFlags) {
+      const itemMatch = line.match(/^\s+-\s+(.+)$/);
+      if (itemMatch) {
+        config.agentFlags!.push(itemMatch[1].trim());
+        continue;
+      }
+      if (!/^\s/.test(line)) inFlags = false;
+    }
+
+    const parallelMatch = line.match(/^parallel:\s*(true|false)\s*$/i);
+    if (parallelMatch) {
+      config.parallel = parallelMatch[1].toLowerCase() === "true";
+      continue;
+    }
+
+    const retriesMatch = line.match(/^max_retries_default:\s*(\d+)\s*$/);
+    if (retriesMatch) {
+      config.maxRetriesDefault = Number(retriesMatch[1]);
+      continue;
+    }
+  }
+
+  return config;
 }
 
 function parseStepConfig(yaml: string): StepAgentConfig {

@@ -432,4 +432,45 @@ echo ok
     expect(runInfo.steps[0].node).toBe("check");
     expect(runInfo.steps[1].node).toBe("deploy");
   });
+
+  it("propagates top-level ```config block onto WorkflowDefinition", () => {
+    const source = `# Config Propagation
+
+\`\`\`config
+agent: sonnet
+flags:
+  - -p
+parallel: false
+max_retries_default: 2
+\`\`\`
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  A --> B
+\`\`\`
+
+# Steps
+
+## A
+
+\`\`\`bash
+echo a
+\`\`\`
+
+## B
+
+\`\`\`bash
+echo b
+\`\`\`
+`;
+    const def = parseWorkflowFromString(source);
+    expect(def.configDefaults).toEqual({
+      agent: "sonnet",
+      agentFlags: ["-p"],
+      parallel: false,
+      maxRetriesDefault: 2,
+    });
+  });
 });

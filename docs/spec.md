@@ -312,17 +312,20 @@ The engine streams stdout, intercepting three sentinel prefixes on their own lin
 
 Everything else in stdout is logged unchanged and ignored by the engine. Sentinel-looking lines whose JSON is malformed are treated as prose.
 
-Invocation: the engine spawns the agent with only the configured `agent_flags`
-in argv and pipes the assembled prompt to stdin, e.g. equivalent to:
+Invocation: the engine spawns the agent with its CLI-specific non-interactive
+argv prefix (engine-owned) followed by the configured `agent_flags`, and pipes
+the assembled prompt to stdin, e.g. equivalent to:
 
 ```bash
-echo "<assembled prompt>" | claude -p
+echo "<assembled prompt>" | claude -p [agent_flags...]
 ```
 
-The agent CLI is configurable via `.workflow.json` (`agent`, `agent_flags`).
-Default: `{ agent: "claude", agent_flags: ["-p"] }`. For other CLIs set the
-appropriate headless-mode flags — e.g. `["-p"]` for `gemini`, `["exec", "-"]`
-for `codex`.
+The agent binary is configurable via `.workflow.json` (`agent`, `agent_flags`);
+default `{ agent: "claude", agent_flags: [] }`. The non-interactive prefix is
+*not* a user setting — markflow prepends it based on the agent basename:
+`-p` for `claude` and `gemini`, `exec -` for `codex`. Unknown agents get no
+prefix, so `agent_flags` is passed through verbatim. If a user-supplied flag
+collides with the baseline it is silently deduped with a warning.
 
 ### Step Result
 

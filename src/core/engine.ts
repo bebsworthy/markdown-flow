@@ -14,10 +14,11 @@ import { resolveRoute, createRetryState, type RetryState } from "./router.js";
 import { runStep } from "./runner/index.js";
 import { assembleAgentPrompt } from "./runner/agent.js";
 import { createRunManager, type RunDirectory } from "./run-manager.js";
-import { loadConfig } from "./config.js";
+import { loadConfig, DEFAULT_CONFIG } from "./config.js";
 import { loadEnvFile } from "./env.js";
 import { ExecutionError, ConfigError } from "./errors.js";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { access } from "node:fs/promises";
 
 export interface EngineOptions {
   config?: Partial<MarkflowConfig>;
@@ -76,7 +77,24 @@ export class WorkflowEngine {
   async start(): Promise<RunInfo> {
     // Load config
     const fileConfig = await loadConfig(this.def.sourceFile);
-    this.config = { ...fileConfig, ...this.options.config } as MarkflowConfig;
+    this.config = {
+      ...DEFAULT_CONFIG,
+      ...(this.def.configDefaults ?? {}),
+      ...fileConfig,
+      ...this.options.config,
+    } as MarkflowConfig;
+
+    if (this.def.configDefaults) {
+      const jsonPath = join(dirname(this.def.sourceFile), ".workflow.json");
+      try {
+        await access(jsonPath);
+        console.warn(
+          `markflow: both a top-level \`\`\`config block and ${jsonPath} are present — .workflow.json values win.`,
+        );
+      } catch {
+        // no sidecar — no conflict
+      }
+    }
 
     // Resolve workflow inputs through the layered source stack
     this.resolvedInputs = await this.resolveInputs();

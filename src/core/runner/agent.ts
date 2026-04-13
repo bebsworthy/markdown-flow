@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { basename } from "node:path";
 import type {
   StepDefinition,
   StepOutput,
@@ -8,6 +9,44 @@ import type {
 } from "../types.js";
 import { renderTemplate, type TemplateContext } from "../template.js";
 import { createStreamParser } from "./stream-parser.js";
+
+// Non-interactive argv prefix per known agent CLI. markflow pipes the prompt to
+// stdin and captures stdout, so interactive REPLs would hang the runner. The
+// prefix is engine-owned and always prepended regardless of user configuration.
+const NON_INTERACTIVE_ARGV: Record<string, readonly string[]> = {
+  claude: ["-p"],
+  gemini: ["-p"],
+  codex: ["exec", "-"],
+};
+
+/**
+ * Compute the argv to pass to the agent binary.
+ *
+ * Prepends the CLI-specific non-interactive prefix (engine-owned, not
+ * user-configurable), then appends user flags, deduping any user-supplied
+ * tokens that would collide with the baseline. The warning notifies users
+ * whose configs predate this behavior.
+ */
+export function resolveAgentArgv(
+  agent: string,
+  configFlags: readonly string[],
+  stepFlags: readonly string[],
+): { argv: string[]; redundant: string[] } {
+  const binName = basename(agent);
+  const baseline = NON_INTERACTIVE_ARGV[binName] ?? [];
+  const userFlags = [...configFlags, ...stepFlags];
+  const redundant = userFlags.filter((f) => baseline.includes(f));
+  if (redundant.length > 0) {
+    console.warn(
+      `markflow: dropping redundant flag(s) ${redundant.join(", ")} — markflow always invokes ${binName} in non-interactive mode.`,
+    );
+  }
+  const argv = [
+    ...baseline,
+    ...userFlags.filter((f) => !baseline.includes(f)),
+  ];
+  return { argv, redundant };
+}
 
 export function assembleAgentPrompt(
   step: StepDefinition,
@@ -76,10 +115,11 @@ export async function runAgent(
 
   // Per-step config overrides global: step agent wins, step flags append to global flags
   const effectiveAgent = step.agentConfig?.agent ?? config.agent;
-  const effectiveFlags = [
-    ...config.agentFlags,
-    ...(step.agentConfig?.flags ?? []),
-  ];
+  const { argv: effectiveFlags } = resolveAgentArgv(
+    effectiveAgent,
+    config.agentFlags,
+    step.agentConfig?.flags ?? [],
+  );
 
   return new Promise<StepOutput>((resolve) => {
     const child = spawn(effectiveAgent, effectiveFlags, {

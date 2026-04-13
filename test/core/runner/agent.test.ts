@@ -1,8 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runAgent, assembleAgentPrompt } from "../../../src/core/runner/agent.js";
+import {
+  runAgent,
+  assembleAgentPrompt,
+  resolveAgentArgv,
+} from "../../../src/core/runner/agent.js";
 import type { StepDefinition, MarkflowConfig } from "../../../src/core/types.js";
 
 const config: MarkflowConfig = {
@@ -54,6 +58,57 @@ describe("runAgent prompt delivery", () => {
     } finally {
       await rm(workspace, { recursive: true, force: true });
     }
+  });
+});
+
+describe("resolveAgentArgv", () => {
+  it("prepends -p for claude when user supplies no flags", () => {
+    const { argv, redundant } = resolveAgentArgv("claude", [], []);
+    expect(argv).toEqual(["-p"]);
+    expect(redundant).toEqual([]);
+  });
+
+  it("prepends -p for claude given an absolute path", () => {
+    const { argv } = resolveAgentArgv("/usr/local/bin/claude", [], []);
+    expect(argv).toEqual(["-p"]);
+  });
+
+  it("prepends exec - for codex", () => {
+    const { argv } = resolveAgentArgv("codex", [], []);
+    expect(argv).toEqual(["exec", "-"]);
+  });
+
+  it("keeps user flags after the baseline", () => {
+    const { argv } = resolveAgentArgv("claude", ["--model", "haiku"], []);
+    expect(argv).toEqual(["-p", "--model", "haiku"]);
+  });
+
+  it("dedupes when user also supplies the baseline flag", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { argv, redundant } = resolveAgentArgv(
+      "claude",
+      ["-p", "--model", "haiku"],
+      [],
+    );
+    expect(argv).toEqual(["-p", "--model", "haiku"]);
+    expect(redundant).toEqual(["-p"]);
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+
+  it("appends step flags after config flags, after baseline", () => {
+    const { argv } = resolveAgentArgv("claude", ["--model", "haiku"], ["-v"]);
+    expect(argv).toEqual(["-p", "--model", "haiku", "-v"]);
+  });
+
+  it("returns user flags unchanged for unknown agents", () => {
+    const { argv, redundant } = resolveAgentArgv(
+      process.execPath,
+      ["-e", "console.log(1)"],
+      [],
+    );
+    expect(argv).toEqual(["-e", "console.log(1)"]);
+    expect(redundant).toEqual([]);
   });
 });
 

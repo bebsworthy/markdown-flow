@@ -297,4 +297,74 @@ echo ok
     expect(a.content).toContain("2. Check lint");
     expect(a.content).toContain("End.");
   });
+
+  it("parses a top-level ```config block", () => {
+    const source = `# My Workflow
+
+\`\`\`config
+agent: gpt
+flags:
+  - --json
+  - -v
+parallel: false
+max_retries_default: 4
+\`\`\`
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  A --> B
+\`\`\`
+
+# Steps
+
+## A
+
+\`\`\`bash
+echo a
+\`\`\`
+
+## B
+
+\`\`\`bash
+echo b
+\`\`\`
+`;
+    const sections = parseMarkdownSections(source);
+    expect(sections.configDefaults).toEqual({
+      agent: "gpt",
+      agentFlags: ["--json", "-v"],
+      parallel: false,
+      maxRetriesDefault: 4,
+    });
+  });
+
+  it("returns undefined configDefaults when no top-level config block is present", () => {
+    const source = `# Plain
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  A --> B
+\`\`\`
+
+# Steps
+
+## A
+
+\`\`\`bash
+echo a
+\`\`\`
+
+## B
+
+\`\`\`bash
+echo b
+\`\`\`
+`;
+    const sections = parseMarkdownSections(source);
+    expect(sections.configDefaults).toBeUndefined();
+  });
 });

@@ -285,13 +285,13 @@ Place a `.workflow.json` next to your workflow `.md` file to override defaults:
 ```json
 {
   "agent": "claude",
-  "agent_flags": ["-p"],
+  "agent_flags": ["--model", "haiku"],
   "max_retries_default": 3,
   "parallel": true
 }
 ```
 
-The assembled prompt is piped to the agent's stdin; argv contains only the flags in `agent_flags`. Set `agent_flags` to whatever puts your CLI into non-interactive mode — e.g. `["-p"]` for `claude` and `gemini`, or `["exec", "-"]` for `codex`. The default is `["-p"]`.
+The assembled prompt is piped to the agent's stdin; argv contains `agent_flags` prefixed by the agent's non-interactive invocation. markflow owns that prefix — `-p` for `claude` and `gemini`, `exec -` for `codex` — and prepends it automatically. `agent_flags` is for *extra* args (model selection, verbosity, etc.); if you list a baseline flag again it is silently deduped with a warning. For agents markflow doesn't know, `agent_flags` is passed through verbatim.
 
 Per-step overrides live in a fenced **YAML** config block (language `config`) at the top of the step body:
 
@@ -301,7 +301,8 @@ Per-step overrides live in a fenced **YAML** config block (language `config`) at
 ```config
 agent: gemini
 flags:
-  - -p
+  - --model
+  - gemini-2.0-flash
 ```
 
 You are a ticket analyst. …

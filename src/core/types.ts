@@ -14,6 +14,7 @@ export interface WorkflowDefinition {
   graph: FlowGraph;
   steps: Map<string, StepDefinition>;
   sourceFile: string;
+  configDefaults?: Partial<MarkflowConfig>;
   parserDiagnostics?: ValidationDiagnostic[];
 }
 
