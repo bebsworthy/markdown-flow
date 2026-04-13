@@ -5,13 +5,14 @@ import {
   validateWorkflow,
   executeWorkflow,
   type EngineEvent,
+  WorkflowAbortError,
 } from "../../core/index.js";
 import {
   resolveTarget,
   parseInputFlags,
 } from "../workspace.js";
 import { initCommand } from "./init.js";
-import { createDebugHook, WorkflowAbortError } from "../debug.js";
+import { createDebugHook } from "../debug.js";
 
 export interface RunOptions {
   workspace?: string;
@@ -23,6 +24,7 @@ export interface RunOptions {
   debug?: boolean;
   breakOn?: string;
   verbose?: boolean;
+  json?: boolean;
 }
 
 export async function runCommand(
@@ -64,34 +66,42 @@ export async function runCommand(
     process.exit(1);
   }
 
-  console.log(chalk.bold(`Workflow: ${definition.name}`));
-  if (definition.description) console.log(chalk.dim(definition.description));
-  console.log();
+  const jsonMode = options.json ?? false;
+
+  if (!jsonMode) {
+    console.log(chalk.bold(`Workflow: ${definition.name}`));
+    if (definition.description) console.log(chalk.dim(definition.description));
+    console.log();
+  }
 
   // Validate
   const diagnostics = validateWorkflow(definition);
   const errors = diagnostics.filter((d) => d.severity === "error");
   const warnings = diagnostics.filter((d) => d.severity === "warning");
-  for (const w of warnings) console.warn(chalk.yellow(`  warning: ${w.message}`));
-  for (const e of errors) console.error(chalk.red(`  error: ${e.message}`));
+  if (!jsonMode) {
+    for (const w of warnings) console.warn(chalk.yellow(`  warning: ${w.message}`));
+    for (const e of errors) console.error(chalk.red(`  error: ${e.message}`));
+  }
   if (errors.length > 0) {
-    console.error(chalk.red(`\n${errors.length} error(s) found. Workflow cannot run.`));
+    if (!jsonMode) console.error(chalk.red(`\n${errors.length} error(s) found. Workflow cannot run.`));
     process.exit(1);
   }
-  if (diagnostics.length === 0) console.log(chalk.green("  Validation passed"));
-  console.log();
+  if (!jsonMode && diagnostics.length === 0) console.log(chalk.green("  Validation passed"));
+  if (!jsonMode) console.log();
 
   if (options.dryRun) {
-    console.log(chalk.green("Dry run complete. Workflow is valid."));
-    console.log(`  Nodes: ${definition.graph.nodes.size}, Edges: ${definition.graph.edges.length}`);
-    const stepTypes = [...definition.steps.values()];
-    console.log(`  Steps: ${stepTypes.filter((s) => s.type === "script").length} script, ${stepTypes.filter((s) => s.type === "agent").length} agent`);
+    if (!jsonMode) {
+      console.log(chalk.green("Dry run complete. Workflow is valid."));
+      console.log(`  Nodes: ${definition.graph.nodes.size}, Edges: ${definition.graph.edges.length}`);
+      const stepTypes = [...definition.steps.values()];
+      console.log(`  Steps: ${stepTypes.filter((s) => s.type === "script").length} script, ${stepTypes.filter((s) => s.type === "agent").length} agent`);
+    }
     return;
   }
 
   // Debug mode: disable parallel (readline + concurrent tokens = deadlock)
   const debugActive = options.debug || options.breakOn !== undefined;
-  if (debugActive && options.parallel) {
+  if (debugActive && options.parallel && !jsonMode) {
     console.log(chalk.dim("Debug mode: disabling parallel execution."));
   }
 
@@ -109,7 +119,18 @@ export async function runCommand(
     : undefined;
 
   const verbose = options.verbose ?? false;
-  const onEvent = (e: EngineEvent) => printEvent(e, verbose);
+  const onEvent = (e: EngineEvent) => {
+    if (jsonMode) {
+      console.log(JSON.stringify(e));
+    } else {
+      printEvent(e, verbose);
+    }
+  };
+
+  const abortController = new AbortController();
+  const onSignal = () => abortController.abort();
+  process.on("SIGINT", onSignal);
+  process.on("SIGTERM", onSignal);
 
   try {
     const runInfo = await executeWorkflow(definition, {
@@ -120,21 +141,29 @@ export async function runCommand(
       inputs,
       onEvent,
       beforeStep: debugger_?.hook,
+      signal: abortController.signal,
     });
 
-    console.log();
-    const statusColor = runInfo.status === "complete" ? chalk.green : chalk.red;
-    console.log(
-      statusColor(`Run ${runInfo.id} finished with status: ${runInfo.status}`),
-    );
+    if (jsonMode) {
+      console.log(JSON.stringify(runInfo));
+    } else {
+      console.log();
+      const statusColor = runInfo.status === "complete" ? chalk.green : chalk.red;
+      console.log(
+        statusColor(`Run ${runInfo.id} finished with status: ${runInfo.status}`),
+      );
+    }
+    if (runInfo.status !== "complete") process.exitCode = 1;
   } catch (err) {
     if (err instanceof WorkflowAbortError) {
-      console.log(chalk.yellow("\nAborted."));
+      if (!jsonMode) console.log(chalk.yellow("\nAborted."));
       process.exitCode = 1;
     } else {
       throw err;
     }
   } finally {
+    process.off("SIGINT", onSignal);
+    process.off("SIGTERM", onSignal);
     debugger_?.close();
   }
 }

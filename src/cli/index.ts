@@ -104,6 +104,11 @@ yargs(hideBin(process.argv))
         .option("break-on", {
           type: "string",
           describe: "Run until the named step, then pause (implies --debug)",
+        })
+        .option("json", {
+          type: "boolean",
+          default: false,
+          describe: "Output events and result as JSON lines",
         }),
     async (argv) => {
       await runCommand(argv.target!, {
@@ -116,6 +121,7 @@ yargs(hideBin(process.argv))
         verbose: argv.verbose,
         debug: argv.debug,
         breakOn: argv.breakOn,
+        json: argv.json,
       });
     },
   )

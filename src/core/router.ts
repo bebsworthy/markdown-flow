@@ -1,5 +1,6 @@
 import type { FlowGraph, FlowEdge, StepResult, MarkflowConfig } from "./types.js";
 import { getOutgoingEdges } from "./graph.js";
+import { ExecutionError } from "./errors.js";
 
 export interface RetryState {
   /** nodeId → edgeLabel → count */
@@ -91,7 +92,7 @@ export function resolveRoute(
   }
 
   if (!matchedEdge) {
-    throw new Error(
+    throw new ExecutionError(
       `Routing error: no matching edge from "${nodeId}" for result edge "${result.edge}"`,
     );
   }
@@ -109,7 +110,7 @@ export function resolveRoute(
         (e) => e.annotations.exhaustionLabel === matchedEdge!.label,
       );
       if (!handler) {
-        throw new Error(
+        throw new ExecutionError(
           `Retry budget exhausted for "${matchedEdge.label}" from "${nodeId}" but no :max handler found`,
         );
       }

@@ -1,4 +1,5 @@
 import type { FlowGraph, FlowNode, FlowEdge, EdgeAnnotations } from "../types.js";
+import { ParseError } from "../errors.js";
 
 /**
  * Parse a Mermaid flowchart string into a FlowGraph.
@@ -11,7 +12,7 @@ export function parseMermaidFlowchart(source: string): FlowGraph {
 
   const firstLine = lines.find((l) => l.length > 0 && !l.startsWith("%%"));
   if (!firstLine || !/^flowchart\s+(TD|TB|LR|RL|BT)/i.test(firstLine)) {
-    throw new Error(
+    throw new ParseError(
       'Mermaid block must start with "flowchart" and a direction (TD, LR, etc.)',
     );
   }

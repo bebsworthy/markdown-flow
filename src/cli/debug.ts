@@ -5,6 +5,7 @@ import type {
   BeforeStepDirective,
   BeforeStepHook,
 } from "../core/index.js";
+import { WorkflowAbortError } from "../core/errors.js";
 
 const SECRET_RE = /KEY|TOKEN|SECRET|PASSWORD/i;
 
@@ -129,13 +130,6 @@ function renderTrace(ctx: BeforeStepContext): void {
     console.log(`  ${parts.join(" → ")}`);
   }
   console.log();
-}
-
-export class WorkflowAbortError extends Error {
-  constructor() {
-    super("Workflow aborted by debugger");
-    this.name = "WorkflowAbortError";
-  }
 }
 
 function prompt(rl: readline.Interface, question: string): Promise<string> {

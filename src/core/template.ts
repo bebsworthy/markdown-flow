@@ -1,4 +1,5 @@
 import { Liquid, LiquidError } from "liquidjs";
+import { TemplateError } from "./errors.js";
 import { registerMarkdownFilters } from "./template-filters.js";
 
 export interface TemplateContext {
@@ -39,7 +40,7 @@ export function renderTemplate(
     return engine.parseAndRenderSync(text, scope);
   } catch (err) {
     if (err instanceof LiquidError) {
-      throw new Error(
+      throw new TemplateError(
         `Template error in step "${stepId}": ${err.message.trim()}`,
       );
     }

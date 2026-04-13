@@ -30,6 +30,7 @@ export async function runScript(
   workdirPath: string,
   runDir: string,
   onOutput?: StepOutputHandler,
+  signal?: AbortSignal,
 ): Promise<StepOutput> {
   const lang = step.lang ?? "bash";
   const interpreter = LANG_TO_INTERPRETER[lang];
@@ -46,6 +47,7 @@ export async function runScript(
       cwd: workdirPath,
       env: { ...process.env, ...env },
       stdio: ["ignore", "pipe", "pipe"],
+      ...(signal ? { signal } : {}),
     });
 
     const stdoutChunks: Buffer[] = [];

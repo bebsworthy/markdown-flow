@@ -18,9 +18,10 @@ export async function runStep(
   config: MarkflowConfig,
   globalContext: Record<string, unknown>,
   onOutput?: StepOutputHandler,
+  signal?: AbortSignal,
 ): Promise<StepOutput> {
   if (step.type === "script") {
-    return runScript(step, env, workdirPath, runDir, onOutput);
+    return runScript(step, env, workdirPath, runDir, onOutput, signal);
   }
   return runAgent(
     step,
@@ -31,5 +32,6 @@ export async function runStep(
     env,
     globalContext,
     onOutput,
+    signal,
   );
 }

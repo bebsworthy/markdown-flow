@@ -63,6 +63,7 @@ export async function runAgent(
   env: Record<string, string> = {},
   globalContext: Record<string, unknown> = {},
   onOutput?: StepOutputHandler,
+  signal?: AbortSignal,
 ): Promise<StepOutput> {
   const prompt = assembleAgentPrompt(
     step,
@@ -85,6 +86,7 @@ export async function runAgent(
       cwd: workdirPath,
       env: process.env,
       stdio: ["pipe", "pipe", "pipe"],
+      ...(signal ? { signal } : {}),
     });
 
     child.stdin.write(prompt);

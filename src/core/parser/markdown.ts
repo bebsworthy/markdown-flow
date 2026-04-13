@@ -3,6 +3,7 @@ import remarkParse from "remark-parse";
 import type { Root, Heading, Code, List } from "mdast";
 import type { StepDefinition, ScriptLang, InputDeclaration, StepAgentConfig } from "../types.js";
 import { SUPPORTED_LANGS } from "../types.js";
+import { ParseError } from "../errors.js";
 
 export interface RawSections {
   name: string;
@@ -24,7 +25,7 @@ export function parseMarkdownSections(source: string): RawSections {
     (n) => n.type === "heading" && n.depth === 1,
   );
   if (h1Index === -1) {
-    throw new Error("Workflow file must have an H1 heading as the name");
+    throw new ParseError("Workflow file must have an H1 heading as the name");
   }
   const name = extractHeadingText(children[h1Index] as Heading);
 
@@ -34,10 +35,10 @@ export function parseMarkdownSections(source: string): RawSections {
   const inputsIndex = findH1ByText(children, "Inputs");
 
   if (flowIndex === -1) {
-    throw new Error('Workflow file must have a "# Flow" section');
+    throw new ParseError('Workflow file must have a "# Flow" section');
   }
   if (stepsIndex === -1) {
-    throw new Error('Workflow file must have a "# Steps" section');
+    throw new ParseError('Workflow file must have a "# Steps" section');
   }
 
   // Extract description: prose between the first H1 and # Flow (headings are skipped)
@@ -54,7 +55,7 @@ export function parseMarkdownSections(source: string): RawSections {
   const flowEnd = findNextH1(children, flowIndex + 1);
   const mermaidBlock = findCodeBlock(children, flowIndex, flowEnd, "mermaid");
   if (!mermaidBlock) {
-    throw new Error("# Flow section must contain a ```mermaid code block");
+    throw new ParseError("# Flow section must contain a ```mermaid code block");
   }
   const mermaidSource = mermaidBlock.value;
 
@@ -197,7 +198,7 @@ function buildStep(
   if (codeBlock) {
     const lang = codeBlock.lang || "";
     if (!SUPPORTED_LANGS.includes(lang)) {
-      throw new Error(
+      throw new ParseError(
         `Step "${id}" uses unsupported language "${lang}". Supported: ${SUPPORTED_LANGS.join(", ")}`,
       );
     }

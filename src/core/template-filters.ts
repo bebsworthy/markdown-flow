@@ -1,5 +1,6 @@
 import type { Liquid } from "liquidjs";
 import yaml from "js-yaml";
+import { TemplateError } from "./errors.js";
 
 function parseFields(csv: unknown): string[] {
   if (typeof csv !== "string" || !csv.trim()) return [];
@@ -29,7 +30,7 @@ function escapeCell(s: string): string {
 
 function asArray(v: unknown, filter: string): unknown[] {
   if (!Array.isArray(v)) {
-    throw new Error(`${filter} filter expects an array, got ${typeof v}`);
+    throw new TemplateError(`${filter} filter expects an array, got ${typeof v}`);
   }
   return v;
 }
@@ -64,7 +65,7 @@ export function registerMarkdownFilters(engine: Liquid): void {
     const arr = asArray(v, "table");
     const fields = parseFields(fieldsCsv);
     if (!fields.length) {
-      throw new Error("table filter requires at least one field name");
+      throw new TemplateError("table filter requires at least one field name");
     }
     const header = `| ${fields.join(" | ")} |`;
     const sep = `| ${fields.map(() => "---").join(" | ")} |`;

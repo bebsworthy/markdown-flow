@@ -16,6 +16,7 @@ import { assembleAgentPrompt } from "./runner/agent.js";
 import { createRunManager, type RunDirectory } from "./run-manager.js";
 import { loadConfig } from "./config.js";
 import { loadEnvFile } from "./env.js";
+import { ExecutionError, ConfigError } from "./errors.js";
 import { join } from "node:path";
 
 export interface EngineOptions {
@@ -34,6 +35,8 @@ export interface EngineOptions {
    * Used by the interactive debugger and the test harness.
    */
   beforeStep?: BeforeStepHook;
+  /** AbortSignal for graceful cancellation (e.g. SIGINT). */
+  signal?: AbortSignal;
 }
 
 export async function executeWorkflow(
@@ -88,7 +91,7 @@ export class WorkflowEngine {
       // Find start nodes and create initial tokens
       const startNodes = getStartNodes(this.def.graph);
       if (startNodes.length === 0) {
-        throw new Error("Workflow has no start nodes (no nodes without incoming edges)");
+        throw new ExecutionError("Workflow has no start nodes (no nodes without incoming edges)");
       }
 
       for (const nodeId of startNodes) {
@@ -132,6 +135,10 @@ export class WorkflowEngine {
 
   private async runLoop(): Promise<void> {
     while (true) {
+      if (this.options.signal?.aborted) {
+        throw new ExecutionError("Workflow interrupted");
+      }
+
       const readyTokens = this.getReadyTokens();
       if (readyTokens.length === 0) {
         // Check if there are still pending tokens (waiting for merge)
@@ -140,7 +147,7 @@ export class WorkflowEngine {
         );
         if (pending.length > 0) {
           // This shouldn't happen in a well-formed workflow
-          throw new Error(
+          throw new ExecutionError(
             `Deadlock: ${pending.length} pending tokens but none are ready. ` +
             `Nodes: ${pending.map((t) => t.nodeId).join(", ")}`,
           );
@@ -185,7 +192,7 @@ export class WorkflowEngine {
   private async executeToken(token: Token): Promise<void> {
     const step = this.def.steps.get(token.nodeId);
     if (!step) {
-      throw new Error(`No step definition for node "${token.nodeId}"`);
+      throw new ExecutionError(`No step definition for node "${token.nodeId}"`);
     }
 
     token.state = "running";
@@ -304,6 +311,7 @@ export class WorkflowEngine {
         this.globalContext,
         (stream, chunk) =>
           this.emit({ type: "step:output", nodeId: token.nodeId, stream, chunk }),
+        this.options.signal,
       );
     }
 
@@ -483,7 +491,7 @@ export class WorkflowEngine {
       .map((d) => d.name);
 
     if (missing.length > 0) {
-      throw new Error(
+      throw new ConfigError(
         `Missing required workflow inputs: ${missing.join(", ")}. ` +
           `Set them in the environment, a .env file, or pass with --input KEY=VALUE`,
       );

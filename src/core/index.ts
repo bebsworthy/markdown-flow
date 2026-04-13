@@ -4,3 +4,4 @@ export { executeWorkflow, WorkflowEngine } from "./engine.js";
 export { createRunManager } from "./run-manager.js";
 export { loadConfig, DEFAULT_CONFIG } from "./config.js";
 export * from "./types.js";
+export * from "./errors.js";
