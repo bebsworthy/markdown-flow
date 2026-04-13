@@ -66,7 +66,7 @@ test/
 | Dev runner | **tsx** | Runs TS directly during development |
 | Test | **vitest** | Native ESM, TS-first, fast |
 | Markdown parse | **unified + remark-parse** | Standard AST library, avoids custom MD parser |
-| Mermaid parse | **@mermaid-js/parser** | Official parser, structured AST, no rendering/D3/jsdom deps |
+| Mermaid parse | **@emily/mermaid-ast** | Vendors mermaid's JISON grammar, full flowchart AST, no rendering deps |
 | CLI framework | **yargs** | Mature, subcommand support |
 | Formatting | **chalk** | Terminal colors for CLI output |
 
@@ -82,8 +82,8 @@ test/
 - `src/core/types.ts` — all interfaces upfront
 
 ### Phase 2: Parser + Validator (testable in isolation)
-1. `parser/mermaid.ts` — adapter over `@mermaid-js/parser`
-   - Parses flowchart via official parser, maps AST nodes/edges into our `FlowGraph` types
+1. `parser/mermaid.ts` — adapter over `@emily/mermaid-ast`
+   - Parses flowchart via vendored JISON grammar, maps AST nodes/edges into our `FlowGraph` types
    - Post-processes edge labels to extract annotations: `max:N`, `:max`
 2. `parser/markdown.ts` — uses remark-parse to extract 3 sections (name, flow mermaid block, steps)
 3. `parser/steps.ts` — determines type from content (code block → script with lang, prose → agent)
@@ -117,7 +117,7 @@ test/
 ## Key Design Decisions
 
 1. **JSONL not JSON** for run history — append-only, crash-safe, streamable. File: `context.jsonl`
-2. **`@mermaid-js/parser`** for Mermaid parsing — official parser, structured AST, no rendering deps. Our adapter just maps AST → `FlowGraph` and extracts annotations from labels
+2. **`@emily/mermaid-ast`** for Mermaid parsing — vendors mermaid's JISON grammar for full-fidelity flowchart AST (all node shapes, edge types, subgraphs). Our adapter maps AST → `FlowGraph` and extracts annotations from labels
 3. **Token model** for execution — supports cycles via `generation` counter; merge nodes wait for current generation only
 4. **Event callback** for engine observability — `onEvent: (event: EngineEvent) => void` — CLI formats for humans, library consumers do whatever they want
 5. **Script materialization** — write step code to temp file before execution (debuggable, works with all interpreters)

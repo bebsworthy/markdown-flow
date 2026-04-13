@@ -180,6 +180,7 @@ markflow run <workflow.md | workspace-dir> [options]
     --verbose / -v          # stream each step's stdout/stderr to the console
     --debug                 # pause before each step for interactive inspection
     --break-on <step>       # run until the named step, then pause (implies --debug)
+    --json                  # output events and final result as JSON lines
 
 # List past runs in a workspace
 markflow ls <workspace-dir> [--json]
@@ -208,6 +209,9 @@ import {
   parseWorkflow,
   validateWorkflow,
   executeWorkflow,
+  ParseError,
+  ValidationError,
+  ExecutionError,
 } from "markflow";
 
 const definition = await parseWorkflow("workflow.md");
@@ -218,11 +222,17 @@ if (diagnostics.some(d => d.severity === "error")) {
   process.exit(1);
 }
 
+const controller = new AbortController();
+process.on("SIGINT", () => controller.abort());
+
 const runInfo = await executeWorkflow(definition, {
   inputs: { DEPLOY_TARGET: "staging" },
+  signal: controller.signal,
   onEvent: (event) => console.log(event),
 });
 ```
+
+The library exports a typed error hierarchy — `ParseError`, `ValidationError`, `ExecutionError`, `ConfigError`, `TemplateError` — all extending `MarkflowError` with a `.code` string. Pass an `AbortSignal` via the `signal` option to cancel a running workflow gracefully.
 
 ### Testing workflows
 
@@ -262,7 +272,7 @@ Unmocked steps run for real — mock only the steps you need to isolate.
 
 ## How It Works
 
-- **Parser** extracts name, declared inputs, Mermaid topology, and step definitions.
+- **Parser** extracts name, declared inputs, Mermaid topology (via `@emily/mermaid-ast`, a full-fidelity JISON-based parser), and step definitions. All standard Mermaid flowchart node shapes, edge types, and subgraphs are supported.
 - **Validator** checks structural correctness: node-step matching, retry handler completeness, edge label uniqueness.
 - **Engine** runs a token-based execution loop — linear flows, branching, parallel fan-out/fan-in, cycles, and retry budgets.
 - **Routing** maps script exit codes to edges (`0` → pass/ok/success/done, non-zero → fail/error/retry). Scripts and agents can also emit `RESULT: {"edge": "...", "summary": "..."}` as the final stdout line for explicit control, plus zero or more `LOCAL: {...}` / `GLOBAL: {...}` lines to publish state to later steps.
@@ -317,6 +327,7 @@ src/
     engine.ts     # Token-based workflow executor
     router.ts     # Edge resolution and retry accounting
     validator.ts  # Structural validation
+    errors.ts     # Typed error hierarchy (ParseError, ExecutionError, etc.)
     run-manager.ts
     context-logger.ts
     env.ts        # Layered input resolution

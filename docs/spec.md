@@ -94,18 +94,32 @@ Any unrecognised code block language is an error at parse time.
 
 ## Mermaid Syntax
 
-Only `flowchart` diagram type is supported. Direction (`TD`, `LR`, etc.) is accepted but ignored by the executor.
+Only `flowchart` (or its alias `graph`) diagram type is supported. Direction (`TD`, `LR`, `TB`, `BT`, `RL`) is accepted but ignored by the executor. Parsing is handled by `@emily/mermaid-ast`, which vendors Mermaid's own JISON grammar for full-fidelity AST extraction.
 
 ### Node Declaration
 
-Nodes are declared implicitly by their appearance in edges. The node ID must match a `##` heading in the Steps section exactly.
+Nodes are declared implicitly by their appearance in edges, or as standalone declarations. The node ID must match a `##` heading in the Steps section exactly.
 
-Node labels are optional and used only for display purposes:
+Node labels are optional and used only for display purposes. All standard Mermaid flowchart shapes are supported:
 
-```
-nodeId[Human readable label]
-nodeId[Human readable label annotation:value]
-```
+| Syntax | Shape | Example |
+|---|---|---|
+| `A[label]` | square (rectangle) | `build[Build Project]` |
+| `A(label)` | round | `init(Initialize)` |
+| `A([label])` | stadium | `emit([Emit next])` |
+| `A{label}` | diamond | `check{Pass?}` |
+| `A((label))` | circle | `hub((Hub))` |
+| `A(((label)))` | doublecircle | `end(((Done)))` |
+| `A[(label)]` | cylinder | `db[(Database)]` |
+| `A[[label]]` | subroutine | `sub[[Subroutine]]` |
+| `A>label]` | odd (asymmetric) | `flag>Flag]` |
+| `A{{label}}` | hexagon | `prep{{Prepare}}` |
+| `A[/label/]` | lean_right (parallelogram) | `input[/Data/]` |
+| `A[\label\]` | lean_left | `output[\Result\]` |
+| `A[/label\]` | trapezoid | `wide[/Trapezoid\]` |
+| `A[\label/]` | inv_trapezoid | `narrow[\Inv Trap/]` |
+
+Labels may be quoted for multi-word text: `A["Long label with spaces"]`.
 
 #### Start Nodes
 
@@ -124,12 +138,23 @@ of a node needs the shape; subsequent references can use the plain ID.
 
 ### Edge Declaration
 
+All standard Mermaid edge types are supported:
+
 ```
-A --> B               # unconditional edge
+A --> B               # normal arrow
+A --- B               # open link (no arrow)
+A -.-> B              # dotted arrow
+A ==> B               # thick arrow
 A -->|label| B        # labelled edge
+A -.->|label| B       # labelled dotted edge
+A ==>|label| B        # labelled thick edge
 A -->|label max:N| B  # labelled edge with retry limit
 A -->|label:max| B    # exhaustion handler edge
 ```
+
+### Subgraphs
+
+Mermaid `subgraph ... end` blocks are parsed — nodes declared inside subgraphs are included in the graph like any other node. Subgraph grouping metadata is not currently used by the engine but may be leveraged for visualization in the future.
 
 ### Annotations
 
