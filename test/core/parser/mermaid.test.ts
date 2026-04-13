@@ -98,4 +98,134 @@ describe("parseMermaidFlowchart", () => {
     expect(exhaustionEdge).toBeDefined();
     expect(exhaustionEdge!.to).toBe("abort");
   });
+
+  // ── New: node shapes ──────────────────────────────────────────────────
+
+  it("parses all common node shapes", () => {
+    const graph = parseMermaidFlowchart(`flowchart TD
+  A[Square] --> B(Round)
+  B --> C{Diamond}
+  C --> D((Circle))
+  D --> E[(Cylinder)]
+  E --> F[[Subroutine]]
+  F --> G>Asymmetric]
+  G --> H{{Hexagon}}`);
+
+    expect(graph.nodes.get("A")?.shape).toBe("square");
+    expect(graph.nodes.get("B")?.shape).toBe("round");
+    expect(graph.nodes.get("C")?.shape).toBe("diamond");
+    expect(graph.nodes.get("D")?.shape).toBe("circle");
+    expect(graph.nodes.get("E")?.shape).toBe("cylinder");
+    expect(graph.nodes.get("F")?.shape).toBe("subroutine");
+    expect(graph.nodes.get("G")?.shape).toBe("odd");
+    expect(graph.nodes.get("H")?.shape).toBe("hexagon");
+  });
+
+  it("parses parallelogram and trapezoid shapes", () => {
+    const graph = parseMermaidFlowchart(`flowchart TD
+  A[/Lean Right/] --> B[\\Lean Left\\]
+  B --> C[/Trapezoid\\]
+  C --> D[\\Inv Trapezoid/]`);
+
+    expect(graph.nodes.get("A")?.shape).toBe("lean_right");
+    expect(graph.nodes.get("B")?.shape).toBe("lean_left");
+    expect(graph.nodes.get("C")?.shape).toBe("trapezoid");
+    expect(graph.nodes.get("D")?.shape).toBe("inv_trapezoid");
+  });
+
+  it("sets isStart only for stadium shape", () => {
+    const graph = parseMermaidFlowchart(`flowchart TD
+  A([Stadium]) --> B{Diamond}
+  B --> C((Circle))`);
+
+    expect(graph.nodes.get("A")?.isStart).toBe(true);
+    expect(graph.nodes.get("B")?.isStart).toBeUndefined();
+    expect(graph.nodes.get("C")?.isStart).toBeUndefined();
+  });
+
+  // ── New: edge types ───────────────────────────────────────────────────
+
+  it("parses dotted edges", () => {
+    const graph = parseMermaidFlowchart(`flowchart TD
+  A -.-> B
+  B -.->|optional| C`);
+
+    expect(graph.edges).toHaveLength(2);
+    expect(graph.edges[0]).toMatchObject({ from: "A", to: "B" });
+    expect(graph.edges[1]).toMatchObject({ from: "B", to: "C", label: "optional" });
+  });
+
+  it("parses thick edges", () => {
+    const graph = parseMermaidFlowchart(`flowchart TD
+  A ==> B
+  B ==>|important| C`);
+
+    expect(graph.edges).toHaveLength(2);
+    expect(graph.edges[0]).toMatchObject({ from: "A", to: "B" });
+    expect(graph.edges[1]).toMatchObject({ from: "B", to: "C", label: "important" });
+  });
+
+  it("parses open (no arrow) edges", () => {
+    const graph = parseMermaidFlowchart(`flowchart TD
+  A --- B
+  B ---|link| C`);
+
+    expect(graph.edges).toHaveLength(2);
+    expect(graph.edges[0]).toMatchObject({ from: "A", to: "B" });
+    expect(graph.edges[1]).toMatchObject({ from: "B", to: "C", label: "link" });
+  });
+
+  // ── New: subgraphs ────────────────────────────────────────────────────
+
+  it("includes subgraph nodes in the graph", () => {
+    const graph = parseMermaidFlowchart(`flowchart TD
+  subgraph Build
+    lint --> test
+    test --> typecheck
+  end
+  setup --> lint
+  typecheck --> deploy`);
+
+    expect(graph.nodes.has("lint")).toBe(true);
+    expect(graph.nodes.has("test")).toBe(true);
+    expect(graph.nodes.has("typecheck")).toBe(true);
+    expect(graph.nodes.has("setup")).toBe(true);
+    expect(graph.nodes.has("deploy")).toBe(true);
+    expect(graph.edges).toHaveLength(4);
+  });
+
+  // ── New: labels and text ──────────────────────────────────────────────
+
+  it("parses quoted multi-word labels", () => {
+    const graph = parseMermaidFlowchart(`flowchart TD
+  A["Long label with spaces"] --> B["Another label"]`);
+
+    expect(graph.nodes.get("A")?.label).toBe("Long label with spaces");
+    expect(graph.nodes.get("B")?.label).toBe("Another label");
+  });
+
+  it("parses standalone node declarations", () => {
+    const graph = parseMermaidFlowchart(`flowchart TD
+  A[Declared]
+  A --> B`);
+
+    expect(graph.nodes.get("A")?.label).toBe("Declared");
+    expect(graph.edges).toHaveLength(1);
+  });
+
+  it("supports graph keyword as alias for flowchart", () => {
+    const graph = parseMermaidFlowchart(`graph TD
+  A --> B`);
+
+    expect(graph.nodes.size).toBe(2);
+    expect(graph.edges).toHaveLength(1);
+  });
+
+  it("handles double-circle shape", () => {
+    const graph = parseMermaidFlowchart(`flowchart TD
+  A(((Double Circle))) --> B`);
+
+    expect(graph.nodes.get("A")?.shape).toBe("doublecircle");
+    expect(graph.nodes.get("A")?.label).toBe("Double Circle");
+  });
 });

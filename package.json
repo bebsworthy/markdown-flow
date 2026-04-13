@@ -22,6 +22,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@emily/mermaid-ast": "npm:@jsr/emily__mermaid-ast@^0.8.2",
     "chalk": "^5.3.0",
     "js-yaml": "^4.1.1",
     "liquidjs": "^10.25.5",

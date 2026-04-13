@@ -24,6 +24,7 @@ export interface FlowGraph {
 export interface FlowNode {
   id: string;
   label?: string;
+  shape?: string;
   isStart?: boolean;
 }
 
