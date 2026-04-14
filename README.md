@@ -12,7 +12,7 @@ npx markflow run workflow.md
 npx markflow run workflow.md --input ISSUE_ID=abc --input PROJECT_ID=xyz
 ```
 
-On first run, markflow scaffolds a workspace directory (`./<workflow-name>/`) containing an `.env` file prefilled with any declared inputs, plus a `runs/` subdirectory that accumulates JSONL logs of every run.
+On first run, markflow scaffolds a workspace directory (`./<workflow-name>/`) containing an `.env` file prefilled with any declared inputs, plus a `runs/` subdirectory that accumulates per-run event logs.
 
 ## Writing a Workflow
 
@@ -89,56 +89,15 @@ The optional `# Inputs` section declares workflow-level parameters:
 - `NAME` (required): description
 - `NAME` (optional): description
 - `NAME` (default: "value"): description
-- `NAME` (default: `value`): description
 ```
 
-At runtime inputs are resolved from (highest priority first): `--input` flags, `--env <file>`, the workspace's `.env`, process environment, declared defaults. Required inputs with no value abort the run. All declared inputs are exported as environment variables to script steps.
+At runtime inputs are resolved from `--input` flags, `--env <file>`, the workspace's `.env`, process environment, and declared defaults (highest priority first). Required inputs with no value abort the run. All declared inputs are exported as environment variables to script steps.
 
-#### Variable Templating in Agent Prompts
+### Templating and context
 
-Agent prompts are rendered with [LiquidJS](https://liquidjs.com/) in strict mode. Use `{{ VAR }}` to interpolate, `{% … %}` for control flow, and `|` for filters. Undefined variables cause the run to fail with a descriptive error.
+Agent prompts are rendered with LiquidJS (`{{ VAR }}`, `{% if %}`, filters). Steps can read and write two JSON-shaped context surfaces — `LOCAL` (step-private) and `GLOBAL` (workflow-wide) — and emit routing decisions via a `RESULT:` stdout sentinel.
 
-```markdown
-## review
-
-You are a code reviewer. The repository is at {{ MARKFLOW_WORKDIR }}.
-The previous step reported: {{ MARKFLOW_PREV_SUMMARY }}
-Review the code for {{ REVIEW_CRITERIA }}.
-```
-
-Flat variables:
-- Any declared workflow input (e.g. `{{ DEPLOY_TARGET }}`)
-- `{{ MARKFLOW_STEP }}` — current step name
-- `{{ MARKFLOW_PREV_STEP }}`, `{{ MARKFLOW_PREV_EDGE }}`, `{{ MARKFLOW_PREV_SUMMARY }}` — context from the previous step
-- `{{ MARKFLOW_WORKDIR }}` — per-run working directory (cwd for scripts and agents)
-- `{{ MARKFLOW_WORKSPACE }}` — persistent workspace directory (contains `.env` and `runs/`)
-- `{{ MARKFLOW_RUNDIR }}` — run log directory
-
-Structured namespaces:
-- `{{ GLOBAL.* }}` — workflow-wide context accumulated across steps
-- `{{ STEPS.<id>.edge }}`, `{{ STEPS.<id>.summary }}`, `{{ STEPS.<id>.local.* }}` — results from prior steps
-
-To include literal `{{` or `{%` in a prompt, wrap the region in `{% raw %}…{% endraw %}`.
-
-Markdown-oriented filters are registered for turning structured data into prompt-ready markdown: `json`, `yaml`, `list`, `table`, `code`, `heading`, `quote`, `indent`, `pluck`, `keys`, `values`. The `json` and `yaml` filters accept an optional comma-separated field list, e.g. `{{ issue | json: "number,title" }}`.
-
-#### Context Surfaces (`LOCAL` / `GLOBAL` / `STEPS`)
-
-Every step can read and emit two JSON-shaped context surfaces:
-
-- **`LOCAL`** — step-private. Only the same step sees it on re-entry (the cursor memory used by loops/emitters).
-- **`GLOBAL`** — workflow-wide. All subsequent steps read it.
-- **`STEPS`** — read-only map of prior steps' `{ edge, summary, local }`.
-
-Scripts receive `$LOCAL`, `$GLOBAL`, and `$STEPS` as JSON-string env vars, and emit updates as stdout sentinels:
-
-```
-LOCAL:  {"cursor": 3}
-GLOBAL: {"item": {...}}
-RESULT: {"edge": "next", "summary": "..."}
-```
-
-Multiple `LOCAL:` / `GLOBAL:` lines shallow-merge (later keys win). These surfaces are unrelated to the engine's internal token-state machine.
+See [`docs/arch/templating-and-context.md`](docs/arch/templating-and-context.md) for the full variable list, filter catalog, and stdin/stdout contract.
 
 ### Edge Annotations
 
@@ -149,19 +108,7 @@ A -->|fail max:3| B        # retry up to 3 times
 A -->|fail:max| C          # followed when retries exhausted
 ```
 
-### Parallel Execution
-
-Multiple unlabelled edges from a node fan out in parallel. A node with multiple incoming edges waits for all upstreams to complete before executing.
-
-```mermaid
-flowchart TD
-  start --> lint
-  start --> test
-  start --> typecheck
-  lint --> merge
-  test --> merge
-  typecheck --> merge
-```
+Multiple unlabelled edges from a node fan out in parallel. A node with multiple incoming edges waits for all upstreams to complete. Full routing semantics — including step-level retry policies and timeouts — in [`docs/arch/routing-and-retries.md`](docs/arch/routing-and-retries.md).
 
 ## CLI
 
@@ -187,6 +134,8 @@ markflow ls <workspace-dir> [--json]
 
 # Show details of a specific run
 markflow show <run-id> [--workspace <dir>] [--json]
+    --events                # print the raw event timeline
+    --output <seq>          # dereference an output:ref to its sidecar file
 ```
 
 ### Debugger
@@ -201,8 +150,6 @@ markflow show <run-id> [--workspace <dir>] [--json]
 `--break-on <step>` runs freely until it reaches the named step, then pauses there. Debug mode forces sequential execution (parallel + interactive stdin deadlocks).
 
 ## Library Usage
-
-### Running workflows programmatically
 
 ```typescript
 import {
@@ -234,37 +181,13 @@ const runInfo = await executeWorkflow(definition, {
 
 The library exports a typed error hierarchy — `ParseError`, `ValidationError`, `ExecutionError`, `ConfigError`, `TemplateError` — all extending `MarkflowError` with a `.code` string. Pass an `AbortSignal` via the `signal` option to cancel a running workflow gracefully.
 
-### Testing workflows
+For a mock-driven test harness, see [`docs/arch/testing-harness.md`](docs/arch/testing-harness.md).
 
-The `markflow/testing` entry point provides `WorkflowTest`, a harness that injects synthetic step results through the `beforeStep` hook so tests run fast with no network or agent calls.
+## Configuration
 
-```typescript
-import { WorkflowTest } from "markflow/testing";
+Defaults can be set at three granularities — inline ` ```config ` block, `.workflow.json` sidecar, or per-step ` ```config ` block — with programmatic `options.config` overriding all three. Workflow-wide settings include `agent`, `flags`, `parallel`, `max_retries_default`, and `timeout_default`. Per-step blocks additionally support `timeout` and `retry` policies.
 
-const wft = await WorkflowTest.fromFile("./ci.md");
-
-// Single mock — every call to this node returns the same result
-wft.mock("fetch-ticket", { edge: "pass", summary: "Fetched TKT-123" });
-
-// Sequential — each call consumes the next entry; last entry repeats
-wft.mock("test", [{ edge: "fail" }, { edge: "fail" }, { edge: "pass" }]);
-
-const result = await wft.run({
-  inputs: { DEPLOY_TARGET: "staging" },
-  // Optional: seed the per-run working directory before execution
-  workdirSetup: async (dir) => {
-    await writeFile(join(dir, "ticket.json"), JSON.stringify(fixture));
-  },
-});
-
-expect(result.status).toBe("complete");
-expect(result.callCount("test")).toBe(3);
-expect(result.edgeTaken("test", 1)).toBe("fail");
-expect(result.edgeTaken("test", 3)).toBe("pass");
-expect(result.events.filter(e => e.type === "retry:increment")).toHaveLength(2);
-```
-
-Unmocked steps run for real — mock only the steps you need to isolate.
+See [`docs/arch/configuration.md`](docs/arch/configuration.md) for the full schema, precedence rules, and how markflow owns the non-interactive agent invocation prefix.
 
 ## Examples
 
@@ -275,103 +198,9 @@ Unmocked steps run for real — mock only the steps you need to isolate.
 
 - **Parser** extracts name, declared inputs, Mermaid topology (via `@emily/mermaid-ast`, a full-fidelity JISON-based parser), and step definitions. All standard Mermaid flowchart node shapes, edge types, and subgraphs are supported.
 - **Validator** checks structural correctness: node–step matching, single start node enforcement, retry handler completeness, edge label uniqueness, mixed labelled/unlabelled edge detection, unreachable node detection, and duplicate input/step name detection. Diagnostics include source file, line numbers, and actionable suggestions.
-- **Engine** runs a token-based execution loop — linear flows, branching, parallel fan-out/fan-in, cycles, and retry budgets.
-- **Routing** maps script exit codes to edges (`0` → pass/ok/success/done, non-zero → fail/error/retry). Scripts and agents can also emit `RESULT: {"edge": "...", "summary": "..."}` as the final stdout line for explicit control, plus zero or more `LOCAL: {...}` / `GLOBAL: {...}` lines to publish state to later steps.
-- **Run history** is persisted as JSONL in `<workspace>/runs/<timestamp>/context.jsonl`.
-
-## Configuration
-
-Defaults can be set at three granularities, in ascending precedence:
-
-1. **Top-level ` ```config ` block** in the workflow `.md` — inline defaults that keep the file self-contained.
-2. **`.workflow.json` sidecar** next to the workflow `.md`.
-3. **Per-step ` ```config ` block** at the top of a step — overrides the agent or appends extra flags for that step only.
-
-Programmatic `options.config` passed to `executeWorkflow` overrides all three.
-
-### Top-level config block
-
-````markdown
-# My Workflow
-
-```config
-agent: claude
-flags:
-  - --model
-  - haiku
-parallel: true
-max_retries_default: 3
-timeout_default: 30m
-```
-
-# Flow
-…
-````
-
-### `.workflow.json` sidecar
-
-```json
-{
-  "agent": "claude",
-  "agent_flags": ["--model", "haiku"],
-  "max_retries_default": 3,
-  "timeout_default": "30m",
-  "parallel": true
-}
-```
-
-If both a top-level block and a `.workflow.json` are present, the engine prints a warning at start — the JSON wins.
-
-### Non-interactive invocation is engine-owned
-
-The assembled prompt is piped to the agent's stdin; argv contains `agent_flags` (or `flags:`) prefixed by the agent's non-interactive invocation. markflow owns that prefix — `-p` for `claude` and `gemini`, `exec -` for `codex` — and prepends it automatically. `flags` is for *extra* args (model selection, verbosity, etc.); if you list a baseline flag again it is silently deduped with a warning. For agents markflow doesn't know, `flags` is passed through verbatim.
-
-### Per-step overrides
-
-````markdown
-## analyze-ticket
-
-```config
-agent: gemini
-flags:
-  - --model
-  - gemini-2.0-flash
-```
-
-You are a ticket analyst. …
-````
-
-Per-step `flags` **append** to the workflow-level list — the per-step block doesn't replace it. Use `agent:` to swap the binary entirely.
-
-The per-step `config` block also supports `timeout: <duration>` (e.g. `30s`, `5m`, `1h30m`). This caps a single execution attempt; retries each get a fresh window. When unset, the step inherits `timeout_default` from the workflow-level config. On timeout, the step routes via its `fail` edge with exit code 124. Works for both script and agent steps.
-
-### Step retry policies
-
-A step can declare an intrinsic retry policy in its `config` block. On failure the step re-executes in place; only after the retry budget is exhausted is the `fail` edge traversed.
-
-````markdown
-## api-call
-
-```config
-retry:
-  max: 3
-  delay: 10s
-  backoff: exponential   # fixed | linear | exponential (default: fixed)
-  maxDelay: 5m
-  jitter: 0.3            # 0..1 fraction (default: 0)
-```
-
-Call the upstream API and return the payload.
-````
-
-With this, the graph needs only a plain `fail` branch — no self-loop:
-
-```
-api-call --> next
-api-call -->|fail| error-handler
-```
-
-The legacy self-loop form (`A -->|fail max:3| A` plus `A -->|fail:max| handler`) still works; when both are specified on the same node, the step-level `retry` policy wins and the validator emits a warning.
+- **Engine** runs a token-based execution loop — linear flows, branching, parallel fan-out/fan-in, cycles, and retry budgets. See [`docs/arch/routing-and-retries.md`](docs/arch/routing-and-retries.md).
+- **Routing** maps script exit codes to edges (`0` → pass/ok/success/done, non-zero → fail/error/retry). Scripts and agents can also emit `RESULT:` / `LOCAL:` / `GLOBAL:` stdout sentinels — see [`docs/arch/templating-and-context.md`](docs/arch/templating-and-context.md).
+- **Run history** is persisted as an append-only event stream in `<workspace>/runs/<timestamp>/events.jsonl`, with step stdout/stderr in sidecar `output/` files. Runs are reconstructed by folding the events through a pure `replay()` function — see [`docs/arch/event-sourced-run-log.md`](docs/arch/event-sourced-run-log.md).
 
 ## Development
 
@@ -394,8 +223,9 @@ src/
     router.ts     # Edge resolution and retry accounting
     validator.ts  # Structural validation
     errors.ts     # Typed error hierarchy (ParseError, ExecutionError, etc.)
+    event-logger.ts
+    replay.ts     # Pure fold from event stream to EngineSnapshot
     run-manager.ts
-    context-logger.ts
     env.ts        # Layered input resolution
   cli/
     commands/     # init, run, show, ls
