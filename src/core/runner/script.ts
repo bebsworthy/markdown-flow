@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { createWriteStream, type WriteStream } from "node:fs";
 import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type {
@@ -6,6 +7,7 @@ import type {
   StepOutput,
   StepOutputHandler,
 } from "../types.js";
+import type { SidecarPaths } from "./index.js";
 import { createStreamParser } from "./stream-parser.js";
 
 const LANG_TO_INTERPRETER: Record<string, string> = {
@@ -31,6 +33,7 @@ export async function runScript(
   runDir: string,
   onOutput?: StepOutputHandler,
   signal?: AbortSignal,
+  sidecar?: SidecarPaths,
 ): Promise<StepOutput> {
   const lang = step.lang ?? "bash";
   const interpreter = LANG_TO_INTERPRETER[lang];
@@ -54,18 +57,29 @@ export async function runScript(
     const stderrChunks: Buffer[] = [];
     const parser = createStreamParser();
 
+    let stdoutSide: WriteStream | undefined;
+    let stderrSide: WriteStream | undefined;
+    if (sidecar) {
+      stdoutSide = createWriteStream(sidecar.stdoutPath, { flags: "a" });
+      stderrSide = createWriteStream(sidecar.stderrPath, { flags: "a" });
+    }
+
     child.stdout.on("data", (chunk: Buffer) => {
       stdoutChunks.push(chunk);
       const text = chunk.toString("utf-8");
       parser.feed(text);
       if (onOutput) onOutput("stdout", text);
+      stdoutSide?.write(chunk);
     });
     child.stderr.on("data", (chunk: Buffer) => {
       stderrChunks.push(chunk);
       if (onOutput) onOutput("stderr", chunk.toString("utf-8"));
+      stderrSide?.write(chunk);
     });
 
     child.on("close", (code) => {
+      stdoutSide?.end();
+      stderrSide?.end();
       const stdout = Buffer.concat(stdoutChunks).toString("utf-8");
       let stderr = Buffer.concat(stderrChunks).toString("utf-8");
       const parsed = parser.finish();

@@ -166,7 +166,47 @@ export interface StepOutput {
 
 // ---- Engine events ----
 
-export type EngineEvent =
+/**
+ * Event payload shapes, without the `seq`/`ts` envelope.
+ *
+ * `EngineEvent` is `EngineEventPayload & { seq, ts }` — every persisted and
+ * in-memory event carries a monotonic `seq` (per-run) and ISO-8601 `ts`.
+ */
+export type EngineEventPayload =
+  | {
+      type: "run:start";
+      v: 1;
+      workflowName: string;
+      sourceFile: string;
+      inputs: Record<string, string>;
+      configResolved: MarkflowConfig;
+    }
+  | {
+      type: "token:created";
+      tokenId: string;
+      nodeId: string;
+      generation: number;
+    }
+  | {
+      type: "token:state";
+      tokenId: string;
+      from: TokenState;
+      to: TokenState;
+    }
+  | {
+      type: "global:update";
+      keys: string[];
+      patch: Record<string, unknown>;
+    }
+  | {
+      type: "output:ref";
+      /** `seq` of the `step:start` this transcript belongs to. */
+      stepSeq: number;
+      tokenId: string;
+      nodeId: string;
+      stream: "stdout" | "stderr";
+      path: string;
+    }
   | { type: "step:start"; nodeId: string; tokenId: string }
   | {
       type: "step:output";
@@ -174,7 +214,7 @@ export type EngineEvent =
       stream: "stdout" | "stderr";
       chunk: string;
     }
-  | { type: "step:complete"; nodeId: string; result: StepResult }
+  | { type: "step:complete"; nodeId: string; tokenId: string; result: StepResult }
   | {
       type: "step:timeout";
       nodeId: string;
@@ -203,7 +243,66 @@ export type EngineEvent =
   | { type: "workflow:complete"; results: StepResult[] }
   | { type: "workflow:error"; error: string };
 
+export type EngineEvent = EngineEventPayload & { seq: number; ts: string };
+
+export type EngineEventType = EngineEventPayload["type"];
+
+/**
+ * Event types that are emitted in-memory only (never persisted to
+ * `events.jsonl`). `step:output` produces kilobytes-to-megabytes of transcript
+ * per step; transcripts live in sidecar files, not the event log.
+ */
+export const NON_PERSISTED_EVENT_TYPES: ReadonlySet<EngineEventType> = new Set([
+  "step:output",
+]);
+
 export type EngineEventHandler = (event: EngineEvent) => void;
+
+// ---- Engine snapshot (replay target) ----
+
+/**
+ * Data-only projection of engine state, sufficient to reconstruct a run from
+ * its event log. Deliberately excludes non-serializable internals (child
+ * processes, handler refs, file handles).
+ */
+export interface EngineSnapshot {
+  tokens: Map<string, Token>;
+  retryBudgets: Map<string, { count: number; max: number }>;
+  globalContext: Record<string, unknown>;
+  completedResults: StepResult[];
+  status: RunStatus;
+}
+
+// ---- Event-log errors ----
+
+export class UnsupportedLogVersionError extends Error {
+  constructor(
+    readonly version: unknown,
+    readonly supported: readonly number[] = [1],
+  ) {
+    super(
+      `Unsupported event log version: ${String(version)} (supported: ${supported.join(", ")})`,
+    );
+    this.name = "UnsupportedLogVersionError";
+  }
+}
+
+export class InconsistentLogError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InconsistentLogError";
+  }
+}
+
+export class TruncatedLogError extends Error {
+  constructor(
+    message: string,
+    readonly byteOffset?: number,
+  ) {
+    super(message);
+    this.name = "TruncatedLogError";
+  }
+}
 
 // ---- Step interception (debugger / test harness) ----
 

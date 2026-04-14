@@ -1,15 +1,57 @@
 import chalk from "chalk";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createRunManager } from "../../core/index.js";
+import { createRunManager, readEventLog } from "../../core/index.js";
 
 export interface ShowOptions {
   workspace?: string;
   runsDir?: string;
   json?: boolean;
+  events?: boolean;
+  output?: number;
 }
 
 export async function showCommand(id: string, options: ShowOptions): Promise<void> {
   const runsDir = options.runsDir ?? (options.workspace ? join(options.workspace, "runs") : "./runs");
+  const runPath = join(runsDir, id);
+
+  if (options.events) {
+    const events = await readEventLog(runPath);
+    if (options.json) {
+      console.log(JSON.stringify(events, null, 2));
+      return;
+    }
+    for (const e of events) {
+      console.log(
+        chalk.dim(`[${String(e.seq).padStart(4, "0")}]`) +
+          ` ${chalk.cyan(e.type)} ${chalk.dim(e.ts)}`,
+      );
+    }
+    return;
+  }
+
+  if (options.output !== undefined) {
+    const targetSeq = options.output;
+    const events = await readEventLog(runPath);
+    const refs = events.filter(
+      (e) => e.type === "output:ref" && e.stepSeq === targetSeq,
+    );
+    if (refs.length === 0) {
+      console.error(
+        chalk.red(`No output:ref found for step:start seq=${targetSeq}`),
+      );
+      process.exit(1);
+    }
+    for (const r of refs) {
+      if (r.type !== "output:ref") continue;
+      console.log(chalk.bold(`── ${r.stream} (${r.path}) ──`));
+      const contents = await readFile(r.path, "utf-8");
+      process.stdout.write(contents);
+      if (!contents.endsWith("\n")) console.log();
+    }
+    return;
+  }
+
   const manager = createRunManager(runsDir);
   const runInfo = await manager.getRun(id);
 

@@ -1,13 +1,14 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createContextLogger, type ContextLogger } from "./context-logger.js";
+import { createEventLogger, type EventLogger } from "./event-logger.js";
+import { readEventLog, replay } from "./replay.js";
 import type { RunInfo, RunStatus, WorkflowDefinition } from "./types.js";
 
 export interface RunDirectory {
   id: string;
   path: string;
   workdirPath: string;
-  logger: ContextLogger;
+  events: EventLogger;
 }
 
 interface RunMeta {
@@ -49,11 +50,10 @@ export function createRunManager(runsDir = "./runs"): RunManager {
         "utf-8",
       );
 
-      // Create empty context.jsonl
-      await writeFile(join(runPath, "context.jsonl"), "", "utf-8");
+      await writeFile(join(runPath, "events.jsonl"), "", "utf-8");
 
-      const logger = createContextLogger(runPath);
-      return { id, path: runPath, workdirPath, logger };
+      const events = createEventLogger(runPath);
+      return { id, path: runPath, workdirPath, events };
     },
 
     async listRuns(): Promise<RunInfo[]> {
@@ -75,8 +75,9 @@ export function createRunManager(runsDir = "./runs"): RunManager {
       try {
         const metaRaw = await readFile(join(runPath, "meta.json"), "utf-8");
         const meta = JSON.parse(metaRaw) as RunMeta;
-        const logger = createContextLogger(runPath);
-        const steps = await logger.readAll();
+        const events = await readEventLog(runPath);
+        const snapshot = replay(events);
+        const steps = snapshot.completedResults;
 
         return {
           id,

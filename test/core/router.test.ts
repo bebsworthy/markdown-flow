@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { resolveRoute, createRetryState } from "../../src/core/router.js";
+import {
+  resolveRoute,
+  createRetryState,
+  incrementRetry,
+} from "../../src/core/router.js";
 import { DEFAULT_CONFIG } from "../../src/core/config.js";
 import type { FlowGraph, StepResult } from "../../src/core/types.js";
 
@@ -145,14 +149,18 @@ describe("resolveRoute", () => {
     const retryState = createRetryState();
     const failResult = makeResult({ node: "test", edge: "fail" });
 
-    // First two retries should go to fix
+    // resolveRoute is now a pure decision function; the caller (engine)
+    // applies `incrementRetry` inside write-ahead event emission. Simulate
+    // that here so the budget actually advances between calls.
     let d1 = resolveRoute(graph, "test", failResult, retryState, DEFAULT_CONFIG);
     expect(d1.targets[0].nodeId).toBe("fix");
     expect(d1.exhausted).toBe(false);
+    incrementRetry(retryState, "test", d1.retryIncrement!.label);
 
     let d2 = resolveRoute(graph, "test", failResult, retryState, DEFAULT_CONFIG);
     expect(d2.targets[0].nodeId).toBe("fix");
     expect(d2.exhausted).toBe(false);
+    incrementRetry(retryState, "test", d2.retryIncrement!.label);
 
     // Third retry should exhaust and go to abort
     let d3 = resolveRoute(graph, "test", failResult, retryState, DEFAULT_CONFIG);
@@ -224,9 +232,11 @@ describe("resolveRoute — maxRetriesDefault", () => {
     const d1 = resolveRoute(retryGraph(), "A", result, retry, configWithDefault);
     expect(d1.targets[0].nodeId).toBe("B");
     expect(d1.retryIncrement).toEqual({ label: "fail", count: 1, max: 2 });
+    incrementRetry(retry, "A", d1.retryIncrement!.label);
 
     const d2 = resolveRoute(retryGraph(), "A", result, retry, configWithDefault);
     expect(d2.retryIncrement).toEqual({ label: "fail", count: 2, max: 2 });
+    incrementRetry(retry, "A", d2.retryIncrement!.label);
 
     const d3 = resolveRoute(retryGraph(), "A", result, retry, configWithDefault);
     expect(d3.exhausted).toBe(true);

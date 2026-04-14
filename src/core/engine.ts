@@ -1,7 +1,10 @@
 import type {
   WorkflowDefinition,
   MarkflowConfig,
+  EngineEvent,
   EngineEventHandler,
+  EngineEventPayload,
+  EngineSnapshot,
   Token,
   StepResult,
   RunInfo,
@@ -10,7 +13,13 @@ import type {
   StepOutput,
 } from "./types.js";
 import { getOutgoingEdges, getStartNodes, getUpstreamNodes, isMergeNode } from "./graph.js";
-import { resolveRoute, createRetryState, effectiveMaxRetries, type RetryState } from "./router.js";
+import {
+  resolveRoute,
+  createRetryState,
+  effectiveMaxRetries,
+  incrementRetry,
+  type RetryState,
+} from "./router.js";
 import { runStep } from "./runner/index.js";
 import { assembleAgentPrompt } from "./runner/agent.js";
 import { createRunManager, type RunDirectory } from "./run-manager.js";
@@ -20,7 +29,7 @@ import { parseDuration } from "./duration.js";
 import { computeRetryDelay, abortableSleep } from "./retry.js";
 import { ExecutionError, ConfigError } from "./errors.js";
 import { join, dirname } from "node:path";
-import { access } from "node:fs/promises";
+import { access, mkdir } from "node:fs/promises";
 
 export interface EngineOptions {
   config?: Partial<MarkflowConfig>;
@@ -105,6 +114,16 @@ export class WorkflowEngine {
     const runManager = createRunManager(this.options.runsDir);
     this.runDir = await runManager.createRun(this.def);
 
+    // First record of every run: the log is self-describing from here on.
+    await this.emit({
+      type: "run:start",
+      v: 1,
+      workflowName: this.def.name,
+      sourceFile: this.def.sourceFile,
+      inputs: this.resolvedInputs,
+      configResolved: this.config,
+    });
+
     this.retryState = createRetryState();
 
     try {
@@ -115,7 +134,7 @@ export class WorkflowEngine {
       }
 
       for (const nodeId of startNodes) {
-        this.createToken(nodeId);
+        await this.createToken(nodeId);
       }
 
       // Main execution loop
@@ -123,7 +142,7 @@ export class WorkflowEngine {
 
       // Complete
       await runManager.completeRun(this.runDir.id, "complete");
-      this.emit({
+      await this.emit({
         type: "workflow:complete",
         results: this.completedResults,
       });
@@ -140,7 +159,7 @@ export class WorkflowEngine {
       const message = error instanceof Error ? error.message : String(error);
       const runManager2 = createRunManager(this.options.runsDir);
       await runManager2.completeRun(this.runDir.id, "error");
-      this.emit({ type: "workflow:error", error: message });
+      await this.emit({ type: "workflow:error", error: message });
 
       return {
         id: this.runDir.id,
@@ -215,8 +234,45 @@ export class WorkflowEngine {
       throw new ExecutionError(`No step definition for node "${token.nodeId}"`);
     }
 
-    token.state = "running";
-    this.emit({ type: "step:start", nodeId: token.nodeId, tokenId: token.id });
+    await this.record(
+      { type: "token:state", tokenId: token.id, from: "pending", to: "running" },
+      () => {
+        token.state = "running";
+      },
+    );
+    const startEvent = await this.emit({
+      type: "step:start",
+      nodeId: token.nodeId,
+      tokenId: token.id,
+    });
+
+    // Sidecar transcript files are keyed by the `step:start` seq (not the
+    // tokenId — a token traverses multiple nodes, and loops re-visit the same
+    // node; seq is the only identifier that uniquely names a single step
+    // execution). Emit `output:ref` events *before* opening the streams so
+    // that a crash mid-step still leaves a log record pointing at the file.
+    const outputDir = join(this.runDir.path, "output");
+    await mkdir(outputDir, { recursive: true });
+    const seqStr = String(startEvent.seq).padStart(4, "0");
+    const stdoutPath = join(outputDir, `${seqStr}-${token.nodeId}.stdout.log`);
+    const stderrPath = join(outputDir, `${seqStr}-${token.nodeId}.stderr.log`);
+    await this.emit({
+      type: "output:ref",
+      stepSeq: startEvent.seq,
+      tokenId: token.id,
+      nodeId: token.nodeId,
+      stream: "stdout",
+      path: stdoutPath,
+    });
+    await this.emit({
+      type: "output:ref",
+      stepSeq: startEvent.seq,
+      tokenId: token.id,
+      nodeId: token.nodeId,
+      stream: "stderr",
+      path: stderrPath,
+    });
+    const sidecar = { stdoutPath, stderrPath };
 
     const startedAt = new Date().toISOString();
 
@@ -352,9 +408,18 @@ export class WorkflowEngine {
           this.runDir.path,
           this.config,
           this.globalContext,
-          (stream, chunk) =>
-            this.emit({ type: "step:output", nodeId: token.nodeId, stream, chunk }),
+          (stream, chunk) => {
+            // step:output is non-persisted; fire-and-forget is fine — the
+            // logger still assigns a monotonic seq synchronously.
+            void this.emit({
+              type: "step:output",
+              nodeId: token.nodeId,
+              stream,
+              chunk,
+            });
+          },
           composed,
+          sidecar,
         );
 
         let timedOut = false;
@@ -367,7 +432,7 @@ export class WorkflowEngine {
           limitMs !== undefined
         ) {
           const elapsedMs = Date.now() - startMs;
-          this.emit({
+          await this.emit({
             type: "step:timeout",
             nodeId: token.nodeId,
             tokenId: token.id,
@@ -395,7 +460,7 @@ export class WorkflowEngine {
         if (!failed || !retryPolicy || retryAttempt >= retryPolicy.max) break;
 
         const delayMs = computeRetryDelay(retryPolicy, retryAttempt);
-        this.emit({
+        await this.emit({
           type: "step:retry",
           nodeId: token.nodeId,
           tokenId: token.id,
@@ -439,19 +504,38 @@ export class WorkflowEngine {
           : mockDirective?.exitCode ?? null,
     };
 
-    if (output.parsedResult?.global) {
-      Object.assign(this.globalContext, output.parsedResult.global);
+    // Preserve the original ordering: global context update, then token state
+    // transition, then step:complete. Replay reconstructs the same interleaving.
+    if (output.parsedResult?.global && Object.keys(output.parsedResult.global).length > 0) {
+      const patch = output.parsedResult.global;
+      await this.record(
+        {
+          type: "global:update",
+          keys: Object.keys(patch),
+          patch,
+        },
+        () => {
+          Object.assign(this.globalContext, patch);
+        },
+      );
     }
 
-    token.state = "complete";
-    token.edge = edge;
-    token.result = result;
+    await this.record(
+      { type: "token:state", tokenId: token.id, from: "running", to: "complete" },
+      () => {
+        token.state = "complete";
+        token.edge = edge;
+        token.result = result;
+      },
+    );
 
-    this.completedResults.push(result);
-    await this.runDir.logger.append(result);
-    this.resolvedNodes.add(token.nodeId);
-
-    this.emit({ type: "step:complete", nodeId: token.nodeId, result });
+    await this.record(
+      { type: "step:complete", nodeId: token.nodeId, tokenId: token.id, result },
+      () => {
+        this.completedResults.push(result);
+        this.resolvedNodes.add(token.nodeId);
+      },
+    );
 
     // Route to next node(s)
     await this.routeFrom(token, result);
@@ -470,17 +554,23 @@ export class WorkflowEngine {
     );
 
     if (decision.retryIncrement) {
-      this.emit({
-        type: "retry:increment",
-        nodeId: token.nodeId,
-        label: decision.retryIncrement.label,
-        count: decision.retryIncrement.count,
-        max: decision.retryIncrement.max,
-      });
+      const inc = decision.retryIncrement;
+      await this.record(
+        {
+          type: "retry:increment",
+          nodeId: token.nodeId,
+          label: inc.label,
+          count: inc.count,
+          max: inc.max,
+        },
+        () => {
+          incrementRetry(this.retryState, token.nodeId, inc.label);
+        },
+      );
     }
 
     if (decision.exhausted) {
-      this.emit({
+      await this.emit({
         type: "retry:exhausted",
         nodeId: token.nodeId,
         label: result.edge,
@@ -488,7 +578,7 @@ export class WorkflowEngine {
     }
 
     for (const target of decision.targets) {
-      this.emit({
+      await this.emit({
         type: "route",
         from: token.nodeId,
         to: target.nodeId,
@@ -508,7 +598,7 @@ export class WorkflowEngine {
         (t) => t.nodeId === target.nodeId && t.state === "pending",
       );
       if (!existingPending) {
-        this.createToken(target.nodeId);
+        await this.createToken(target.nodeId);
       }
     }
 
@@ -601,7 +691,46 @@ export class WorkflowEngine {
     return map;
   }
 
-  private createToken(nodeId: string): Token {
+  /**
+   * Test-only: capture the engine's live state as an `EngineSnapshot`.
+   * Round-trip tests assert `replay(events) deep-equals getSnapshot()` at
+   * every `step:complete` checkpoint.
+   */
+  getSnapshot(): EngineSnapshot {
+    const budgets = new Map<string, { count: number; max: number }>();
+    for (const [nodeId, byLabel] of this.retryState.counters) {
+      for (const [label, count] of byLabel) {
+        const max = this.findMaxForEdge(nodeId, label);
+        if (max !== undefined) {
+          budgets.set(`${nodeId}:${label}`, { count, max });
+        }
+      }
+    }
+    return {
+      tokens: new Map(
+        [...this.tokens.entries()].map(([id, t]) => [id, { ...t }]),
+      ),
+      retryBudgets: budgets,
+      globalContext: { ...this.globalContext },
+      completedResults: this.completedResults.map((r) => ({ ...r })),
+      status: "running",
+    };
+  }
+
+  private findMaxForEdge(nodeId: string, label: string): number | undefined {
+    const edge = this.def.graph.edges.find(
+      (e) => e.from === nodeId && e.label === label,
+    );
+    if (!edge) return undefined;
+    return effectiveMaxRetries(edge, this.def.graph, nodeId, this.config);
+  }
+
+  private async createToken(nodeId: string): Promise<Token> {
+    // Reserve the token synchronously so that parallel `routeFrom` callers
+    // see the new pending token before they decide whether to create their
+    // own. Write-ahead discipline is preserved at the run level: a crash
+    // between `set` and `append` loses only this token, which the replay
+    // correctly never sees (nothing else referenced it yet).
     const id = `token-${++this.tokenCounter}`;
     const token: Token = {
       id,
@@ -610,10 +739,40 @@ export class WorkflowEngine {
       state: "pending",
     };
     this.tokens.set(id, token);
+    await this.record(
+      { type: "token:created", tokenId: id, nodeId, generation: 0 },
+      () => {},
+    );
     return token;
   }
 
-  private emit(event: Parameters<EngineEventHandler>[0]): void {
-    this.options.onEvent?.(event);
+  /**
+   * Stamp the payload with `seq`/`ts` via the run's EventLogger and dispatch
+   * it to the registered handler. Mutation-site migration to write-ahead
+   * ordering (`record()`) is handled in a follow-up PR; until then, callers
+   * continue to mutate before emitting.
+   */
+  private async emit(payload: EngineEventPayload): Promise<EngineEvent> {
+    const stamped = await this.runDir.events.append(payload);
+    this.options.onEvent?.(stamped);
+    return stamped;
+  }
+
+  /**
+   * Write-ahead event emission: append → mutate → dispatch.
+   *
+   * Guarantees that a crash between append and mutate leaves a log that
+   * replay can reconstruct to the exact state the engine would have reached.
+   * Use this for every event that reflects a state mutation; use `emit()`
+   * only for pure notifications.
+   */
+  private async record<E extends EngineEvent>(
+    payload: EngineEventPayload,
+    apply: () => void,
+  ): Promise<E> {
+    const stamped = await this.runDir.events.append(payload);
+    apply();
+    this.options.onEvent?.(stamped);
+    return stamped as E;
   }
 }

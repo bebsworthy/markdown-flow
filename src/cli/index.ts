@@ -167,9 +167,23 @@ yargs(hideBin(process.argv))
           type: "boolean",
           default: false,
           describe: "Output as JSON",
+        })
+        .option("events", {
+          type: "boolean",
+          default: false,
+          describe: "Dump the raw event timeline (events.jsonl)",
+        })
+        .option("output", {
+          type: "number",
+          describe: "Print the sidecar output file produced at the given step:start seq",
         }),
     async (argv) => {
-      await showCommand(argv.id!, { workspace: argv.workspace, json: argv.json });
+      await showCommand(argv.id!, {
+        workspace: argv.workspace,
+        json: argv.json,
+        events: argv.events,
+        output: argv.output,
+      });
     },
   )
 

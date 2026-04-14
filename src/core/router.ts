@@ -122,11 +122,14 @@ export function resolveRoute(
     );
   }
 
-  // Check retry budget
+  // Check retry budget. `resolveRoute` is a pure decision function — it
+  // peeks at the counter but does *not* mutate it. The caller applies the
+  // bump via `incrementRetry` inside write-ahead event emission so that
+  // replay can reconstruct the same counter from the event log.
   let retryIncrement: RouteDecision["retryIncrement"];
   const max = effectiveMaxRetries(matchedEdge, graph, nodeId, config);
   if (max !== undefined && matchedEdge.label) {
-    const count = incrementRetry(retryState, nodeId, matchedEdge.label);
+    const count = peekRetry(retryState, nodeId, matchedEdge.label) + 1;
     retryIncrement = { label: matchedEdge.label, count, max };
 
     if (count > max) {
@@ -154,7 +157,11 @@ export function resolveRoute(
   };
 }
 
-function incrementRetry(
+function peekRetry(state: RetryState, nodeId: string, label: string): number {
+  return state.counters.get(nodeId)?.get(label) ?? 0;
+}
+
+export function incrementRetry(
   state: RetryState,
   nodeId: string,
   label: string,
