@@ -43,7 +43,7 @@ export interface EdgeAnnotations {
   exhaustionLabel?: string;
 }
 
-export type StepType = "script" | "agent";
+export type StepType = "script" | "agent" | "approval";
 export type ScriptLang = "bash" | "sh" | "python" | "js" | "javascript";
 
 export const SUPPORTED_LANGS: readonly string[] = [
@@ -81,6 +81,11 @@ export interface StepConfig {
   retry?: RetryConfig;
 }
 
+export interface StepApprovalConfig {
+  prompt: string;
+  options: string[];
+}
+
 export interface StepDefinition {
   id: string;
   type: StepType;
@@ -88,6 +93,7 @@ export interface StepDefinition {
   content: string;
   agentConfig?: StepAgentConfig;
   stepConfig?: StepConfig;
+  approvalConfig?: StepApprovalConfig;
   line?: number;
 }
 
@@ -117,7 +123,7 @@ export interface MarkflowConfig {
 
 // ---- Execution / Runtime ----
 
-export type TokenState = "pending" | "running" | "complete" | "skipped";
+export type TokenState = "pending" | "running" | "complete" | "skipped" | "waiting";
 
 export interface Token {
   id: string;
@@ -139,7 +145,7 @@ export interface StepResult {
   exit_code: number | null;
 }
 
-export type RunStatus = "running" | "complete" | "error";
+export type RunStatus = "running" | "complete" | "error" | "suspended";
 
 export interface RunInfo {
   id: string;
@@ -243,7 +249,24 @@ export type EngineEventPayload =
   | { type: "workflow:complete"; results: StepResult[] }
   | { type: "workflow:error"; error: string }
   | { type: "run:resumed"; v: 1; resumedAtSeq: number }
-  | { type: "token:reset"; v: 1; tokenId: string };
+  | { type: "token:reset"; v: 1; tokenId: string }
+  | {
+      type: "step:waiting";
+      v: 1;
+      nodeId: string;
+      tokenId: string;
+      prompt: string;
+      options: string[];
+    }
+  | {
+      type: "approval:decided";
+      v: 1;
+      nodeId: string;
+      tokenId: string;
+      choice: string;
+      decidedAt: string;
+      decidedBy?: string;
+    };
 
 export type EngineEvent = EngineEventPayload & { seq: number; ts: string };
 

@@ -167,7 +167,12 @@ export function createRunManager(runsDir = "./runs"): RunManager {
       const metaRaw = await readFile(join(runPath, "meta.json"), "utf-8");
       const meta = JSON.parse(metaRaw) as RunMeta;
       meta.status = status;
-      meta.completedAt = new Date().toISOString();
+      // Suspended runs are non-terminal — do not stamp a completion time.
+      if (status === "suspended") {
+        delete meta.completedAt;
+      } else {
+        meta.completedAt = new Date().toISOString();
+      }
       await writeFile(
         join(runPath, "meta.json"),
         JSON.stringify(meta, null, 2),

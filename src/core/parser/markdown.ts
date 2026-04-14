@@ -1,7 +1,7 @@
 import { unified } from "unified";
 import remarkParse from "remark-parse";
 import type { Root, Heading, Code, List } from "mdast";
-import type { StepDefinition, ScriptLang, InputDeclaration, StepAgentConfig, StepConfig, RetryConfig, BackoffKind, ValidationDiagnostic, MarkflowConfig } from "../types.js";
+import type { StepDefinition, ScriptLang, StepType, InputDeclaration, StepAgentConfig, StepConfig, StepApprovalConfig, RetryConfig, BackoffKind, ValidationDiagnostic, MarkflowConfig } from "../types.js";
 import { SUPPORTED_LANGS } from "../types.js";
 import { ParseError } from "../errors.js";
 
@@ -166,7 +166,7 @@ function extractSteps(
       if (currentId) {
         const step = buildStep(source, currentId, currentNodes, currentLine);
         steps.push(step);
-        if (!step.content.trim()) {
+        if (!step.content.trim() && step.type !== "approval") {
           diagnostics.push({
             severity: "warning",
             message: `Step "${currentId}" has no content`,
@@ -226,6 +226,8 @@ function buildStep(
   const firstCode = nodes.find((n) => n.type === "code") as Code | undefined;
   let agentConfig: StepAgentConfig | undefined;
   let stepConfig: StepConfig | undefined;
+  let approvalConfig: StepApprovalConfig | undefined;
+  let explicitType: StepType | undefined;
   let remainingNodes = nodes;
 
   if (firstCode?.lang === "config") {
@@ -236,7 +238,47 @@ function buildStep(
     if (parsed.step.timeout !== undefined || parsed.step.retry !== undefined) {
       stepConfig = parsed.step;
     }
+    if (parsed.type !== undefined) {
+      explicitType = parsed.type;
+    }
+    if (parsed.approval !== undefined) {
+      approvalConfig = parsed.approval;
+    }
     remainingNodes = nodes.filter((n) => n !== firstCode);
+  }
+
+  if (explicitType === "approval") {
+    // Approval steps must not carry a runnable code block. Prose is allowed
+    // and ignored (documentation for reviewers).
+    const hasCode = remainingNodes.some((n) => n.type === "code");
+    if (hasCode) {
+      throw new ParseError(
+        `Step "${id}" is type:approval and must not contain a code block. ` +
+          `Move any executable logic to a separate step.`,
+      );
+    }
+    if (agentConfig !== undefined) {
+      throw new ParseError(
+        `Step "${id}" is type:approval and cannot declare agent/flags.`,
+      );
+    }
+    if (!approvalConfig || !approvalConfig.prompt) {
+      throw new ParseError(
+        `Step "${id}" is type:approval and must declare a non-empty \`prompt\` in its config block.`,
+      );
+    }
+    if (!approvalConfig.options || approvalConfig.options.length === 0) {
+      throw new ParseError(
+        `Step "${id}" is type:approval and must declare at least one \`options\` entry.`,
+      );
+    }
+    return {
+      id,
+      type: "approval",
+      content: "",
+      approvalConfig,
+      line,
+    };
   }
 
   // Classify as script only when the step's body is a single runnable code
@@ -430,12 +472,21 @@ function parseTopConfig(yaml: string): Partial<MarkflowConfig> {
   return config;
 }
 
-function parseStepConfig(yaml: string): { agent: StepAgentConfig; step: StepConfig } {
+function parseStepConfig(yaml: string): {
+  agent: StepAgentConfig;
+  step: StepConfig;
+  type?: StepType;
+  approval?: StepApprovalConfig;
+} {
   const agent: StepAgentConfig = {};
   const step: StepConfig = {};
+  let type: StepType | undefined;
+  let prompt: string | undefined;
+  let options: string[] | undefined;
   const lines = yaml.split("\n");
   let inFlags = false;
   let inRetry = false;
+  let inOptions = false;
   let retry: RetryConfig | undefined;
 
   for (const rawLine of lines) {
@@ -502,11 +553,73 @@ function parseStepConfig(yaml: string): { agent: StepAgentConfig; step: StepConf
       inRetry = false;
       continue;
     }
+
+    const typeMatch = line.match(/^type:\s*(.+)$/);
+    if (typeMatch) {
+      const raw = typeMatch[1].trim();
+      if (raw === "script" || raw === "agent" || raw === "approval") {
+        type = raw;
+      } else {
+        throw new ParseError(
+          `Unknown step type "${raw}". Supported: script, agent, approval.`,
+        );
+      }
+      inFlags = false;
+      inRetry = false;
+      inOptions = false;
+      continue;
+    }
+
+    const promptMatch = line.match(/^prompt:\s*(.+)$/);
+    if (promptMatch) {
+      let raw = promptMatch[1].trim();
+      // Strip surrounding quotes if present
+      if (
+        (raw.startsWith('"') && raw.endsWith('"')) ||
+        (raw.startsWith("'") && raw.endsWith("'"))
+      ) {
+        raw = raw.slice(1, -1);
+      }
+      prompt = raw;
+      inFlags = false;
+      inRetry = false;
+      inOptions = false;
+      continue;
+    }
+
+    if (/^options:\s*$/.test(line)) {
+      options = [];
+      inOptions = true;
+      inFlags = false;
+      inRetry = false;
+      continue;
+    }
+
+    if (inOptions) {
+      const itemMatch = line.match(/^\s+-\s+(.+)$/);
+      if (itemMatch) {
+        let v = itemMatch[1].trim();
+        if (
+          (v.startsWith('"') && v.endsWith('"')) ||
+          (v.startsWith("'") && v.endsWith("'"))
+        ) {
+          v = v.slice(1, -1);
+        }
+        options!.push(v);
+        continue;
+      }
+      if (!/^\s/.test(line)) inOptions = false;
+    }
   }
 
   if (retry && retry.max > 0) {
     step.retry = retry;
   }
 
-  return { agent, step };
+  const approval: StepApprovalConfig | undefined =
+    prompt !== undefined || options !== undefined
+      ? { prompt: prompt ?? "", options: options ?? [] }
+      : undefined;
+
+  return { agent, step, type, approval };
 }

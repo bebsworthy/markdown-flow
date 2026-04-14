@@ -101,6 +101,16 @@ export function replay(events: EngineEvent[]): EngineSnapshot {
         break;
       }
 
+      case "step:waiting":
+      case "approval:decided": {
+        if (evt.v !== 1) {
+          throw new UnsupportedLogVersionError(evt.v);
+        }
+        // Pure notifications. Token-state transitions are carried by paired
+        // `token:state` events; suspended-run detection happens after the fold.
+        break;
+      }
+
       case "run:resumed": {
         if (evt.v !== 1) {
           throw new UnsupportedLogVersionError(evt.v);
@@ -163,6 +173,18 @@ export function replay(events: EngineEvent[]): EngineSnapshot {
         throw new InconsistentLogError(
           `Unknown event type in log: ${JSON.stringify(_exhaustive)}`,
         );
+      }
+    }
+  }
+
+  // If the run is non-terminal and has at least one waiting token, project
+  // status as "suspended" so `RunInfo` / CLI can distinguish mid-run pauses
+  // from genuinely in-flight runs.
+  if (snap.status === "running") {
+    for (const tok of snap.tokens.values()) {
+      if (tok.state === "waiting") {
+        snap.status = "suspended";
+        break;
       }
     }
   }

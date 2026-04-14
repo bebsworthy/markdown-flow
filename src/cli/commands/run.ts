@@ -14,6 +14,7 @@ import {
 } from "../workspace.js";
 import { initCommand } from "./init.js";
 import { createDebugHook } from "../debug.js";
+import { renderEvent, statusToExitCode } from "../render-events.js";
 
 export interface RunOptions {
   workspace?: string;
@@ -121,11 +122,7 @@ export async function runCommand(
 
   const verbose = options.verbose ?? false;
   const onEvent = (e: EngineEvent) => {
-    if (jsonMode) {
-      console.log(JSON.stringify(e));
-    } else {
-      printEvent(e, verbose);
-    }
+    renderEvent(e, { verbose, json: jsonMode });
   };
 
   const abortController = new AbortController();
@@ -149,12 +146,22 @@ export async function runCommand(
       console.log(JSON.stringify(runInfo));
     } else {
       console.log();
-      const statusColor = runInfo.status === "complete" ? chalk.green : chalk.red;
+      const statusColor =
+        runInfo.status === "complete"
+          ? chalk.green
+          : runInfo.status === "suspended"
+            ? chalk.yellow
+            : chalk.red;
       console.log(
         statusColor(`Run ${runInfo.id} finished with status: ${runInfo.status}`),
       );
+      if (runInfo.status === "suspended") {
+        process.stderr.write(
+          `[markflow] resume: markflow approve ${runInfo.id} <node> <choice>\n`,
+        );
+      }
     }
-    if (runInfo.status !== "complete") process.exitCode = 1;
+    process.exitCode = statusToExitCode(runInfo.status);
   } catch (err) {
     if (err instanceof WorkflowAbortError) {
       if (!jsonMode) console.log(chalk.yellow("\nAborted."));
@@ -180,42 +187,3 @@ function formatDiagnostic(d: ValidationDiagnostic): string {
   return d.suggestion ? `${msg}\n    suggestion: ${d.suggestion}` : msg;
 }
 
-function printEvent(event: EngineEvent, verbose = false): void {
-  switch (event.type) {
-    case "step:start":
-      console.log(chalk.blue(`  ▶ ${event.nodeId}`));
-      break;
-    case "step:complete":
-      console.log(
-        chalk.green(`  ✓ ${event.nodeId} → ${event.result.edge}: ${event.result.summary || "(no summary)"}`),
-      );
-      break;
-    case "route":
-      console.log(chalk.dim(`    ${event.from} → ${event.to}${event.edge ? ` [${event.edge}]` : ""}`));
-      break;
-    case "retry:increment":
-      console.log(chalk.yellow(`  ↻ ${event.nodeId} retry ${event.count}/${event.max} (${event.label})`));
-      break;
-    case "retry:exhausted":
-      console.log(chalk.red(`  ✗ ${event.nodeId} retries exhausted (${event.label})`));
-      break;
-    case "workflow:error":
-      console.error(chalk.red(`  Error: ${event.error}`));
-      break;
-    case "workflow:complete":
-      break;
-    case "step:output":
-      if (verbose) {
-        const prefix = chalk.dim(`[${event.nodeId}]`);
-        const stream = event.stream === "stderr" ? process.stderr : process.stdout;
-        const lines = event.chunk.split("\n");
-        // Drop trailing empty element when chunk ends with newline
-        if (lines[lines.length - 1] === "") lines.pop();
-        for (const line of lines) {
-          const colored = event.stream === "stderr" ? chalk.yellow(line) : line;
-          stream.write(`${prefix} ${colored}\n`);
-        }
-      }
-      break;
-  }
-}

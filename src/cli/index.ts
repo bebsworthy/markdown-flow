@@ -5,6 +5,8 @@ import { initCommand } from "./commands/init.js";
 import { runCommand } from "./commands/run.js";
 import { showCommand } from "./commands/show.js";
 import { lsCommand } from "./commands/ls.js";
+import { pendingCommand } from "./commands/pending.js";
+import { approveCommand } from "./commands/approve.js";
 
 yargs(hideBin(process.argv))
   .scriptName("markflow")
@@ -183,6 +185,79 @@ yargs(hideBin(process.argv))
         json: argv.json,
         events: argv.events,
         output: argv.output,
+      });
+    },
+  )
+
+  // ── pending ───────────────────────────────────────────────────────────────
+  .command(
+    "pending <workspace>",
+    "List runs waiting for approval",
+    (y) =>
+      y
+        .positional("workspace", {
+          type: "string",
+          describe: "Workspace directory",
+          demandOption: true,
+        })
+        .option("json", {
+          type: "boolean",
+          default: false,
+          describe: "Output as JSON",
+        }),
+    async (argv) => {
+      await pendingCommand(argv.workspace!, { json: argv.json });
+    },
+  )
+
+  // ── approve ───────────────────────────────────────────────────────────────
+  .command(
+    "approve <run> <node> <choice>",
+    "Decide a pending approval and resume the run",
+    (y) =>
+      y
+        .positional("run", {
+          type: "string",
+          describe: "Run ID (or unique prefix)",
+          demandOption: true,
+        })
+        .positional("node", {
+          type: "string",
+          describe: "Approval node ID",
+          demandOption: true,
+        })
+        .positional("choice", {
+          type: "string",
+          describe: "Option to choose (must appear in the node's options)",
+          demandOption: true,
+        })
+        .option("workspace", {
+          type: "string",
+          alias: "w",
+          describe: "Workspace directory containing the run",
+          demandOption: true,
+        })
+        .option("as", {
+          type: "string",
+          describe: "Record this actor as decidedBy (default: $USER)",
+        })
+        .option("verbose", {
+          type: "boolean",
+          alias: "v",
+          default: false,
+          describe: "Stream each step's stdout/stderr to the console",
+        })
+        .option("json", {
+          type: "boolean",
+          default: false,
+          describe: "Output events and result as JSON lines",
+        }),
+    async (argv) => {
+      await approveCommand(argv.run!, argv.node!, argv.choice!, {
+        workspace: argv.workspace,
+        as: argv.as,
+        verbose: argv.verbose,
+        json: argv.json,
       });
     },
   )

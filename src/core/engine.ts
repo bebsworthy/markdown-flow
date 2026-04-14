@@ -6,6 +6,8 @@ import type {
   EngineEventPayload,
   EngineSnapshot,
   Token,
+  TokenState,
+  StepDefinition,
   StepResult,
   RunInfo,
   RunStatus,
@@ -61,6 +63,14 @@ export interface EngineOptions {
    * dispatches any pending tokens.
    */
   resumeFrom?: ResumeHandle;
+  /**
+   * Decide a pending approval on a single node. The engine consumes the
+   * decision when it dispatches a waiting token at `nodeId`, emits
+   * `approval:decided`, synthesises a `StepResult` with `edge = choice`, and
+   * routes as if a script had selected that edge. A second waiting token on
+   * the same node is not auto-decided — call the engine again.
+   */
+  approvalDecision?: { nodeId: string; choice: string; decidedBy?: string };
 }
 
 /**
@@ -204,6 +214,25 @@ export class WorkflowEngine {
       // Main execution loop
       await this.runLoop();
 
+      // Suspended (at least one token in `waiting` state) — clean exit without
+      // `workflow:complete`. Persisted status goes to "suspended" so `ls`/`show`
+      // and the CLI exit-code contract distinguish it from "complete"/"error".
+      const hasWaiting = [...this.tokens.values()].some(
+        (t) => t.state === "waiting",
+      );
+      if (hasWaiting) {
+        await runManager.completeRun(this.runDir.id, "suspended");
+        this.status = "suspended";
+        return {
+          id: this.runDir.id,
+          workflowName: this.def.name,
+          sourceFile: this.def.sourceFile,
+          status: "suspended",
+          startedAt: this.runDir.id,
+          steps: this.completedResults,
+        };
+      }
+
       // Complete
       await runManager.completeRun(this.runDir.id, "complete");
       this.status = "complete";
@@ -246,6 +275,13 @@ export class WorkflowEngine {
 
       const readyTokens = this.getReadyTokens();
       if (readyTokens.length === 0) {
+        // Waiting tokens (approval nodes pending a decision) are a clean-exit
+        // condition — suspend, don't deadlock.
+        const waiting = [...this.tokens.values()].filter(
+          (t) => t.state === "waiting",
+        );
+        if (waiting.length > 0) break;
+
         // Check if there are still pending tokens (waiting for merge)
         const pending = [...this.tokens.values()].filter(
           (t) => t.state === "pending",
@@ -274,8 +310,18 @@ export class WorkflowEngine {
 
   private getReadyTokens(): Token[] {
     const ready: Token[] = [];
+    const decision = this.options.approvalDecision;
 
     for (const token of this.tokens.values()) {
+      // A waiting token is ready only if the caller supplied a matching
+      // approvalDecision for this invocation. Otherwise it stays suspended.
+      if (token.state === "waiting") {
+        if (decision && decision.nodeId === token.nodeId) {
+          ready.push(token);
+        }
+        continue;
+      }
+
       if (token.state !== "pending") continue;
 
       if (isMergeNode(this.def.graph, token.nodeId)) {
@@ -298,6 +344,14 @@ export class WorkflowEngine {
     const step = this.def.steps.get(token.nodeId);
     if (!step) {
       throw new ExecutionError(`No step definition for node "${token.nodeId}"`);
+    }
+
+    // Approval nodes branch before the pending→running transition. `getReadyTokens`
+    // only surfaces `pending` tokens, so a `waiting` token dispatches here only
+    // when resumed with a matching `approvalDecision`.
+    if (step.type === "approval") {
+      await this.executeApproval(token, step.approvalConfig);
+      return;
     }
 
     await this.record(
@@ -604,6 +658,102 @@ export class WorkflowEngine {
     );
 
     // Route to next node(s)
+    await this.routeFrom(token, result);
+  }
+
+  private async executeApproval(
+    token: Token,
+    cfg: StepDefinition["approvalConfig"],
+  ): Promise<void> {
+    if (!cfg) {
+      throw new ExecutionError(
+        `Approval step "${token.nodeId}" has no approvalConfig`,
+      );
+    }
+
+    const decision = this.options.approvalDecision;
+    const matches = decision && decision.nodeId === token.nodeId;
+
+    if (!matches) {
+      // Case A — no decision for this token. Transition pending→waiting and
+      // emit step:waiting. The runLoop observes no ready tokens and exits.
+      await this.record(
+        { type: "token:state", tokenId: token.id, from: token.state, to: "waiting" },
+        () => {
+          token.state = "waiting";
+        },
+      );
+      await this.emit({
+        type: "step:waiting",
+        v: 1,
+        nodeId: token.nodeId,
+        tokenId: token.id,
+        prompt: cfg.prompt,
+        options: [...cfg.options],
+      });
+      return;
+    }
+
+    // Case B — decision matches this token's node.
+    const choice = decision!.choice;
+    if (!cfg.options.includes(choice)) {
+      throw new ExecutionError(
+        `Approval choice "${choice}" is not valid for node "${token.nodeId}". ` +
+          `Options: ${cfg.options.join(", ")}`,
+      );
+    }
+
+    // Consume the decision so a second waiting token on the same node is not
+    // auto-decided within the same invocation.
+    this.options = { ...this.options, approvalDecision: undefined };
+
+    const fromState: TokenState = token.state === "waiting" ? "waiting" : "pending";
+    await this.record(
+      { type: "token:state", tokenId: token.id, from: fromState, to: "running" },
+      () => {
+        token.state = "running";
+      },
+    );
+
+    const startedAt = new Date().toISOString();
+    await this.emit({
+      type: "approval:decided",
+      v: 1,
+      nodeId: token.nodeId,
+      tokenId: token.id,
+      choice,
+      decidedAt: startedAt,
+      decidedBy: decision!.decidedBy,
+    });
+
+    const completedAt = new Date().toISOString();
+    const result: StepResult = {
+      node: token.nodeId,
+      type: "approval",
+      edge: choice,
+      summary: `approved: ${choice}`,
+      started_at: startedAt,
+      completed_at: completedAt,
+      exit_code: null,
+    };
+
+    await this.record(
+      { type: "token:state", tokenId: token.id, from: "running", to: "complete" },
+      () => {
+        token.state = "complete";
+        token.edge = choice;
+        token.result = result;
+      },
+    );
+
+    await this.record(
+      { type: "step:complete", nodeId: token.nodeId, tokenId: token.id, result },
+      () => {
+        this.completedResults.push(result);
+        this.resolvedNodes.add(token.nodeId);
+      },
+    );
+
     await this.routeFrom(token, result);
   }
 

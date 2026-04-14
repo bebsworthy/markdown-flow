@@ -182,7 +182,58 @@ export function validateWorkflow(
     }
   }
 
-  // 8. Duplicate input names
+  // 8. Approval-step rules: options must correspond to outgoing edge labels.
+  for (const step of steps.values()) {
+    if (step.type !== "approval") continue;
+    const cfg = step.approvalConfig;
+    if (!cfg) {
+      diagnostics.push({
+        severity: "error",
+        message: `Approval step "${step.id}" is missing its approvalConfig`,
+        nodeId: step.id,
+        line: step.line,
+        source,
+      });
+      continue;
+    }
+    if (!graph.nodes.has(step.id)) {
+      // Step not in graph — skip edge checks (will already diagnose via rule 2)
+      continue;
+    }
+    const outgoing = getOutgoingEdges(graph, step.id);
+    const edgeLabels = new Set(
+      outgoing
+        .filter((e) => !e.annotations.isExhaustionHandler && e.label)
+        .map((e) => e.label!),
+    );
+    for (const opt of cfg.options) {
+      if (!edgeLabels.has(opt)) {
+        diagnostics.push({
+          severity: "error",
+          message: `Approval step "${step.id}" option "${opt}" has no matching outgoing edge labelled "${opt}"`,
+          nodeId: step.id,
+          line: step.line,
+          source,
+          suggestion: `Add an edge \`${step.id} -->|${opt}| <target>\` or remove the option.`,
+        });
+      }
+    }
+    const optionSet = new Set(cfg.options);
+    for (const label of edgeLabels) {
+      if (!optionSet.has(label)) {
+        diagnostics.push({
+          severity: "error",
+          message: `Approval step "${step.id}" has outgoing edge "${label}" but no matching entry in \`options\``,
+          nodeId: step.id,
+          line: step.line,
+          source,
+          suggestion: `Add "${label}" to the options list, or drop the edge.`,
+        });
+      }
+    }
+  }
+
+  // 9. Duplicate input names
   const seenInputs = new Map<string, number>();
   for (let i = 0; i < def.inputs.length; i++) {
     const input = def.inputs[i];
