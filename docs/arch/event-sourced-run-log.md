@@ -54,6 +54,8 @@ Defined in `src/core/types.ts` as the `EngineEventPayload` union.
 | `retry:exhausted` | edge-level retry budget hit its cap | no |
 | `workflow:complete` | run finished successfully | sets status to `complete` |
 | `workflow:error` | run aborted with an error | sets status to `error` |
+| `run:resumed` | first event after a run is reopened via `openExistingRun`; carries `v: 1` and `resumedAtSeq` | no (marker) |
+| `token:reset` | completed token moved back to `pending` (e.g. `markflow resume --rerun step-x`) | clears token `edge`/`result`, flips state to `pending` |
 
 `step:output` is the only event type in `NON_PERSISTED_EVENT_TYPES`. It claims a
 `seq` (so in-memory consumers see monotonic ordering) but never hits disk —
@@ -111,14 +113,59 @@ interface EngineSnapshot {
 
 Replay is **strict**. It throws rather than silently patch over a corrupt log:
 
-- `UnsupportedLogVersionError` — `run:start.v !== 1`.
+- `UnsupportedLogVersionError` — `run:start.v !== 1` or `run:resumed.v !== 1`.
 - `InconsistentLogError` — out-of-order `seq`, duplicate `run:start`,
   `token:state` for an unknown token, `token:state.from` disagrees with the
-  token's current state, or `step:output` encountered in persisted log.
+  token's current state, `token:reset` for an unknown token, or `step:output`
+  encountered in persisted log.
 - `TruncatedLogError` — unparseable line that isn't a trailing crash-truncated
   record. Truncation exactly at end-of-file (no trailing newline on the last
   line) is tolerated: the last partial record is dropped, earlier records are
   returned.
+
+## Resuming a run
+
+Runs are reopened, not forked. One run = one log = one snapshot. The resume
+primitive lives across three layers and is composed by callers (idea 04 approval
+nodes, idea 05 resume-from-failure). For the design rationale see
+[`docs/ideas/19-resume-entry-point.md`](../ideas/19-resume-entry-point.md).
+
+```ts
+const handle = await runManager.openExistingRun(id);
+// handle: { runDir, snapshot, lastSeq, tokenCounter }
+await executeWorkflow(workflow, { ...opts, resumeFrom: handle });
+```
+
+- **`RunManager.openExistingRun(id)`** reopens the run directory, replays the
+  log into a snapshot, derives `tokenCounter` from `token:created` suffixes, and
+  constructs an `EventLogger` seeded at `lastSeq` via
+  `createEventLoggerFromExisting`. It also flips `meta.json` back to `running`.
+- **`EngineOptions.resumeFrom`** short-circuits `start()`: no fresh `createRun`,
+  no `getStartNodes` seeding. Snapshot state (tokens, `globalContext`,
+  `completedResults`, retry budgets) is loaded into the engine, and a
+  `run:resumed` event is appended as the first new record.
+- **Pending tokens** from the snapshot are picked up by `runLoop` on the next
+  tick — no special dispatch path needed.
+
+### Schema drift
+
+Before appending `run:resumed`, the engine checks that every replayed token's
+`nodeId` still exists in `workflow.graph.nodes`. Missing nodes throw
+`WorkflowChangedError` and leave the log untouched. Deeper drift (step body
+changed but nodeId stable) is out of scope — the user opts in by resuming.
+
+### Token counter continuity
+
+`tokenCounter` is derived from the log rather than persisted separately — the
+log is already the source of truth. `extractTokenCounter(events)` parses the
+numeric suffix of `token:created.tokenId` and returns the maximum, so new
+tokens minted after resume have strictly greater suffixes.
+
+### Concurrent resume
+
+Not guarded. Two processes that both `openExistingRun` the same id will both
+seed their seq counters at the same `lastSeq` and race at first append. A lock
+file or CAS check is a known follow-up.
 
 ## Reading the log
 
@@ -139,10 +186,13 @@ extend the union in `UnsupportedLogVersionError.supported`.
 ## Key files
 
 - `src/core/types.ts` — `EngineEventPayload`, `EngineSnapshot`, error classes.
-- `src/core/event-logger.ts` — `seq` assignment, serialized appends.
-- `src/core/engine.ts` — `record()` / `emit()`, emission sites.
-- `src/core/replay.ts` — `replay()`, `readEventLog()`.
-- `src/core/run-manager.ts` — run directory lifecycle, `getRun` projection.
+- `src/core/event-logger.ts` — `seq` assignment, serialized appends,
+  `createEventLoggerFromExisting` for resume.
+- `src/core/engine.ts` — `record()` / `emit()`, emission sites, resume branch
+  in `start()`.
+- `src/core/replay.ts` — `replay()`, `readEventLog()`, `extractTokenCounter()`.
+- `src/core/run-manager.ts` — run directory lifecycle, `getRun` projection,
+  `openExistingRun` → `ResumeHandle`.
 
 ## See also
 

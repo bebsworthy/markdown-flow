@@ -241,7 +241,9 @@ export type EngineEventPayload =
       reason: "fail" | "timeout";
     }
   | { type: "workflow:complete"; results: StepResult[] }
-  | { type: "workflow:error"; error: string };
+  | { type: "workflow:error"; error: string }
+  | { type: "run:resumed"; v: 1; resumedAtSeq: number }
+  | { type: "token:reset"; v: 1; tokenId: string };
 
 export type EngineEvent = EngineEventPayload & { seq: number; ts: string };
 

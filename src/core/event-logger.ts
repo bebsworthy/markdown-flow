@@ -30,14 +30,15 @@ export interface EventLoggerOptions {
   now?: () => string;
 }
 
-export function createEventLogger(
+function buildEventLogger(
   runDir: string,
-  opts: EventLoggerOptions = {},
+  initialSeq: number,
+  opts: EventLoggerOptions,
 ): EventLogger {
   const filePath = join(runDir, "events.jsonl");
   const now = opts.now ?? (() => new Date().toISOString());
 
-  let seq = 0;
+  let seq = initialSeq;
   let tail: Promise<void> = Promise.resolve();
 
   return {
@@ -61,6 +62,28 @@ export function createEventLogger(
       return tail.then(() => stamped);
     },
   };
+}
+
+export function createEventLogger(
+  runDir: string,
+  opts: EventLoggerOptions = {},
+): EventLogger {
+  return buildEventLogger(runDir, 0, opts);
+}
+
+/**
+ * Construct an EventLogger that continues an existing `events.jsonl`.
+ *
+ * Seeds the internal `seq` counter at `lastSeq` so the next `append()` yields
+ * `lastSeq + 1`. Append semantics and on-disk serialization are otherwise
+ * identical to the fresh-start logger.
+ */
+export function createEventLoggerFromExisting(
+  runDir: string,
+  lastSeq: number,
+  opts: EventLoggerOptions = {},
+): EventLogger {
+  return buildEventLogger(runDir, lastSeq, opts);
 }
 
 export async function readEventLogRaw(runDir: string): Promise<string> {

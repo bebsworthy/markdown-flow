@@ -23,12 +23,16 @@ import {
 } from "./router.js";
 import { runStep } from "./runner/index.js";
 import { assembleAgentPrompt } from "./runner/agent.js";
-import { createRunManager, type RunDirectory } from "./run-manager.js";
+import {
+  createRunManager,
+  type ResumeHandle,
+  type RunDirectory,
+} from "./run-manager.js";
 import { loadConfig, DEFAULT_CONFIG } from "./config.js";
 import { loadEnvFile } from "./env.js";
 import { parseDuration } from "./duration.js";
 import { computeRetryDelay, abortableSleep } from "./retry.js";
-import { ExecutionError, ConfigError } from "./errors.js";
+import { ExecutionError, ConfigError, WorkflowChangedError } from "./errors.js";
 import { join, dirname } from "node:path";
 import { access, mkdir } from "node:fs/promises";
 
@@ -50,6 +54,35 @@ export interface EngineOptions {
   beforeStep?: BeforeStepHook;
   /** AbortSignal for graceful cancellation (e.g. SIGINT). */
   signal?: AbortSignal;
+  /**
+   * Resume a prior run obtained via `RunManager.openExistingRun`. When set,
+   * `start()` skips fresh-run setup (no `createRun`, no start-node seeding)
+   * and instead restores snapshot state, emits a `run:resumed` marker, and
+   * dispatches any pending tokens.
+   */
+  resumeFrom?: ResumeHandle;
+}
+
+/**
+ * Reconstruct a RetryState from a snapshot's `retryBudgets` map. Keys are
+ * `${nodeId}:${label}` — split them back into the nested counter shape the
+ * router expects.
+ */
+function rebuildRetryState(snap: EngineSnapshot): RetryState {
+  const state = createRetryState();
+  for (const [key, budget] of snap.retryBudgets) {
+    const idx = key.lastIndexOf(":");
+    if (idx <= 0) continue;
+    const nodeId = key.slice(0, idx);
+    const label = key.slice(idx + 1);
+    let perNode = state.counters.get(nodeId);
+    if (!perNode) {
+      perNode = new Map();
+      state.counters.set(nodeId, perNode);
+    }
+    perNode.set(label, budget.count);
+  }
+  return state;
 }
 
 export async function executeWorkflow(
@@ -112,31 +145,60 @@ export class WorkflowEngine {
     // Resolve workflow inputs through the layered source stack
     this.resolvedInputs = await this.resolveInputs();
 
-    // Create run directory
+    const resume = this.options.resumeFrom;
     const runManager = createRunManager(this.options.runsDir);
-    this.runDir = await runManager.createRun(this.def);
 
-    // First record of every run: the log is self-describing from here on.
-    await this.emit({
-      type: "run:start",
-      v: 1,
-      workflowName: this.def.name,
-      sourceFile: this.def.sourceFile,
-      inputs: this.resolvedInputs,
-      configResolved: this.config,
-    });
-
-    this.retryState = createRetryState();
-
-    try {
-      // Find start nodes and create initial tokens
-      const startNodes = getStartNodes(this.def.graph);
-      if (startNodes.length === 0) {
-        throw new ExecutionError("Workflow has no start nodes (no nodes without incoming edges)");
+    if (resume) {
+      // Reject workflows whose node set no longer contains a replayed token's
+      // nodeId. Deeper semantic drift (changed step bodies) is out of scope.
+      const missing = new Set<string>();
+      for (const tok of resume.snapshot.tokens.values()) {
+        if (!this.def.graph.nodes.has(tok.nodeId)) missing.add(tok.nodeId);
+      }
+      if (missing.size > 0) {
+        throw new WorkflowChangedError([...missing]);
       }
 
-      for (const nodeId of startNodes) {
-        await this.createToken(nodeId);
+      this.runDir = resume.runDir;
+      this.tokenCounter = resume.tokenCounter;
+      this.restoreFromSnapshot(resume.snapshot);
+      this.retryState = rebuildRetryState(resume.snapshot);
+
+      // First new event on the appended log — makes "resumed at seq N"
+      // directly observable via `markflow show --events`.
+      await this.emit({
+        type: "run:resumed",
+        v: 1,
+        resumedAtSeq: resume.lastSeq,
+      });
+    } else {
+      // Create run directory
+      this.runDir = await runManager.createRun(this.def);
+
+      // First record of every run: the log is self-describing from here on.
+      await this.emit({
+        type: "run:start",
+        v: 1,
+        workflowName: this.def.name,
+        sourceFile: this.def.sourceFile,
+        inputs: this.resolvedInputs,
+        configResolved: this.config,
+      });
+
+      this.retryState = createRetryState();
+    }
+
+    try {
+      if (!resume) {
+        // Find start nodes and create initial tokens
+        const startNodes = getStartNodes(this.def.graph);
+        if (startNodes.length === 0) {
+          throw new ExecutionError("Workflow has no start nodes (no nodes without incoming edges)");
+        }
+
+        for (const nodeId of startNodes) {
+          await this.createToken(nodeId);
+        }
       }
 
       // Main execution loop
@@ -727,6 +789,34 @@ export class WorkflowEngine {
     );
     if (!edge) return undefined;
     return effectiveMaxRetries(edge, this.def.graph, nodeId, this.config);
+  }
+
+  /**
+   * Load a replayed `EngineSnapshot` into the live engine's mutable state.
+   * Clone maps/records so mutating engine state does not alias the snapshot.
+   */
+  private restoreFromSnapshot(snap: EngineSnapshot): void {
+    this.tokens = new Map(
+      [...snap.tokens.entries()].map(([id, t]) => [id, { ...t }]),
+    );
+    this.globalContext = { ...snap.globalContext };
+    this.completedResults = snap.completedResults.map((r) => ({ ...r }));
+    this.status = snap.status === "complete" ? "running" : snap.status;
+
+    // Rebuild derived per-run bookkeeping from the snapshot.
+    this.resolvedNodes = new Set();
+    for (const tok of this.tokens.values()) {
+      if (tok.state === "complete" || tok.state === "skipped") {
+        this.resolvedNodes.add(tok.nodeId);
+      }
+    }
+    this.nodeCalls = new Map();
+    for (const r of this.completedResults) {
+      this.nodeCalls.set(r.node, (this.nodeCalls.get(r.node) ?? 0) + 1);
+    }
+    // `mergeCompletions` is populated by `routeFrom`; the readiness check
+    // reads `resolvedNodes`, so leaving it empty on resume is safe.
+    this.mergeCompletions = new Map();
   }
 
   private async createToken(nodeId: string): Promise<Token> {

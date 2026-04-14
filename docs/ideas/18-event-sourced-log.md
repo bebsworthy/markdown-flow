@@ -1,5 +1,6 @@
 # 18 — Event-Sourced Run Log
 
+**Status** IMPLEMENTED
 **Tier:** Foundation | **Effort:** Medium (3-5 days) | **Priority:** Highest (unblocks 04, 05, 09, 17)
 
 ## Problem
@@ -232,7 +233,8 @@ Remaining question worth flagging before build:
 
 ## Downstream unblocks
 
-- **04 Approval nodes** — add `waiting` token state + `step:waiting` / `step:resumed` events; suspend = exit after emit, resume = replay + re-enter scheduler.
-- **05 Resume-from-failure** — replay up to the failure event, then re-dispatch pending tokens.
+- **19 Engine resume entry point** — direct consumer: wraps `readEventLog` + `replay` into an `openExistingRun` handle and an `EngineOptions.resumeFrom` surface. 04 and 05 flow through 19.
+- **04 Approval nodes** (via 19) — add `waiting` token state + `step:waiting` / `approval:decided` events; suspend = exit after emit, resume = 19's entry point.
+- **05 Resume-from-failure** (via 19) — `markflow resume <id>` becomes a thin CLI wrapper over 19; optionally appends `token:reset` for `--rerun`.
 - **09 OpenTelemetry** — map events to spans in a separate exporter; no engine changes needed.
 - **17 Data lineage** — `global:update` events already carry the keys that changed, per step.

@@ -60,3 +60,21 @@ export class WorkflowAbortError extends MarkflowError {
     this.name = "WorkflowAbortError";
   }
 }
+
+/**
+ * Thrown when resuming an existing run against a workflow whose node set no
+ * longer contains a replayed token's `nodeId`. Deeper semantic drift (changed
+ * step logic) is out of scope — the user opted in by resuming.
+ */
+export class WorkflowChangedError extends MarkflowError {
+  readonly missingNodeIds: string[];
+
+  constructor(missingNodeIds: string[]) {
+    super(
+      "WORKFLOW_CHANGED",
+      `Cannot resume: workflow no longer contains node(s) referenced by the run log: ${missingNodeIds.join(", ")}`,
+    );
+    this.name = "WorkflowChangedError";
+    this.missingNodeIds = missingNodeIds;
+  }
+}

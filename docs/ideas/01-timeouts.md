@@ -1,5 +1,6 @@
 # 01 — Timeouts
 
+**Status** IMPLEMENTED
 **Tier:** Essential | **Effort:** Quick win (1-2 days) | **Priority:** Highest
 
 ## Problem

@@ -101,6 +101,27 @@ export function replay(events: EngineEvent[]): EngineSnapshot {
         break;
       }
 
+      case "run:resumed": {
+        if (evt.v !== 1) {
+          throw new UnsupportedLogVersionError(evt.v);
+        }
+        // No-op marker; observable in the log as "this run was resumed at seq N".
+        break;
+      }
+
+      case "token:reset": {
+        const tok = snap.tokens.get(evt.tokenId);
+        if (!tok) {
+          throw new InconsistentLogError(
+            `token:reset for unknown tokenId ${evt.tokenId}`,
+          );
+        }
+        tok.state = "pending";
+        delete tok.edge;
+        delete tok.result;
+        break;
+      }
+
       case "step:complete": {
         snap.completedResults.push(evt.result);
         const tok = snap.tokens.get(evt.tokenId);
@@ -147,6 +168,25 @@ export function replay(events: EngineEvent[]): EngineSnapshot {
   }
 
   return snap;
+}
+
+/**
+ * Scan a persisted event log for the maximum numeric suffix of any
+ * `token:created` event's `tokenId`. Used by `openExistingRun` to seed a
+ * resumed engine's `tokenCounter` so newly allocated ids do not collide.
+ *
+ * Returns 0 if no matching tokens were ever created.
+ */
+export function extractTokenCounter(events: EngineEvent[]): number {
+  let max = 0;
+  for (const evt of events) {
+    if (evt.type !== "token:created") continue;
+    const match = /^token-(\d+)$/.exec(evt.tokenId);
+    if (!match) continue;
+    const n = Number(match[1]);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return max;
 }
 
 /**
