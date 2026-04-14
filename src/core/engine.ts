@@ -8,6 +8,7 @@ import type {
   Token,
   StepResult,
   RunInfo,
+  RunStatus,
   BeforeStepHook,
   BeforeStepContext,
   StepOutput,
@@ -70,6 +71,7 @@ export class WorkflowEngine {
   private globalContext: Record<string, unknown> = {};
   private tokenCounter = 0;
   private resolvedInputs: Record<string, string> = {};
+  private status: RunStatus = "running";
 
   /** Per-node execution counts (nodeId → count). */
   private nodeCalls: Map<string, number> = new Map();
@@ -142,6 +144,7 @@ export class WorkflowEngine {
 
       // Complete
       await runManager.completeRun(this.runDir.id, "complete");
+      this.status = "complete";
       await this.emit({
         type: "workflow:complete",
         results: this.completedResults,
@@ -159,6 +162,7 @@ export class WorkflowEngine {
       const message = error instanceof Error ? error.message : String(error);
       const runManager2 = createRunManager(this.options.runsDir);
       await runManager2.completeRun(this.runDir.id, "error");
+      this.status = "error";
       await this.emit({ type: "workflow:error", error: message });
 
       return {
@@ -713,7 +717,7 @@ export class WorkflowEngine {
       retryBudgets: budgets,
       globalContext: { ...this.globalContext },
       completedResults: this.completedResults.map((r) => ({ ...r })),
-      status: "running",
+      status: this.status,
     };
   }
 
@@ -748,9 +752,8 @@ export class WorkflowEngine {
 
   /**
    * Stamp the payload with `seq`/`ts` via the run's EventLogger and dispatch
-   * it to the registered handler. Mutation-site migration to write-ahead
-   * ordering (`record()`) is handled in a follow-up PR; until then, callers
-   * continue to mutate before emitting.
+   * it to the registered handler. Use for pure notifications; state-mutating
+   * events must go through `record()` to preserve write-ahead ordering.
    */
   private async emit(payload: EngineEventPayload): Promise<EngineEvent> {
     const stamped = await this.runDir.events.append(payload);

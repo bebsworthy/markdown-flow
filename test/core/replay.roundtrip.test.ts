@@ -37,21 +37,7 @@ describe("replay round-trip", () => {
     const events = await readEventLog(join(tempRunsDir, runInfo.id));
     const replayed = replay(events);
 
-    // Completed results and global context are the substantive bits.
-    expect(replayed.completedResults).toEqual(liveSnapshot.completedResults);
-    expect(replayed.globalContext).toEqual(liveSnapshot.globalContext);
-    expect(replayed.retryBudgets).toEqual(liveSnapshot.retryBudgets);
-
-    // Every live token appears in the replayed snapshot with the same shape.
-    for (const [id, live] of liveSnapshot.tokens) {
-      const mirrored = replayed.tokens.get(id);
-      expect(mirrored).toBeDefined();
-      expect(mirrored!.id).toBe(live.id);
-      expect(mirrored!.nodeId).toBe(live.nodeId);
-      expect(mirrored!.state).toBe(live.state);
-      expect(mirrored!.edge).toBe(live.edge);
-      expect(mirrored!.result).toEqual(live.result);
-    }
+    expect(replayed).toEqual(liveSnapshot);
   });
 
   it("intermediate snapshots match at each step:complete", async () => {
