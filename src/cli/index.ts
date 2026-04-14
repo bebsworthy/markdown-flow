@@ -7,6 +7,7 @@ import { showCommand } from "./commands/show.js";
 import { lsCommand } from "./commands/ls.js";
 import { pendingCommand } from "./commands/pending.js";
 import { approveCommand } from "./commands/approve.js";
+import { resumeCommand } from "./commands/resume.js";
 
 yargs(hideBin(process.argv))
   .scriptName("markflow")
@@ -256,6 +257,55 @@ yargs(hideBin(process.argv))
       await approveCommand(argv.run!, argv.node!, argv.choice!, {
         workspace: argv.workspace,
         as: argv.as,
+        verbose: argv.verbose,
+        json: argv.json,
+      });
+    },
+  )
+
+  // ── resume ─────────────────────────────────────────────────────────────
+  .command(
+    "resume <run>",
+    "Resume a failed or suspended run from where it stopped",
+    (y) =>
+      y
+        .positional("run", {
+          type: "string",
+          describe: "Run ID (or unique prefix)",
+          demandOption: true,
+        })
+        .option("workspace", {
+          type: "string",
+          alias: "w",
+          describe: "Workspace directory containing the run",
+          demandOption: true,
+        })
+        .option("input", {
+          type: "string",
+          array: true,
+          describe: "Input override (KEY=VALUE), repeatable",
+        })
+        .option("rerun", {
+          type: "string",
+          array: true,
+          describe: "Force re-run of a completed step by node ID",
+        })
+        .option("verbose", {
+          type: "boolean",
+          alias: "v",
+          default: false,
+          describe: "Stream each step's stdout/stderr to the console",
+        })
+        .option("json", {
+          type: "boolean",
+          default: false,
+          describe: "Output events and result as JSON lines",
+        }),
+    async (argv) => {
+      await resumeCommand(argv.run!, {
+        workspace: argv.workspace,
+        input: argv.input,
+        rerun: argv.rerun,
         verbose: argv.verbose,
         json: argv.json,
       });

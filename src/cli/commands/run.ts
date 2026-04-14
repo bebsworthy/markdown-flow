@@ -159,6 +159,10 @@ export async function runCommand(
         process.stderr.write(
           `[markflow] resume: markflow approve ${runInfo.id} <node> <choice>\n`,
         );
+      } else if (runInfo.status === "error") {
+        process.stderr.write(
+          `[markflow] resume: markflow resume ${runInfo.id} -w ${workspaceDir}\n`,
+        );
       }
     }
     process.exitCode = statusToExitCode(runInfo.status);
