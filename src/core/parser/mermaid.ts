@@ -28,8 +28,15 @@ export function parseMermaidFlowchart(source: string): FlowGraph {
   }
 
   const edges: FlowEdge[] = ast.links.map((link) => {
+    const stroke = (link as { stroke?: string }).stroke ?? "normal";
     const { label, annotations } = parseEdgeLabel(link.text?.text);
-    return { from: link.source, to: link.target, label, annotations };
+    return {
+      from: link.source,
+      to: link.target,
+      label,
+      stroke: stroke as FlowEdge["stroke"],
+      annotations,
+    };
   });
 
   return { nodes, edges };
@@ -45,6 +52,12 @@ function parseEdgeLabel(
   }
 
   const trimmed = rawLabel.trim();
+
+  const forEachMatch = trimmed.match(/^each:\s*(\w+)$/);
+  if (forEachMatch) {
+    annotations.forEach = { key: forEachMatch[1] };
+    return { label: trimmed, annotations };
+  }
 
   const exhaustionMatch = trimmed.match(/^(\w+):max$/);
   if (exhaustionMatch) {

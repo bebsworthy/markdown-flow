@@ -15,7 +15,13 @@ import type {
   BeforeStepContext,
   StepOutput,
 } from "./types.js";
-import { getOutgoingEdges, getStartNodes, getUpstreamNodes, isMergeNode } from "./graph.js";
+import {
+  getOutgoingEdges,
+  getStartNodes,
+  getUpstreamNodes,
+  isMergeNode,
+  getForEachScope,
+} from "./graph.js";
 import {
   resolveRoute,
   createRetryState,
@@ -124,6 +130,9 @@ export class WorkflowEngine {
 
   /** Track which upstream nodes have resolved (completed or skipped) */
   private resolvedNodes: Set<string> = new Set();
+
+  /** Active forEach batches (batchId → state). */
+  private batches: Map<string, import("./types.js").BatchState> = new Map();
 
   constructor(definition: WorkflowDefinition, options: EngineOptions = {}) {
     this.def = definition;
@@ -426,6 +435,11 @@ export class WorkflowEngine {
     }
     env.LOCAL = JSON.stringify(selfPrior?.local ?? {});
     env.GLOBAL = JSON.stringify(this.globalContext);
+
+    if (token.batchId != null) {
+      env.ITEM = JSON.stringify(token.itemContext ?? null);
+      env.ITEM_INDEX = String(token.itemIndex ?? 0);
+    }
 
     // Get outgoing edge labels for agent prompt
     const outgoing = getOutgoingEdges(this.def.graph, token.nodeId);
@@ -759,7 +773,50 @@ export class WorkflowEngine {
 
   private async routeFrom(token: Token, result: StepResult): Promise<void> {
     const outgoing = getOutgoingEdges(this.def.graph, token.nodeId);
-    if (outgoing.length === 0) return; // terminal node
+    if (outgoing.length === 0) {
+      // Terminal node — if this is a batch token at the last body node,
+      // complete the batch item and potentially the entire batch.
+      if (token.batchId) {
+        await this.completeBatchItem(token);
+      }
+      return;
+    }
+
+    // forEach fan-out: if the outgoing edge is a thick `each:` edge,
+    // spawn N batch tokens instead of normal routing.
+    const forEachEdge = outgoing.find(
+      (e) => e.stroke === "thick" && e.annotations.forEach,
+    );
+    if (forEachEdge) {
+      await this.spawnBatch(token, result, forEachEdge);
+      return;
+    }
+
+    // Batch token routing within the forEach scope: if this token is a
+    // batch item and the next edge transitions from thick to normal,
+    // this is the end of the chain — complete the batch item.
+    if (token.batchId) {
+      const nextThick = outgoing.find((e) => e.stroke === "thick");
+      if (nextThick) {
+        // Continue within the forEach scope — route to next body node.
+        await this.emit({
+          type: "route",
+          from: token.nodeId,
+          to: nextThick.to,
+        });
+        await this.createBatchToken(
+          nextThick.to,
+          token.batchId,
+          token.itemIndex!,
+          token.parentTokenId!,
+          token.itemContext,
+        );
+        return;
+      }
+      // No thick edge means end of chain — complete this batch item.
+      await this.completeBatchItem(token);
+      return;
+    }
 
     const decision = resolveRoute(
       this.def.graph,
@@ -820,6 +877,109 @@ export class WorkflowEngine {
 
     // Mark nodes that routed away from merge targets as skipped
     this.handleSkippedUpstreams();
+  }
+
+  private async spawnBatch(
+    sourceToken: Token,
+    result: StepResult,
+    forEachEdge: import("./types.js").FlowEdge,
+  ): Promise<void> {
+    const key = forEachEdge.annotations.forEach!.key;
+    const local = result.local ?? {};
+    const items = local[key];
+
+    if (!Array.isArray(items)) {
+      throw new ExecutionError(
+        `forEach: LOCAL.${key} is not an array (got ${typeof items}) at node "${sourceToken.nodeId}"`,
+      );
+    }
+
+    if (items.length === 0) {
+      // Empty array — skip to collector.
+      const scope = getForEachScope(this.def.graph, sourceToken.nodeId);
+      if (scope) {
+        this.resolvedNodes.add(sourceToken.nodeId);
+        await this.createToken(scope.collectorNode);
+      }
+      return;
+    }
+
+    const batchId = `batch-${++this.tokenCounter}`;
+
+    await this.emit({
+      type: "batch:start",
+      v: 1,
+      batchId,
+      nodeId: sourceToken.nodeId,
+      items: items.length,
+    });
+    this.batches.set(batchId, {
+      nodeId: sourceToken.nodeId,
+      expected: items.length,
+      completed: 0,
+    });
+
+    for (let i = 0; i < items.length; i++) {
+      await this.createBatchToken(
+        forEachEdge.to,
+        batchId,
+        i,
+        sourceToken.id,
+        items[i],
+      );
+    }
+  }
+
+  private async completeBatchItem(token: Token): Promise<void> {
+    const batchId = token.batchId!;
+    const batch = this.batches.get(batchId);
+    if (!batch) return;
+
+    await this.emit({
+      type: "batch:item:complete",
+      v: 1,
+      batchId,
+      itemIndex: token.itemIndex!,
+      tokenId: token.id,
+    });
+    batch.completed++;
+
+    if (batch.completed >= batch.expected) {
+      await this.emit({ type: "batch:complete", v: 1, batchId });
+
+      // Collect results from all batch tokens into GLOBAL.results
+      const batchResults: unknown[] = [];
+      for (const t of this.tokens.values()) {
+        if (t.batchId === batchId && t.result) {
+          batchResults[t.itemIndex!] = {
+            edge: t.result.edge,
+            summary: t.result.summary,
+            local: t.result.local,
+          };
+        }
+      }
+
+      await this.record(
+        {
+          type: "global:update",
+          keys: ["results"],
+          patch: { results: batchResults },
+        },
+        () => {
+          this.globalContext.results = batchResults;
+        },
+      );
+
+      // Create token for the collector node.
+      const scope = getForEachScope(this.def.graph, batch.nodeId);
+      if (scope) {
+        this.resolvedNodes.add(batch.nodeId);
+        for (const bodyNode of scope.bodyNodes) {
+          this.resolvedNodes.add(bodyNode);
+        }
+        await this.createToken(scope.collectorNode);
+      }
+    }
   }
 
   private handleSkippedUpstreams(): void {
@@ -930,6 +1090,7 @@ export class WorkflowEngine {
       globalContext: { ...this.globalContext },
       completedResults: this.completedResults.map((r) => ({ ...r })),
       status: this.status,
+      batches: new Map(this.batches),
     };
   }
 
@@ -967,6 +1128,9 @@ export class WorkflowEngine {
     // `mergeCompletions` is populated by `routeFrom`; the readiness check
     // reads `resolvedNodes`, so leaving it empty on resume is safe.
     this.mergeCompletions = new Map();
+    this.batches = new Map(
+      [...snap.batches.entries()].map(([id, b]) => [id, { ...b }]),
+    );
   }
 
   private async createToken(nodeId: string): Promise<Token> {
@@ -985,6 +1149,40 @@ export class WorkflowEngine {
     this.tokens.set(id, token);
     await this.record(
       { type: "token:created", tokenId: id, nodeId, generation: 0 },
+      () => {},
+    );
+    return token;
+  }
+
+  private async createBatchToken(
+    nodeId: string,
+    batchId: string,
+    itemIndex: number,
+    parentTokenId: string,
+    itemContext: unknown,
+  ): Promise<Token> {
+    const id = `token-${++this.tokenCounter}`;
+    const token: Token = {
+      id,
+      nodeId,
+      generation: 0,
+      state: "pending",
+      batchId,
+      itemIndex,
+      parentTokenId,
+      itemContext,
+    };
+    this.tokens.set(id, token);
+    await this.record(
+      {
+        type: "token:created",
+        tokenId: id,
+        nodeId,
+        generation: 0,
+        batchId,
+        itemIndex,
+        parentTokenId,
+      },
       () => {},
     );
     return token;

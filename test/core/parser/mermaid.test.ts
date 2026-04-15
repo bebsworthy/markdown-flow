@@ -155,14 +155,36 @@ describe("parseMermaidFlowchart", () => {
     expect(graph.edges[1]).toMatchObject({ from: "B", to: "C", label: "optional" });
   });
 
-  it("parses thick edges", () => {
+  it("parses thick edges and preserves stroke type", () => {
     const graph = parseMermaidFlowchart(`flowchart TD
   A ==> B
   B ==>|important| C`);
 
     expect(graph.edges).toHaveLength(2);
-    expect(graph.edges[0]).toMatchObject({ from: "A", to: "B" });
-    expect(graph.edges[1]).toMatchObject({ from: "B", to: "C", label: "important" });
+    expect(graph.edges[0]).toMatchObject({ from: "A", to: "B", stroke: "thick" });
+    expect(graph.edges[1]).toMatchObject({ from: "B", to: "C", label: "important", stroke: "thick" });
+  });
+
+  it("distinguishes stroke types: normal, thick, dotted", () => {
+    const graph = parseMermaidFlowchart(`flowchart TD
+  A --> B
+  B ==> C
+  C -.-> D`);
+
+    expect(graph.edges[0].stroke).toBe("normal");
+    expect(graph.edges[1].stroke).toBe("thick");
+    expect(graph.edges[2].stroke).toBe("dotted");
+  });
+
+  it("parses each: label as forEach annotation", () => {
+    const graph = parseMermaidFlowchart(`flowchart TD
+  A ==>|each: items| B
+  B ==> C
+  C --> D`);
+
+    expect(graph.edges[0].annotations.forEach).toEqual({ key: "items" });
+    expect(graph.edges[0].label).toBe("each: items");
+    expect(graph.edges[1].annotations.forEach).toBeUndefined();
   });
 
   it("parses open (no arrow) edges", () => {

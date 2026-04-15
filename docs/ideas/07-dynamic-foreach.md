@@ -1,5 +1,6 @@
 # 07 — Dynamic Task Mapping / forEach
 
+**Status** IMPLEMENTED
 **Tier:** Essential | **Effort:** Deep (5-8 days) | **Priority:** High
 
 ## Problem

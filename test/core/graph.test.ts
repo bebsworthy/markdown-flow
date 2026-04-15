@@ -8,6 +8,8 @@ import {
   isMergeNode,
   getUpstreamNodes,
   getFanOutTargets,
+  getForEachScope,
+  isForEachCollector,
 } from "../../src/core/graph.js";
 
 const FIXTURES = join(import.meta.dirname, "../fixtures");
@@ -124,5 +126,32 @@ exit 1
     expect(isMergeNode(def.graph, "error")).toBe(false);
     // done also has two labeled incoming edges
     expect(isMergeNode(def.graph, "done")).toBe(false);
+  });
+
+  it("detects forEach scope from thick edges with each: label", () => {
+    const source = readFileSync(join(FIXTURES, "foreach.md"), "utf-8");
+    const def = parseWorkflowFromString(source);
+
+    const scope = getForEachScope(def.graph, "produce");
+    expect(scope).toBeDefined();
+    expect(scope!.key).toBe("items");
+    expect(scope!.bodyNodes).toEqual(["process", "transform"]);
+    expect(scope!.collectorNode).toBe("collect");
+  });
+
+  it("identifies forEach collector nodes", () => {
+    const source = readFileSync(join(FIXTURES, "foreach.md"), "utf-8");
+    const def = parseWorkflowFromString(source);
+
+    expect(isForEachCollector(def.graph, "collect")).toBe(true);
+    expect(isForEachCollector(def.graph, "produce")).toBe(false);
+    expect(isForEachCollector(def.graph, "process")).toBe(false);
+  });
+
+  it("returns undefined for nodes without forEach edges", () => {
+    const source = readFileSync(join(FIXTURES, "linear.md"), "utf-8");
+    const def = parseWorkflowFromString(source);
+
+    expect(getForEachScope(def.graph, "setup")).toBeUndefined();
   });
 });

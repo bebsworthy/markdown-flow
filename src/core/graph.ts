@@ -65,3 +65,73 @@ export function getFanOutTargets(
   const outgoing = getOutgoingEdges(graph, nodeId);
   return [...new Set(outgoing.map((e) => e.to))];
 }
+
+export interface ForEachScope {
+  key: string;
+  bodyNodes: string[];
+  collectorNode: string;
+}
+
+/**
+ * Given a node with an outgoing thick `each:` edge, trace the `==>` chain
+ * and return the forEach scope: item key, body nodes, and collector node.
+ *
+ * Returns `undefined` if the node has no outgoing forEach edge.
+ */
+export function getForEachScope(
+  graph: FlowGraph,
+  nodeId: string,
+): ForEachScope | undefined {
+  const outgoing = getOutgoingEdges(graph, nodeId);
+  const forEachEdge = outgoing.find(
+    (e) => e.stroke === "thick" && e.annotations.forEach,
+  );
+  if (!forEachEdge) return undefined;
+
+  const key = forEachEdge.annotations.forEach!.key;
+  const bodyNodes: string[] = [];
+  let current = forEachEdge.to;
+
+  while (true) {
+    bodyNodes.push(current);
+    const next = getOutgoingEdges(graph, current);
+    const thickNext = next.find((e) => e.stroke === "thick");
+    if (thickNext) {
+      current = thickNext.to;
+    } else {
+      const normalNext = next.find((e) => e.stroke === "normal" || !e.stroke);
+      if (!normalNext) break;
+      return { key, bodyNodes, collectorNode: normalNext.to };
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * True if a node is a forEach collector — the first normal-edge target
+ * after a thick-edge chain originating from a forEach source.
+ */
+export function isForEachCollector(graph: FlowGraph, nodeId: string): boolean {
+  for (const node of graph.nodes.values()) {
+    const scope = getForEachScope(graph, node.id);
+    if (scope && scope.collectorNode === nodeId) return true;
+  }
+  return false;
+}
+
+/**
+ * Find the forEach source node whose scope covers the given body node.
+ */
+export function findForEachSource(
+  graph: FlowGraph,
+  bodyNodeId: string,
+): { sourceNodeId: string; scope: ForEachScope } | undefined {
+  for (const node of graph.nodes.values()) {
+    const scope = getForEachScope(graph, node.id);
+    if (scope && scope.bodyNodes.includes(bodyNodeId)) {
+      return { sourceNodeId: node.id, scope };
+    }
+  }
+  return undefined;
+}

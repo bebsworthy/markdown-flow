@@ -71,6 +71,17 @@ export function renderEvent(
         ),
       );
       break;
+    case "batch:start":
+      console.log(chalk.magenta(`  ⟳ forEach: ${event.items} items at ${event.nodeId}`));
+      break;
+    case "batch:item:complete":
+      if (verbose) {
+        console.log(chalk.dim(`    batch item ${event.itemIndex} complete`));
+      }
+      break;
+    case "batch:complete":
+      console.log(chalk.magenta(`  ⟳ forEach batch complete`));
+      break;
     case "step:output":
       if (verbose) {
         const prefix = chalk.dim(`[${event.nodeId}]`);

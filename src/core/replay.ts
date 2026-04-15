@@ -26,6 +26,7 @@ export function replay(events: EngineEvent[]): EngineSnapshot {
     globalContext: {},
     completedResults: [],
     status: "running",
+    batches: new Map(),
   };
 
   let lastSeq = 0;
@@ -61,12 +62,16 @@ export function replay(events: EngineEvent[]): EngineSnapshot {
             `token:created for existing tokenId ${evt.tokenId}`,
           );
         }
-        snap.tokens.set(evt.tokenId, {
+        const tok: Token = {
           id: evt.tokenId,
           nodeId: evt.nodeId,
           generation: evt.generation,
           state: "pending",
-        });
+        };
+        if (evt.batchId != null) tok.batchId = evt.batchId;
+        if (evt.itemIndex != null) tok.itemIndex = evt.itemIndex;
+        if (evt.parentTokenId != null) tok.parentTokenId = evt.parentTokenId;
+        snap.tokens.set(evt.tokenId, tok);
         break;
       }
 
@@ -147,6 +152,44 @@ export function replay(events: EngineEvent[]): EngineSnapshot {
           count: evt.count,
           max: evt.max,
         });
+        break;
+      }
+
+      case "batch:start": {
+        if (evt.v !== 1) throw new UnsupportedLogVersionError(evt.v);
+        if (snap.batches.has(evt.batchId)) {
+          throw new InconsistentLogError(
+            `batch:start for existing batchId ${evt.batchId}`,
+          );
+        }
+        snap.batches.set(evt.batchId, {
+          nodeId: evt.nodeId,
+          expected: evt.items,
+          completed: 0,
+        });
+        break;
+      }
+
+      case "batch:item:complete": {
+        if (evt.v !== 1) throw new UnsupportedLogVersionError(evt.v);
+        const batch = snap.batches.get(evt.batchId);
+        if (!batch) {
+          throw new InconsistentLogError(
+            `batch:item:complete for unknown batchId ${evt.batchId}`,
+          );
+        }
+        batch.completed++;
+        break;
+      }
+
+      case "batch:complete": {
+        if (evt.v !== 1) throw new UnsupportedLogVersionError(evt.v);
+        const b = snap.batches.get(evt.batchId);
+        if (!b) {
+          throw new InconsistentLogError(
+            `batch:complete for unknown batchId ${evt.batchId}`,
+          );
+        }
         break;
       }
 

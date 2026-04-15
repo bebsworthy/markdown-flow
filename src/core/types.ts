@@ -30,10 +30,13 @@ export interface FlowNode {
   isStart?: boolean;
 }
 
+export type EdgeStroke = "normal" | "thick" | "dotted";
+
 export interface FlowEdge {
   from: string;
   to: string;
   label?: string;
+  stroke: EdgeStroke;
   annotations: EdgeAnnotations;
 }
 
@@ -41,6 +44,7 @@ export interface EdgeAnnotations {
   maxRetries?: number;
   isExhaustionHandler?: boolean;
   exhaustionLabel?: string;
+  forEach?: { key: string };
 }
 
 export type StepType = "script" | "agent" | "approval";
@@ -132,6 +136,10 @@ export interface Token {
   state: TokenState;
   edge?: string;
   result?: StepResult;
+  batchId?: string;
+  itemIndex?: number;
+  parentTokenId?: string;
+  itemContext?: unknown;
 }
 
 export interface StepResult {
@@ -192,6 +200,9 @@ export type EngineEventPayload =
       tokenId: string;
       nodeId: string;
       generation: number;
+      parentTokenId?: string;
+      batchId?: string;
+      itemIndex?: number;
     }
   | {
       type: "token:state";
@@ -246,6 +257,9 @@ export type EngineEventPayload =
       delayMs: number;
       reason: "fail" | "timeout";
     }
+  | { type: "batch:start"; v: 1; batchId: string; nodeId: string; items: number }
+  | { type: "batch:item:complete"; v: 1; batchId: string; itemIndex: number; tokenId: string }
+  | { type: "batch:complete"; v: 1; batchId: string }
   | { type: "workflow:complete"; results: StepResult[] }
   | { type: "workflow:error"; error: string }
   | { type: "run:resumed"; v: 1; resumedAtSeq: number }
@@ -290,12 +304,19 @@ export type EngineEventHandler = (event: EngineEvent) => void;
  * its event log. Deliberately excludes non-serializable internals (child
  * processes, handler refs, file handles).
  */
+export interface BatchState {
+  nodeId: string;
+  expected: number;
+  completed: number;
+}
+
 export interface EngineSnapshot {
   tokens: Map<string, Token>;
   retryBudgets: Map<string, { count: number; max: number }>;
   globalContext: Record<string, unknown>;
   completedResults: StepResult[];
   status: RunStatus;
+  batches: Map<string, BatchState>;
 }
 
 // ---- Event-log errors ----
