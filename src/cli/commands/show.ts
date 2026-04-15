@@ -2,6 +2,7 @@ import chalk from "chalk";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createRunManager, readEventLog } from "../../core/index.js";
+import { readMarkflowJson } from "../workspace.js";
 
 export interface ShowOptions {
   workspace?: string;
@@ -74,6 +75,14 @@ export async function showCommand(id: string, options: ShowOptions): Promise<voi
 
   console.log(chalk.bold(`Workflow: ${runInfo.workflowName}`));
   console.log(`Source:   ${runInfo.sourceFile}`);
+  if (options.workspace) {
+    const meta = await readMarkflowJson(options.workspace);
+    if (meta?.origin?.type === "url") {
+      console.log(`Origin:   ${meta.origin.url} (fetched ${meta.origin.fetchedAt})`);
+    } else if (meta?.origin?.type === "stdin") {
+      console.log(`Origin:   <stdin> (received ${meta.origin.receivedAt})`);
+    }
+  }
   console.log(`Status:   ${statusColor(runInfo.status)}`);
   console.log(`Started:  ${runInfo.startedAt}`);
   if (runInfo.completedAt) {

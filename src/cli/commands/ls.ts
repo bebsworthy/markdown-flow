@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import { join } from "node:path";
 import { createRunManager } from "../../core/index.js";
+import { readMarkflowJson } from "../workspace.js";
 
 export interface LsOptions {
   json?: boolean;
@@ -10,13 +11,21 @@ export async function lsCommand(workspace: string, options: LsOptions): Promise<
   const manager = createRunManager(join(workspace, "runs"));
   const runs = await manager.listRuns();
 
-  if (runs.length === 0) {
-    console.log(chalk.dim("No runs found."));
+  if (options.json) {
+    console.log(JSON.stringify(runs, null, 2));
     return;
   }
 
-  if (options.json) {
-    console.log(JSON.stringify(runs, null, 2));
+  // Origin banner for URL/stdin-backed workspaces.
+  const meta = await readMarkflowJson(workspace);
+  if (meta?.origin?.type === "url") {
+    console.log(chalk.dim(`Origin: ${meta.origin.url} (fetched ${meta.origin.fetchedAt})`));
+  } else if (meta?.origin?.type === "stdin") {
+    console.log(chalk.dim(`Origin: <stdin> (received ${meta.origin.receivedAt})`));
+  }
+
+  if (runs.length === 0) {
+    console.log(chalk.dim("No runs found."));
     return;
   }
 

@@ -9,7 +9,12 @@ import { pendingCommand } from "./commands/pending.js";
 import { approveCommand } from "./commands/approve.js";
 import { resumeCommand } from "./commands/resume.js";
 
-yargs(hideBin(process.argv))
+// yargs's parser strips bare `-` tokens. Rewrite `-` to a sentinel so users
+// can still use the Unix-standard `markflow run -` for stdin.
+const STDIN_SENTINEL = "@stdin";
+const rawArgs = hideBin(process.argv).map((a) => (a === "-" ? STDIN_SENTINEL : a));
+
+yargs(rawArgs)
   .scriptName("markflow")
   .usage("$0 <command> [options]")
 
@@ -21,7 +26,8 @@ yargs(hideBin(process.argv))
       y
         .positional("target", {
           type: "string",
-          describe: "Workflow .md file or existing workspace directory",
+          describe:
+            "Workflow .md file, workspace directory, http(s) URL, or '-' for stdin",
           demandOption: true,
         })
         .option("workspace", {
@@ -62,7 +68,8 @@ yargs(hideBin(process.argv))
       y
         .positional("target", {
           type: "string",
-          describe: "Workflow .md file or workspace directory",
+          describe:
+            "Workflow .md file, workspace directory, http(s) URL, or '-' for stdin",
           demandOption: true,
         })
         .option("workspace", {
@@ -112,6 +119,12 @@ yargs(hideBin(process.argv))
           type: "boolean",
           default: false,
           describe: "Output events and result as JSON lines",
+        })
+        .option("refresh", {
+          type: "boolean",
+          default: false,
+          describe:
+            "Re-fetch the workflow from its recorded URL origin before running",
         }),
     async (argv) => {
       await runCommand(argv.target!, {
@@ -125,6 +138,7 @@ yargs(hideBin(process.argv))
         debug: argv.debug,
         breakOn: argv.breakOn,
         json: argv.json,
+        refresh: argv.refresh,
       });
     },
   )

@@ -14,6 +14,39 @@ npx markflow run workflow.md --input ISSUE_ID=abc --input PROJECT_ID=xyz
 
 On first run, markflow scaffolds a workspace directory (`./<workflow-name>/`) containing an `.env` file prefilled with any declared inputs, plus a `runs/` subdirectory that accumulates per-run event logs.
 
+## Loading Workflows From a URL or Stdin
+
+`markflow run` accepts an `http(s)` URL or `-` (stdin) as the target:
+
+```bash
+# Fetch and run — creates ./flow/ from the URL basename, persists flow.md locally
+markflow run https://example.com/flow.md
+
+# Pipe from stdin — --workspace is required
+cat flow.md | markflow run - --workspace ./my-flow
+
+# Re-run later without hitting the network (uses the frozen local copy)
+markflow run ./flow
+
+# Explicitly re-fetch the URL before running
+markflow run ./flow --refresh
+```
+
+On materialization the workspace records provenance in `.markflow.json`:
+
+```json
+{
+  "workflow": "flow.md",
+  "origin": {
+    "type": "url",
+    "url": "https://example.com/flow.md",
+    "fetchedAt": "2026-04-15T16:29:00.070Z"
+  }
+}
+```
+
+`markflow ls` and `markflow show` display the recorded origin for URL/stdin-backed workspaces. Remote workflows can run arbitrary shell — only run URLs you trust.
+
 ## Writing a Workflow
 
 A workflow is a `.md` file with up to four sections:

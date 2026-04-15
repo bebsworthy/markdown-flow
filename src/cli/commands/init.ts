@@ -10,6 +10,7 @@ import {
   updateEnvContent,
   parseInputFlags,
   workflowRelativePath,
+  prepareTarget,
 } from "../workspace.js";
 
 export interface InitOptions {
@@ -23,14 +24,34 @@ export async function initCommand(
   target: string,
   options: InitOptions,
 ): Promise<void> {
+  // Materialize remote / stdin source into the workspace first.
+  let prepared;
+  try {
+    prepared = await prepareTarget(target, options.workspace);
+  } catch (err) {
+    console.error(chalk.red((err as Error).message));
+    process.exit(1);
+  }
+  if (prepared.materialized && prepared.origin) {
+    console.log(
+      chalk.dim(
+        prepared.origin.type === "url"
+          ? `Fetched ${prepared.origin.url} → ${prepared.target}`
+          : `Read workflow from stdin → ${prepared.target}`,
+      ),
+    );
+  }
+  const effectiveTarget = prepared.target;
+  const effectiveWorkspace = prepared.workspace;
+
   let workflowPath: string;
   let workspaceDir: string;
   let workspaceExists: boolean;
 
   try {
     ({ workflowPath, workspaceDir, workspaceExists } = await resolveTarget(
-      target,
-      options.workspace,
+      effectiveTarget,
+      effectiveWorkspace,
     ));
   } catch (err) {
     console.error(chalk.red((err as Error).message));

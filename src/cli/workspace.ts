@@ -1,11 +1,17 @@
-import { readFile, writeFile, stat } from "node:fs/promises";
+import { readFile, writeFile, stat, mkdir } from "node:fs/promises";
+import { text } from "node:stream/consumers";
 import { resolve, relative, basename, join } from "node:path";
 import type { InputDeclaration } from "../core/types.js";
 
 // ---- .markflow.json --------------------------------------------------------
 
+export type WorkflowOrigin =
+  | { type: "url"; url: string; fetchedAt: string }
+  | { type: "stdin"; receivedAt: string };
+
 export interface MarkflowJson {
   workflow: string; // path relative to workspace dir
+  origin?: WorkflowOrigin;
 }
 
 export async function readMarkflowJson(
@@ -22,13 +28,172 @@ export async function readMarkflowJson(
 export async function writeMarkflowJson(
   workspaceDir: string,
   relativeWorkflow: string,
+  origin?: WorkflowOrigin,
 ): Promise<void> {
   const data: MarkflowJson = { workflow: relativeWorkflow };
+  if (origin) data.origin = origin;
   await writeFile(
     join(workspaceDir, ".markflow.json"),
     JSON.stringify(data, null, 2) + "\n",
     "utf-8",
   );
+}
+
+// ---- Remote / stdin materialization ----------------------------------------
+
+export function isRemoteTarget(target: string): boolean {
+  return /^https?:\/\//i.test(target) || target === "-" || target === "@stdin";
+}
+
+export interface MaterializedTarget {
+  workflowPath: string; // absolute path to the persisted local .md
+  workspaceDir: string; // absolute path to the workspace that now contains it
+  origin: WorkflowOrigin;
+}
+
+/**
+ * If `target` is an http(s) URL or `-` (stdin), fetch/read the workflow,
+ * persist it into a workspace directory, and return the local path.
+ *
+ * For URLs the workspace defaults to `./<basename-stem>`; for stdin
+ * `--workspace` is required.
+ *
+ * `.markflow.json` is written (with `origin` recorded) so subsequent
+ * `markflow run <workspace>` invocations reuse the frozen copy.
+ *
+ * Returns `null` if the target is a local file/directory.
+ */
+export async function materializeRemoteTarget(
+  target: string,
+  workspaceFlag: string | undefined,
+): Promise<MaterializedTarget | null> {
+  if (!isRemoteTarget(target)) return null;
+
+  let content: string;
+  let origin: WorkflowOrigin;
+  let defaultStem: string;
+
+  if (target === "-" || target === "@stdin") {
+    if (!workspaceFlag) {
+      throw new Error(
+        "Reading workflow from stdin requires --workspace <dir>.",
+      );
+    }
+    content = await text(process.stdin);
+    origin = { type: "stdin", receivedAt: new Date().toISOString() };
+    defaultStem = "flow";
+  } else {
+    const url = target;
+    let res: Response;
+    try {
+      res = await fetch(url);
+    } catch (err) {
+      throw new Error(
+        `Failed to fetch workflow from ${url}: ${(err as Error).message}`,
+      );
+    }
+    if (!res.ok) {
+      throw new Error(
+        `Failed to fetch workflow from ${url}: HTTP ${res.status} ${res.statusText}`,
+      );
+    }
+    const ct = res.headers.get("content-type") ?? "";
+    if (ct && !/text\/(markdown|plain|x-markdown)|application\/(octet-stream|markdown)/i.test(ct)) {
+      process.stderr.write(
+        `Warning: unexpected Content-Type "${ct}" for ${url}\n`,
+      );
+    }
+    content = await res.text();
+    origin = { type: "url", url, fetchedAt: new Date().toISOString() };
+    let urlBase: string;
+    try {
+      urlBase = basename(new URL(url).pathname, ".md");
+    } catch {
+      urlBase = "";
+    }
+    defaultStem = urlBase && urlBase !== "/" ? urlBase : "flow";
+  }
+
+  const workspaceDir = resolve(workspaceFlag ?? `./${defaultStem}`);
+  await mkdir(workspaceDir, { recursive: true });
+  const workflowPath = join(workspaceDir, "flow.md");
+  await writeFile(workflowPath, content, "utf-8");
+  await writeMarkflowJson(workspaceDir, "flow.md", origin);
+
+  return { workflowPath, workspaceDir, origin };
+}
+
+/**
+ * Re-fetch a workspace's URL origin and overwrite flow.md + fetchedAt.
+ * Throws if the workspace has no URL origin recorded.
+ */
+export async function refreshWorkspaceOrigin(
+  workspaceDir: string,
+): Promise<Extract<WorkflowOrigin, { type: "url" }>> {
+  const meta = await readMarkflowJson(workspaceDir);
+  if (!meta?.origin || meta.origin.type !== "url") {
+    throw new Error(
+      `--refresh requires a workspace with a URL origin; ` +
+        `"${workspaceDir}" has no recorded URL origin.`,
+    );
+  }
+  const url = meta.origin.url;
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch (err) {
+    throw new Error(
+      `Failed to refresh from ${url}: ${(err as Error).message}`,
+    );
+  }
+  if (!res.ok) {
+    throw new Error(
+      `Failed to refresh from ${url}: HTTP ${res.status} ${res.statusText}`,
+    );
+  }
+  const ct = res.headers.get("content-type") ?? "";
+  if (ct && !/text\/(markdown|plain|x-markdown)|application\/(octet-stream|markdown)/i.test(ct)) {
+    process.stderr.write(
+      `Warning: unexpected Content-Type "${ct}" for ${url}\n`,
+    );
+  }
+  const content = await res.text();
+  const workflowRel = meta.workflow;
+  await writeFile(join(workspaceDir, workflowRel), content, "utf-8");
+  const newOrigin: WorkflowOrigin = {
+    type: "url",
+    url,
+    fetchedAt: new Date().toISOString(),
+  };
+  await writeMarkflowJson(workspaceDir, workflowRel, newOrigin);
+  return newOrigin;
+}
+
+export interface PreparedTarget {
+  target: string; // local .md path (or the original, if not remote)
+  workspace: string | undefined; // resolved workspace path if materialized
+  materialized: boolean;
+  origin?: WorkflowOrigin;
+}
+
+/**
+ * Normalise a CLI target for downstream commands: if remote/stdin, materialize
+ * it to disk and return the local path + workspace; otherwise pass through.
+ */
+export async function prepareTarget(
+  target: string,
+  workspaceFlag: string | undefined,
+): Promise<PreparedTarget> {
+  const materialized = await materializeRemoteTarget(target, workspaceFlag);
+  if (!materialized) {
+    return { target, workspace: workspaceFlag, materialized: false };
+  }
+  return {
+    target: materialized.workflowPath,
+    workspace: materialized.workspaceDir,
+    materialized: true,
+    origin: materialized.origin,
+  };
 }
 
 // ---- Target resolution -----------------------------------------------------

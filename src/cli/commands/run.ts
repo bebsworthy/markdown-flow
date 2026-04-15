@@ -11,6 +11,8 @@ import {
 import {
   resolveTarget,
   parseInputFlags,
+  prepareTarget,
+  refreshWorkspaceOrigin,
 } from "../workspace.js";
 import { initCommand } from "./init.js";
 import { createDebugHook } from "../debug.js";
@@ -27,16 +29,38 @@ export interface RunOptions {
   breakOn?: string;
   verbose?: boolean;
   json?: boolean;
+  refresh?: boolean;
 }
 
 export async function runCommand(
   target: string,
   options: RunOptions,
 ): Promise<void> {
+  // Materialize remote / stdin source into the workspace first.
+  let prepared;
+  try {
+    prepared = await prepareTarget(target, options.workspace);
+  } catch (err) {
+    console.error(chalk.red((err as Error).message));
+    process.exit(1);
+  }
+  if (prepared.materialized && prepared.origin) {
+    console.log(
+      chalk.dim(
+        prepared.origin.type === "url"
+          ? `Fetched ${prepared.origin.url} → ${prepared.target}`
+          : `Read workflow from stdin → ${prepared.target}`,
+      ),
+    );
+  }
+  const effectiveTarget = prepared.target;
+  const effectiveWorkspace = prepared.workspace;
+  const wasMaterialized = prepared.materialized;
+
   // Resolve workspace + workflow path
   let resolved;
   try {
-    resolved = await resolveTarget(target, options.workspace);
+    resolved = await resolveTarget(effectiveTarget, effectiveWorkspace);
   } catch (err) {
     console.error(chalk.red((err as Error).message));
     process.exit(1);
@@ -44,10 +68,26 @@ export async function runCommand(
 
   const { workflowPath, workspaceDir, workspaceExists } = resolved;
 
-  // Auto-init if workspace doesn't exist
-  if (!workspaceExists) {
-    console.log(chalk.dim(`Workspace not found — initialising ${workspaceDir}...`));
-    await initCommand(target, { workspace: options.workspace });
+  // --refresh: re-fetch from recorded URL origin before running.
+  if (options.refresh && !wasMaterialized && workspaceExists) {
+    try {
+      const o = await refreshWorkspaceOrigin(workspaceDir);
+      console.log(chalk.dim(`Refreshed ${o.url} → ${workflowPath}`));
+    } catch (err) {
+      console.error(chalk.red((err as Error).message));
+      process.exit(1);
+    }
+  } else if (options.refresh && wasMaterialized) {
+    // URL target already triggered a fresh fetch via prepareTarget; --refresh is redundant.
+    console.log(chalk.dim("(--refresh redundant: target is a URL and was just fetched)"));
+  }
+
+  // Auto-init if workspace doesn't exist, or if we just materialized (no .env yet)
+  if (!workspaceExists || wasMaterialized) {
+    if (!workspaceExists) {
+      console.log(chalk.dim(`Workspace not found — initialising ${workspaceDir}...`));
+    }
+    await initCommand(effectiveTarget, { workspace: effectiveWorkspace });
   }
 
   // Parse --input flags
