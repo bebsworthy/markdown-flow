@@ -190,6 +190,8 @@ export class WorkflowEngine {
         v: 1,
         resumedAtSeq: resume.lastSeq,
       });
+
+      await this.resumeIncompleteBatches();
     } else {
       // Create run directory
       this.runDir = await runManager.createRun(this.def);
@@ -879,6 +881,71 @@ export class WorkflowEngine {
     this.handleSkippedUpstreams();
   }
 
+  /**
+   * On resume, walk incomplete batches and re-spawn tokens for items that
+   * never finished. Reuses the original `batchId` and pulls `itemContext`
+   * from the per-batch list captured at `batch:start` time, so the source
+   * step's `LOCAL` does not need to be re-evaluated. Mid-flight tokens left
+   * in the `running` state are reset to `pending` so the run loop will
+   * re-dispatch them.
+   */
+  private async resumeIncompleteBatches(): Promise<void> {
+    for (const [batchId, batch] of this.batches) {
+      if (batch.done) continue;
+
+      const completedIndices = new Set<number>();
+      const liveTokensByIndex = new Map<number, Token>();
+      for (const tok of this.tokens.values()) {
+        if (tok.batchId !== batchId || tok.itemIndex == null) continue;
+        if (tok.state === "complete" || tok.state === "skipped") {
+          completedIndices.add(tok.itemIndex);
+        } else {
+          liveTokensByIndex.set(tok.itemIndex, tok);
+        }
+      }
+      // Batch-item events may have been recorded without a terminal
+      // token:state — treat any `batch:item:complete` as authoritative too.
+      for (let i = 0; i < batch.results.length; i++) {
+        if (batch.results[i] != null) completedIndices.add(i);
+      }
+
+      const scope = getForEachScope(this.def.graph, batch.nodeId);
+      if (!scope) continue;
+      const firstBodyNode = scope.bodyNodes[0];
+
+      for (let i = 0; i < batch.expected; i++) {
+        if (completedIndices.has(i)) continue;
+
+        const existing = liveTokensByIndex.get(i);
+        if (existing) {
+          if (existing.state === "running") {
+            await this.record(
+              { type: "token:reset", v: 1, tokenId: existing.id },
+              () => {
+                existing.state = "pending";
+                delete existing.edge;
+                delete existing.result;
+              },
+            );
+          }
+          continue;
+        }
+
+        // No live token for this itemIndex — spawn a fresh one at the start
+        // of the forEach chain using the stored item context.
+        await this.createBatchToken(
+          firstBodyNode,
+          batchId,
+          i,
+          // parentTokenId is best-effort on resume: original source token may
+          // not be in the snapshot if pruned; fall back to nodeId marker.
+          `batch-source:${batch.nodeId}`,
+          batch.itemContexts[i],
+        );
+      }
+    }
+  }
+
   private async spawnBatch(
     sourceToken: Token,
     result: StepResult,
@@ -904,19 +971,31 @@ export class WorkflowEngine {
       return;
     }
 
+    const sourceStep = this.def.steps.get(sourceToken.nodeId);
+    const onItemError: import("./types.js").ForEachItemErrorMode =
+      sourceStep?.stepConfig?.foreach?.onItemError ?? "fail-fast";
+
     const batchId = `batch-${++this.tokenCounter}`;
 
     await this.emit({
       type: "batch:start",
-      v: 1,
+      v: 2,
       batchId,
       nodeId: sourceToken.nodeId,
       items: items.length,
+      itemContexts: [...items],
+      onItemError,
     });
     this.batches.set(batchId, {
       nodeId: sourceToken.nodeId,
       expected: items.length,
       completed: 0,
+      succeeded: 0,
+      failed: 0,
+      onItemError,
+      itemContexts: [...items],
+      results: new Array(items.length),
+      done: false,
     });
 
     for (let i = 0; i < items.length; i++) {
@@ -935,29 +1014,48 @@ export class WorkflowEngine {
     const batch = this.batches.get(batchId);
     if (!batch) return;
 
+    const itemIndex = token.itemIndex!;
+    const edge = token.result?.edge ?? "fail";
+    const ok = edge !== "fail";
+
     await this.emit({
       type: "batch:item:complete",
-      v: 1,
+      v: 2,
       batchId,
-      itemIndex: token.itemIndex!,
+      itemIndex,
       tokenId: token.id,
+      ok,
+      edge,
     });
     batch.completed++;
+    if (ok) batch.succeeded++;
+    else batch.failed++;
+    batch.results[itemIndex] = {
+      itemIndex,
+      ok,
+      edge,
+      summary: token.result?.summary,
+      local: token.result?.local,
+    };
 
     if (batch.completed >= batch.expected) {
-      await this.emit({ type: "batch:complete", v: 1, batchId });
+      const hadFailure = batch.failed > 0;
+      const status: "ok" | "error" =
+        batch.onItemError === "fail-fast" && hadFailure ? "error" : "ok";
 
-      // Collect results from all batch tokens into GLOBAL.results
-      const batchResults: unknown[] = [];
-      for (const t of this.tokens.values()) {
-        if (t.batchId === batchId && t.result) {
-          batchResults[t.itemIndex!] = {
-            edge: t.result.edge,
-            summary: t.result.summary,
-            local: t.result.local,
-          };
-        }
-      }
+      await this.emit({
+        type: "batch:complete",
+        v: 2,
+        batchId,
+        succeeded: batch.succeeded,
+        failed: batch.failed,
+        status,
+      });
+      batch.done = true;
+      batch.status = status;
+
+      // Results ordered by itemIndex (pre-allocated on batch:start).
+      const batchResults = batch.results.map((r) => r ?? null);
 
       await this.record(
         {
@@ -970,15 +1068,46 @@ export class WorkflowEngine {
         },
       );
 
-      // Create token for the collector node.
       const scope = getForEachScope(this.def.graph, batch.nodeId);
-      if (scope) {
-        this.resolvedNodes.add(batch.nodeId);
-        for (const bodyNode of scope.bodyNodes) {
-          this.resolvedNodes.add(bodyNode);
-        }
+      if (!scope) return;
+
+      this.resolvedNodes.add(batch.nodeId);
+      for (const bodyNode of scope.bodyNodes) {
+        this.resolvedNodes.add(bodyNode);
+      }
+
+      if (status === "error") {
+        // fail-fast: bypass the collector and route the source on its `fail` edge.
+        await this.routeBatchFailure(batch.nodeId);
+      } else {
         await this.createToken(scope.collectorNode);
       }
+    }
+  }
+
+  /**
+   * When a batch aborts under `fail-fast`, route the source node on its
+   * outgoing `fail` edge (if one exists). Without an explicit `fail` edge the
+   * workflow terminates at the source — the collector is deliberately skipped.
+   */
+  private async routeBatchFailure(sourceNodeId: string): Promise<void> {
+    const outgoing = getOutgoingEdges(this.def.graph, sourceNodeId);
+    const failEdge = outgoing.find(
+      (e) => e.label === "fail" && !e.annotations.isExhaustionHandler,
+    );
+    if (!failEdge) return;
+
+    await this.emit({
+      type: "route",
+      from: sourceNodeId,
+      to: failEdge.to,
+      edge: "fail",
+    });
+    const existingPending = [...this.tokens.values()].find(
+      (t) => t.nodeId === failEdge.to && t.state === "pending",
+    );
+    if (!existingPending) {
+      await this.createToken(failEdge.to);
     }
   }
 

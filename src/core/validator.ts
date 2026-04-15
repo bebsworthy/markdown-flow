@@ -3,7 +3,12 @@ import type {
   ValidationDiagnostic,
   FlowEdge,
 } from "./types.js";
-import { getStartNodes, getOutgoingEdges } from "./graph.js";
+import {
+  getStartNodes,
+  getOutgoingEdges,
+  getForEachScope,
+  findForEachSource,
+} from "./graph.js";
 
 export function validateWorkflow(
   def: WorkflowDefinition,
@@ -230,6 +235,85 @@ export function validateWorkflow(
           suggestion: `Add "${label}" to the options list, or drop the edge.`,
         });
       }
+    }
+  }
+
+  // 10. forEach structural rules
+  const forEachSources = new Set<string>();
+  for (const nodeId of graph.nodes.keys()) {
+    const outgoing = getOutgoingEdges(graph, nodeId);
+    const hasThickEach = outgoing.some(
+      (e) => e.stroke === "thick" && e.annotations.forEach,
+    );
+    if (hasThickEach) forEachSources.add(nodeId);
+  }
+
+  // 10a. FOREACH_LABEL_MISSING_KEY — thick `each:` edge with no / empty key
+  for (const edge of graph.edges) {
+    if (edge.stroke !== "thick") continue;
+    if (edge.annotations.forEach) continue;
+    // Label present, starts with `each:`, but didn't parse — missing/empty key.
+    if (edge.label && /^each:/i.test(edge.label.trim())) {
+      diagnostics.push({
+        severity: "error",
+        code: "FOREACH_LABEL_MISSING_KEY",
+        message: `Thick edge from "${edge.from}" has an \`each:\` label with no key (got "${edge.label}")`,
+        nodeId: edge.from,
+        source,
+        suggestion: "Use `==>|each: KEY|` where KEY is the LOCAL array name.",
+      });
+    }
+  }
+
+  // 10b. FOREACH_NO_COLLECTOR — thick chain terminates without a normal fan-in
+  for (const sourceNodeId of forEachSources) {
+    const scope = getForEachScope(graph, sourceNodeId);
+    if (!scope) {
+      diagnostics.push({
+        severity: "error",
+        code: "FOREACH_NO_COLLECTOR",
+        message: `forEach chain from "${sourceNodeId}" does not terminate at a collector (first normal edge)`,
+        nodeId: sourceNodeId,
+        source,
+        suggestion:
+          "End the `==>` chain with a normal edge `-->` to a collector node.",
+      });
+    }
+  }
+
+  // 10c. FOREACH_ORPHAN_THICK — thick edge whose source is neither a forEach
+  //      source nor inside an existing forEach body chain.
+  for (const edge of graph.edges) {
+    if (edge.stroke !== "thick") continue;
+    if (edge.annotations.forEach) continue; // labelled `each:` — already checked
+    if (forEachSources.has(edge.from)) continue; // legit chain start
+    const parentScope = findForEachSource(graph, edge.from);
+    if (!parentScope) {
+      diagnostics.push({
+        severity: "error",
+        code: "FOREACH_ORPHAN_THICK",
+        message: `Thick edge from "${edge.from}" is not part of any forEach chain`,
+        nodeId: edge.from,
+        source,
+        suggestion:
+          "Use a normal `-->` edge, or make this node part of a chain started by `==>|each: KEY|`.",
+      });
+    }
+  }
+
+  // 10d. FOREACH_NESTED — a body node of one forEach has its own `each:` edge
+  for (const sourceNodeId of forEachSources) {
+    const parentScope = findForEachSource(graph, sourceNodeId);
+    if (parentScope) {
+      diagnostics.push({
+        severity: "error",
+        code: "FOREACH_NESTED",
+        message: `forEach source "${sourceNodeId}" is nested inside another forEach (body of "${parentScope.sourceNodeId}") — unsupported in v1`,
+        nodeId: sourceNodeId,
+        source,
+        suggestion:
+          "Flatten the workflow so only one forEach is active at a time, or split into sequential runs.",
+      });
     }
   }
 

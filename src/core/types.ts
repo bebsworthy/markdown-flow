@@ -40,6 +40,8 @@ export interface FlowEdge {
   annotations: EdgeAnnotations;
 }
 
+export type ForEachItemErrorMode = "fail-fast" | "continue";
+
 export interface EdgeAnnotations {
   maxRetries?: number;
   isExhaustionHandler?: boolean;
@@ -78,11 +80,24 @@ export interface RetryConfig {
   jitter?: number;
 }
 
+export interface ForEachConfig {
+  /**
+   * How the batch handles an item that resolves on the `fail` edge.
+   * - `fail-fast` (default): first failure aborts the batch; in-flight items
+   *   still finish, no collector runs, and the source routes on `fail`.
+   * - `continue`: all items run; the collector sees successful and failed
+   *   entries. Read on the first `batch:start` and pinned in the event log.
+   */
+  onItemError: ForEachItemErrorMode;
+}
+
 export interface StepConfig {
   /** Human-readable duration (e.g. "30s", "5m", "1h30m") for this step's per-attempt timeout. */
   timeout?: string;
   /** Intrinsic retry policy applied when the step's resolved edge is "fail". */
   retry?: RetryConfig;
+  /** forEach batch policy — applies when this step has an outgoing `==>|each:|` edge. */
+  foreach?: ForEachConfig;
 }
 
 export interface StepApprovalConfig {
@@ -107,6 +122,8 @@ export type Severity = "error" | "warning";
 
 export interface ValidationDiagnostic {
   severity: Severity;
+  /** Machine-readable error code (e.g. `FOREACH_NO_COLLECTOR`). Optional for legacy diagnostics. */
+  code?: string;
   message: string;
   nodeId?: string;
   line?: number;
@@ -257,9 +274,33 @@ export type EngineEventPayload =
       delayMs: number;
       reason: "fail" | "timeout";
     }
-  | { type: "batch:start"; v: 1; batchId: string; nodeId: string; items: number }
-  | { type: "batch:item:complete"; v: 1; batchId: string; itemIndex: number; tokenId: string }
-  | { type: "batch:complete"; v: 1; batchId: string }
+  | {
+      type: "batch:start";
+      v: 2;
+      batchId: string;
+      nodeId: string;
+      items: number;
+      /** Per-item context values (`LOCAL[key]`), preserved for mid-batch resume. */
+      itemContexts: unknown[];
+      onItemError: ForEachItemErrorMode;
+    }
+  | {
+      type: "batch:item:complete";
+      v: 2;
+      batchId: string;
+      itemIndex: number;
+      tokenId: string;
+      ok: boolean;
+      edge: string;
+    }
+  | {
+      type: "batch:complete";
+      v: 2;
+      batchId: string;
+      succeeded: number;
+      failed: number;
+      status: "ok" | "error";
+    }
   | { type: "workflow:complete"; results: StepResult[] }
   | { type: "workflow:error"; error: string }
   | { type: "run:resumed"; v: 1; resumedAtSeq: number }
@@ -308,6 +349,32 @@ export interface BatchState {
   nodeId: string;
   expected: number;
   completed: number;
+  /** Number of items that resolved on a non-`fail` edge. */
+  succeeded: number;
+  /** Number of items that resolved on `fail`. */
+  failed: number;
+  /** Failure policy pinned at `batch:start` time. */
+  onItemError: ForEachItemErrorMode;
+  /**
+   * Per-item input contexts, indexed by `itemIndex`. Captured on `batch:start`
+   * so mid-batch resume can re-spawn unfinished items without consulting the
+   * source step's `LOCAL`.
+   */
+  itemContexts: unknown[];
+  /** Per-item result payloads (edge/summary/local), indexed by `itemIndex`. */
+  results: Array<BatchItemResult | undefined>;
+  /** True once `batch:complete` has been observed. */
+  done: boolean;
+  /** Terminal status from `batch:complete`, if known. */
+  status?: "ok" | "error";
+}
+
+export interface BatchItemResult {
+  itemIndex: number;
+  ok: boolean;
+  edge: string;
+  summary?: string;
+  local?: Record<string, unknown>;
 }
 
 export interface EngineSnapshot {

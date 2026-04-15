@@ -49,8 +49,9 @@ export function replay(events: EngineEvent[]): EngineSnapshot {
             "Duplicate run:start event in log",
           );
         }
-        if (evt.v !== 1) {
-          throw new UnsupportedLogVersionError(evt.v);
+        const v = (evt as { v: unknown }).v;
+        if (v !== 1) {
+          throw new UnsupportedLogVersionError(v);
         }
         sawRunStart = true;
         break;
@@ -108,8 +109,9 @@ export function replay(events: EngineEvent[]): EngineSnapshot {
 
       case "step:waiting":
       case "approval:decided": {
-        if (evt.v !== 1) {
-          throw new UnsupportedLogVersionError(evt.v);
+        const v = (evt as { v: unknown }).v;
+        if (v !== 1) {
+          throw new UnsupportedLogVersionError(v);
         }
         // Pure notifications. Token-state transitions are carried by paired
         // `token:state` events; suspended-run detection happens after the fold.
@@ -117,8 +119,9 @@ export function replay(events: EngineEvent[]): EngineSnapshot {
       }
 
       case "run:resumed": {
-        if (evt.v !== 1) {
-          throw new UnsupportedLogVersionError(evt.v);
+        const v = (evt as { v: unknown }).v;
+        if (v !== 1) {
+          throw new UnsupportedLogVersionError(v);
         }
         // No-op marker; observable in the log as "this run was resumed at seq N".
         break;
@@ -156,7 +159,7 @@ export function replay(events: EngineEvent[]): EngineSnapshot {
       }
 
       case "batch:start": {
-        if (evt.v !== 1) throw new UnsupportedLogVersionError(evt.v);
+        { const v = (evt as { v: unknown }).v; if (v !== 2) throw new UnsupportedLogVersionError(v, [2]); }
         if (snap.batches.has(evt.batchId)) {
           throw new InconsistentLogError(
             `batch:start for existing batchId ${evt.batchId}`,
@@ -166,12 +169,18 @@ export function replay(events: EngineEvent[]): EngineSnapshot {
           nodeId: evt.nodeId,
           expected: evt.items,
           completed: 0,
+          succeeded: 0,
+          failed: 0,
+          onItemError: evt.onItemError,
+          itemContexts: [...evt.itemContexts],
+          results: new Array(evt.items),
+          done: false,
         });
         break;
       }
 
       case "batch:item:complete": {
-        if (evt.v !== 1) throw new UnsupportedLogVersionError(evt.v);
+        { const v = (evt as { v: unknown }).v; if (v !== 2) throw new UnsupportedLogVersionError(v, [2]); }
         const batch = snap.batches.get(evt.batchId);
         if (!batch) {
           throw new InconsistentLogError(
@@ -179,17 +188,39 @@ export function replay(events: EngineEvent[]): EngineSnapshot {
           );
         }
         batch.completed++;
+        if (evt.ok) batch.succeeded++;
+        else batch.failed++;
+        // Backfill per-item result from the completing token's StepResult, if
+        // that token's step:complete has already been folded.
+        const tok = snap.tokens.get(evt.tokenId);
+        if (tok?.result) {
+          batch.results[evt.itemIndex] = {
+            itemIndex: evt.itemIndex,
+            ok: evt.ok,
+            edge: evt.edge,
+            summary: tok.result.summary,
+            local: tok.result.local,
+          };
+        } else {
+          batch.results[evt.itemIndex] = {
+            itemIndex: evt.itemIndex,
+            ok: evt.ok,
+            edge: evt.edge,
+          };
+        }
         break;
       }
 
       case "batch:complete": {
-        if (evt.v !== 1) throw new UnsupportedLogVersionError(evt.v);
+        { const v = (evt as { v: unknown }).v; if (v !== 2) throw new UnsupportedLogVersionError(v, [2]); }
         const b = snap.batches.get(evt.batchId);
         if (!b) {
           throw new InconsistentLogError(
             `batch:complete for unknown batchId ${evt.batchId}`,
           );
         }
+        b.done = true;
+        b.status = evt.status;
         break;
       }
 

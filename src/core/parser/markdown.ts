@@ -235,7 +235,11 @@ function buildStep(
     if (parsed.agent.agent !== undefined || parsed.agent.flags !== undefined) {
       agentConfig = parsed.agent;
     }
-    if (parsed.step.timeout !== undefined || parsed.step.retry !== undefined) {
+    if (
+      parsed.step.timeout !== undefined ||
+      parsed.step.retry !== undefined ||
+      parsed.step.foreach !== undefined
+    ) {
       stepConfig = parsed.step;
     }
     if (parsed.type !== undefined) {
@@ -487,7 +491,9 @@ function parseStepConfig(yaml: string): {
   let inFlags = false;
   let inRetry = false;
   let inOptions = false;
+  let inForeach = false;
   let retry: RetryConfig | undefined;
+  let foreach: import("../types.js").ForEachConfig | undefined;
 
   for (const rawLine of lines) {
     const line = rawLine.trimEnd();
@@ -521,7 +527,35 @@ function parseStepConfig(yaml: string): {
       retry = { max: 0 };
       inRetry = true;
       inFlags = false;
+      inForeach = false;
       continue;
+    }
+
+    if (/^foreach:\s*$/.test(line)) {
+      foreach = { onItemError: "fail-fast" };
+      inForeach = true;
+      inRetry = false;
+      inFlags = false;
+      inOptions = false;
+      continue;
+    }
+
+    if (inForeach) {
+      const indented = line.match(/^\s+(\w+):\s*(.+)$/);
+      if (indented) {
+        const key = indented[1];
+        const val = indented[2].trim();
+        if (key === "onItemError") {
+          if (val !== "fail-fast" && val !== "continue") {
+            throw new ParseError(
+              `foreach.onItemError must be "fail-fast" or "continue" (got "${val}")`,
+            );
+          }
+          foreach!.onItemError = val;
+        }
+        continue;
+      }
+      if (!/^\s/.test(line)) inForeach = false;
     }
 
     if (inRetry) {
@@ -614,6 +648,10 @@ function parseStepConfig(yaml: string): {
 
   if (retry && retry.max > 0) {
     step.retry = retry;
+  }
+
+  if (foreach) {
+    step.foreach = foreach;
   }
 
   const approval: StepApprovalConfig | undefined =

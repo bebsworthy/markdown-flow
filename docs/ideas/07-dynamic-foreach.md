@@ -1,7 +1,56 @@
 # 07 — Dynamic Task Mapping / forEach
 
-**Status** IMPLEMENTED
+**Status** IMPLEMENTED (v1)
 **Tier:** Essential | **Effort:** Deep (5-8 days) | **Priority:** High
+
+## Guarantees (v1)
+
+- **Result ordering.** `GLOBAL.results` after batch completion is an array
+  indexed by input position (`itemIndex`), not by completion time. The engine
+  pre-allocates a fixed-length slot per item at `batch:start` and writes each
+  result to its own slot, so parallel completions cannot shuffle the output.
+- **Mid-batch resume.** `batch:start` carries the full `itemContexts` array,
+  pinned in the event log. On `markflow resume`, any batch with
+  `completed < expected` re-spawns tokens only for the missing `itemIndex`
+  values (reusing the original `batchId`); completed items are never re-run,
+  in-flight items left as `running` are reset to `pending` and re-dispatched.
+- **Failure policy** (see below) is frozen at `batch:start` time. Edits to
+  the source step's `foreach.onItemError` config after that point do not
+  affect an in-flight batch — replay is deterministic.
+
+## Failure semantics — `onItemError`
+
+Configured on the source step (the node with the outgoing `==>|each: KEY|`
+edge):
+
+````markdown
+## produce
+
+```config
+foreach:
+  onItemError: fail-fast   # or: continue
+```
+````
+
+- `fail-fast` (default): the first item that resolves on `fail` marks the
+  batch as errored. In-flight items still run to completion (no cancellation
+  in v1), but the collector is **skipped**; the source node routes on its
+  outgoing `fail` edge if one exists.
+- `continue`: every item runs. The collector runs regardless; `GLOBAL.results`
+  contains both ok and failed entries, each tagged `{ ok: boolean, edge }`,
+  so the collector can decide how to react.
+
+`batch:complete` carries `succeeded`, `failed`, and an overall
+`status: "ok" | "error"` derived from the pinned policy.
+
+## Validator rules
+
+| Code | Meaning |
+|---|---|
+| `FOREACH_NO_COLLECTOR` | A `==>|each:|` chain does not terminate at a normal-edge fan-in (collector). |
+| `FOREACH_LABEL_MISSING_KEY` | Thick edge carries an `each:` label with no key. |
+| `FOREACH_ORPHAN_THICK` | A `==>` edge starts outside any forEach chain. |
+| `FOREACH_NESTED` | A forEach source is reachable from another forEach body chain. |
 
 ## Problem
 
@@ -78,9 +127,26 @@ onItemError: continue  # or: fail-fast, collect
 All batch state must be reconstructible from `events.jsonl` — otherwise resume (idea 19) cannot continue a mid-batch run. Three new persisted events:
 
 ```ts
-{ type: "batch:start"; v: 1; batchId: string; nodeId: string; expected: number }
-{ type: "batch:item:complete"; v: 1; batchId: string; itemIndex: number; tokenId: string }
-{ type: "batch:complete"; v: 1; batchId: string }
+// v2 (shipped)
+{
+  type: "batch:start"; v: 2;
+  batchId: string; nodeId: string;
+  items: number;                 // cardinality
+  itemContexts: unknown[];       // per-item input values, captured for resume
+  onItemError: "fail-fast" | "continue";
+}
+{
+  type: "batch:item:complete"; v: 2;
+  batchId: string; itemIndex: number; tokenId: string;
+  ok: boolean;                   // edge !== "fail"
+  edge: string;
+}
+{
+  type: "batch:complete"; v: 2;
+  batchId: string;
+  succeeded: number; failed: number;
+  status: "ok" | "error";
+}
 ```
 
 `token:created` is extended (not a new variant — 18 deliberately left `parentTokenId` out, naming this idea as the consumer):
