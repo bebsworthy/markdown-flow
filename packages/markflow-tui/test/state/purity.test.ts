@@ -32,6 +32,13 @@ const files = [
   "../../src/engine/reducer.ts",
   "../../src/engine/adapter.ts",
   "../../src/engine/index.ts",
+  // Theme pure surface (P3-T3). NOTE: context.tsx is NOT in this list —
+  // it is the designated React-boundary file for the theme slice.
+  "../../src/theme/tokens.ts",
+  "../../src/theme/glyphs.ts",
+  "../../src/theme/capabilities.ts",
+  "../../src/theme/theme.ts",
+  "../../src/theme/index.ts",
 ];
 
 /**
@@ -81,5 +88,28 @@ describe("pure-module purity", () => {
     expect(typeof mod.engineReducer).toBe("function");
     expect(typeof mod.toEngineAction).toBe("function");
     expect(mod.initialEngineState).toBeDefined();
+  });
+
+  it("theme tokens module loads without Ink/React", async () => {
+    const mod = await import("../../src/theme/tokens.js");
+    expect(mod.COLOR_TABLE).toBeDefined();
+    expect(mod.MONOCHROME_COLOR_TABLE).toBeDefined();
+  });
+
+  it("theme glyphs module loads without Ink/React", async () => {
+    const mod = await import("../../src/theme/glyphs.js");
+    expect(mod.UNICODE_GLYPHS).toBeDefined();
+    expect(mod.ASCII_GLYPHS).toBeDefined();
+    expect(typeof mod.glyphKeyForRole).toBe("function");
+  });
+
+  it("theme capabilities module loads without Ink/React", async () => {
+    const mod = await import("../../src/theme/capabilities.js");
+    expect(typeof mod.detectCapabilities).toBe("function");
+  });
+
+  it("theme buildTheme loads without Ink/React", async () => {
+    const mod = await import("../../src/theme/theme.js");
+    expect(typeof mod.buildTheme).toBe("function");
   });
 });
