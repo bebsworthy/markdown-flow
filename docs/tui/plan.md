@@ -366,7 +366,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 ## Phase 5 — Runs mode (stacked layout)
 
-### [ ] P5-T1 — Runs table component (columns, sort, status glyphs)
+### [x] P5-T1 — Runs table component (columns, sort, status glyphs)
 
 **Reference.** features.md §3.2; mockups.md §1 top half, §3.
 
@@ -578,6 +578,7 @@ Every time the orchestrator finishes a task it appends one line here (most recen
 ```
 
 ```
+2026-04-16  P5-T1  f46414b  runs table component (709 TUI tests, attention-first sort + theme glyphs + column-drop tiers)
 2026-04-16  P4-T3  7b1b723  add-workflow modal + launch-arg ingest + empty-state keybar (616 TUI tests, fuzzy walker + URL materialize)
 2026-04-16  P4-T2  d2a37cc  workflow browser pane with preview (502 TUI tests, two-pane layout + empty state)
 2026-04-16  P4-T1  660ff63  workflow registry persistence (390 TUI tests, atomic write + .bak rotation)
