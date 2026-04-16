@@ -5,7 +5,9 @@ export {
   createRunManager,
   type ResumeHandle,
   type RunDirectory,
+  type RunEvent,
   type RunManager,
+  type WatchOptions,
 } from "./run-manager.js";
 export { replay, readEventLog, extractTokenCounter } from "./replay.js";
 export { tailEventLog } from "./tail-event-log.js";

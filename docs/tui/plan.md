@@ -178,7 +178,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 - Never skips events; never duplicates them.
 - Unit tests cover: cold start with N events present, attach before any events, writer appends while consumer is awaiting.
 
-### [ ] P1-T4 — RunManager watch API
+### [x] P1-T4 — RunManager watch API
 
 **Reference.** features.md §7 row "No watch API".
 
@@ -578,7 +578,7 @@ Every time the orchestrator finishes a task it appends one line here (most recen
 ```
 
 ```
-2026-04-16  P1-T3  (staged)  add tailEventLog async iterable over events.jsonl
+2026-04-16  P1-T3  0439eb5  add tailEventLog async iterable over events.jsonl
 2026-04-16  P1-T2  a3864cc  add getSidecarStream resolver + SidecarNotFoundError
 2026-04-16  P1-T1  3aa29e8  re-export graph helpers; add tokensByBatch query
 2026-04-16  P0-T1  d59d00d  npm workspaces; engine → packages/markflow, TUI scaffold → packages/markflow-tui
