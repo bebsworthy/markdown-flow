@@ -246,7 +246,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 **Acceptance criteria.** Both tests pass; harness documented in a short `packages/markflow-tui/test/README.md`.
 
-### [ ] P2-T3 — Lint config, CI workflow, VHS stub
+### [x] P2-T3 — Lint config, CI workflow, VHS stub
 
 **Reference.** testing.md §Recommended 5-layer stack (layer 5 visual regression — scaffold only).
 
@@ -578,6 +578,7 @@ Every time the orchestrator finishes a task it appends one line here (most recen
 ```
 
 ```
+2026-04-16  P2-T3  c89ad8e  GitHub Actions CI (engine + tui) + VHS scaffold
 2026-04-16  P2-T2  525e0d7  vitest + ink-testing-library test harness
 2026-04-16  P2-T1  c317501  scaffold Ink project; tsconfig.base.json + src/
 2026-04-16  P1-T5  14b5bdc  concurrent-resume file lock + RunLockedError
