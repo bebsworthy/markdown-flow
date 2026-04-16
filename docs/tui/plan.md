@@ -285,7 +285,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 **Acceptance criteria.** No polling; unsubscribes cleanly on unmount.
 
-### [ ] P3-T3 — Theme tokens, glyphs, fallback
+### [x] P3-T3 — Theme tokens, glyphs, fallback
 
 **Reference.** features.md §5.10 (Visual vocabulary); mockups.md §14 (monochrome / ASCII fallback).
 
@@ -578,6 +578,7 @@ Every time the orchestrator finishes a task it appends one line here (most recen
 ```
 
 ```
+2026-04-16  P3-T3  5a39704  theme tokens, glyphs, capability detection (159 TUI tests)
 2026-04-16  P3-T2  68436c4  engine adapter (async iterable) + useEngineAdapter hook
 2026-04-16  P3-T1  fec45c3  AppState types + pure reducer FSM (40 TUI tests)
 2026-04-16  P2-T3  c89ad8e  GitHub Actions CI (engine + tui) + VHS scaffold
