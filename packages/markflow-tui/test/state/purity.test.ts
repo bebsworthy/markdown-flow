@@ -39,6 +39,10 @@ const files = [
   "../../src/theme/capabilities.ts",
   "../../src/theme/theme.ts",
   "../../src/theme/index.ts",
+  // Keybar pure surface (P3-T4). NOTE: keybar.tsx and components/index.ts
+  // are NOT in this list — they import React/Ink by design.
+  "../../src/components/types.ts",
+  "../../src/components/keybar-layout.ts",
 ];
 
 /**
@@ -111,5 +115,23 @@ describe("pure-module purity", () => {
   it("theme buildTheme loads without Ink/React", async () => {
     const mod = await import("../../src/theme/theme.js");
     expect(typeof mod.buildTheme).toBe("function");
+  });
+
+  it("keybar types module loads without Ink/React", async () => {
+    // types.ts is a pure type-only module — importing it should succeed
+    // and the import should have no runtime-exported values.
+    const mod = await import("../../src/components/types.js");
+    expect(Object.keys(mod)).toEqual([]);
+  });
+
+  it("keybar-layout module loads without Ink/React", async () => {
+    const mod = await import("../../src/components/keybar-layout.js");
+    expect(typeof mod.formatKeys).toBe("function");
+    expect(typeof mod.pickTier).toBe("function");
+    expect(typeof mod.filterBindings).toBe("function");
+    expect(typeof mod.groupByCategory).toBe("function");
+    expect(typeof mod.renderableLabel).toBe("function");
+    expect(typeof mod.sortByOrder).toBe("function");
+    expect(typeof mod.countCategories).toBe("function");
   });
 });
