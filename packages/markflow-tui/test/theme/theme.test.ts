@@ -8,6 +8,8 @@ import {
 import {
   UNICODE_GLYPHS,
   ASCII_GLYPHS,
+  UNICODE_FRAME,
+  ASCII_FRAME,
   glyphKeyForRole,
 } from "../../src/theme/glyphs.js";
 
@@ -183,6 +185,46 @@ describe("ASCII_GLYPHS tier", () => {
 
   it("distinguishes pending from waiting (no duplicate [wait])", () => {
     expect(ASCII_GLYPHS.pending).not.toBe(ASCII_GLYPHS.waiting);
+  });
+});
+
+describe("buildTheme — frame glyphs", () => {
+  it("unicode capabilities yield the box-drawing FrameGlyphs (╔ ╗ ╚ ╝ ═ ║ ╠ ╣)", () => {
+    const theme = buildTheme({ color: true, unicode: true });
+    expect(theme.frame).toBe(UNICODE_FRAME);
+    expect(theme.frame.tl).toBe("╔");
+    expect(theme.frame.tr).toBe("╗");
+    expect(theme.frame.bl).toBe("╚");
+    expect(theme.frame.br).toBe("╝");
+    expect(theme.frame.h).toBe("═");
+    expect(theme.frame.v).toBe("║");
+    expect(theme.frame.mid_l).toBe("╠");
+    expect(theme.frame.mid_r).toBe("╣");
+    expect(theme.frame.mid_h).toBe("═");
+  });
+
+  it("ASCII capabilities yield the ASCII FrameGlyphs (+ + + + - | + +)", () => {
+    const theme = buildTheme({ color: true, unicode: false });
+    expect(theme.frame).toBe(ASCII_FRAME);
+    expect(theme.frame.tl).toBe("+");
+    expect(theme.frame.tr).toBe("+");
+    expect(theme.frame.bl).toBe("+");
+    expect(theme.frame.br).toBe("+");
+    expect(theme.frame.h).toBe("-");
+    expect(theme.frame.v).toBe("|");
+    expect(theme.frame.mid_l).toBe("+");
+    expect(theme.frame.mid_r).toBe("+");
+    expect(theme.frame.mid_h).toBe("-");
+  });
+
+  it("frame glyphs are identical references across calls with equal capabilities (memo-friendly)", () => {
+    const a = buildTheme({ color: true, unicode: true });
+    const b = buildTheme({ color: false, unicode: true });
+    expect(a.frame).toBe(b.frame);
+
+    const c = buildTheme({ color: true, unicode: false });
+    const d = buildTheme({ color: false, unicode: false });
+    expect(c.frame).toBe(d.frame);
   });
 });
 

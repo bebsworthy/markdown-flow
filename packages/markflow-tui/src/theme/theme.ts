@@ -1,13 +1,19 @@
 // src/theme/theme.ts
 import type { Capabilities } from "./capabilities.js";
 import type { ColorTable } from "./tokens.js";
-import type { GlyphTable } from "./glyphs.js";
+import type { GlyphTable, FrameGlyphs } from "./glyphs.js";
 import { COLOR_TABLE, MONOCHROME_COLOR_TABLE } from "./tokens.js";
-import { UNICODE_GLYPHS, ASCII_GLYPHS } from "./glyphs.js";
+import {
+  UNICODE_GLYPHS,
+  ASCII_GLYPHS,
+  UNICODE_FRAME,
+  ASCII_FRAME,
+} from "./glyphs.js";
 
 export interface Theme {
   readonly colors: ColorTable;
   readonly glyphs: GlyphTable;
+  readonly frame: FrameGlyphs;
   readonly capabilities: Capabilities;
 }
 
@@ -20,6 +26,7 @@ export function buildTheme(capabilities: Capabilities): Theme {
   return Object.freeze({
     colors: capabilities.color ? COLOR_TABLE : MONOCHROME_COLOR_TABLE,
     glyphs: capabilities.unicode ? UNICODE_GLYPHS : ASCII_GLYPHS,
+    frame: capabilities.unicode ? UNICODE_FRAME : ASCII_FRAME,
     capabilities,
   });
 }

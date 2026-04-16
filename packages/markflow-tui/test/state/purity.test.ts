@@ -43,6 +43,9 @@ const files = [
   // are NOT in this list — they import React/Ink by design.
   "../../src/components/types.ts",
   "../../src/components/keybar-layout.ts",
+  // App-shell pure surface (P3-T5). NOTE: app-shell.tsx, mode-tabs.tsx are
+  // NOT in this list — they import React/Ink by design.
+  "../../src/components/app-shell-layout.ts",
 ];
 
 /**
@@ -133,5 +136,15 @@ describe("pure-module purity", () => {
     expect(typeof mod.renderableLabel).toBe("function");
     expect(typeof mod.sortByOrder).toBe("function");
     expect(typeof mod.countCategories).toBe("function");
+  });
+
+  it("app-shell-layout module loads without Ink/React", async () => {
+    const mod = await import("../../src/components/app-shell-layout.js");
+    expect(typeof mod.activeTabFromMode).toBe("function");
+    expect(typeof mod.keyToMode).toBe("function");
+    expect(typeof mod.frameTitle).toBe("function");
+    expect(typeof mod.composeTopRow).toBe("function");
+    expect(typeof mod.pickFrameSlots).toBe("function");
+    expect(typeof mod.pickActiveTabStyle).toBe("function");
   });
 });

@@ -3,6 +3,61 @@
 import type { ColorRole } from "./tokens.js";
 
 /**
+ * Box-drawing frame glyphs. Used by the app-shell (P3-T5) to render the
+ * outer `╔═══╗` frame and the mid splitter row. Keyed by geometric role:
+ *
+ *   tl ─ top-left corner            ╔ / +
+ *   tr ─ top-right corner           ╗ / +
+ *   bl ─ bottom-left corner         ╚ / +
+ *   br ─ bottom-right corner        ╝ / +
+ *   h  ─ horizontal edge fill       ═ / -
+ *   v  ─ vertical edge fill         ║ / |
+ *   mid_l ─ left T-splitter         ╠ / +
+ *   mid_r ─ right T-splitter        ╣ / +
+ *   mid_h ─ horizontal mid fill     ═ / -   (equal to h; split for symmetry)
+ *
+ * Selection is capability-driven via `buildTheme(capabilities)` — see
+ * theme.ts.
+ */
+export interface FrameGlyphs {
+  readonly tl: string;
+  readonly tr: string;
+  readonly bl: string;
+  readonly br: string;
+  readonly h: string;
+  readonly v: string;
+  readonly mid_l: string;
+  readonly mid_r: string;
+  readonly mid_h: string;
+}
+
+/** Unicode box-drawing frame glyphs (default). */
+export const UNICODE_FRAME: FrameGlyphs = Object.freeze({
+  tl: "\u2554", // ╔
+  tr: "\u2557", // ╗
+  bl: "\u255A", // ╚
+  br: "\u255D", // ╝
+  h: "\u2550",  // ═
+  v: "\u2551",  // ║
+  mid_l: "\u2560", // ╠
+  mid_r: "\u2563", // ╣
+  mid_h: "\u2550", // ═
+});
+
+/** ASCII fallback frame glyphs. */
+export const ASCII_FRAME: FrameGlyphs = Object.freeze({
+  tl: "+",
+  tr: "+",
+  bl: "+",
+  br: "+",
+  h: "-",
+  v: "|",
+  mid_l: "+",
+  mid_r: "+",
+  mid_h: "-",
+});
+
+/**
  * The 10 glyphs from docs/tui/features.md §5.10 (line 529–540), keyed by
  * state name. The task brief (plan.md line 294) enumerates the same 10
  * characters: ⊙ ▶ ✓ ✗ ○ ⏸ ↻ ⏱ ⟳ →.
