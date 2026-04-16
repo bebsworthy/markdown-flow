@@ -297,7 +297,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 **Acceptance criteria.** Setting `NO_COLOR=1` disables all color; setting `MARKFLOW_ASCII=1` forces the ASCII glyph set. Unit tests for both paths.
 
-### [ ] P3-T4 — Keybar primitive + responsive tiers
+### [x] P3-T4 — Keybar primitive + responsive tiers
 
 **Reference.** features.md §5.6 (full keybar rules, all 10).
 
@@ -578,6 +578,7 @@ Every time the orchestrator finishes a task it appends one line here (most recen
 ```
 
 ```
+2026-04-16  P3-T4  498bb8d  keybar primitive + responsive tiers (253 TUI tests, R1..R10 + 10×3 matrix)
 2026-04-16  P3-T3  5a39704  theme tokens, glyphs, capability detection (159 TUI tests)
 2026-04-16  P3-T2  68436c4  engine adapter (async iterable) + useEngineAdapter hook
 2026-04-16  P3-T1  fec45c3  AppState types + pure reducer FSM (40 TUI tests)
