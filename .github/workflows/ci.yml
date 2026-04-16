@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    name: engine (packages/markflow)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+
+      - name: Install dependencies (monorepo, hoisted)
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint -w packages/markflow
+
+      - name: Test
+        run: npm test -w packages/markflow -- --run
+
+      - name: Build
+        run: npm run build -w packages/markflow
+
+  tui:
+    name: tui (packages/markflow-tui)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+
+      - name: Install dependencies (monorepo, hoisted)
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint -w packages/markflow-tui
+
+      - name: Test
+        run: npm test -w packages/markflow-tui -- --run
+
+      - name: Build
+        run: npm run build -w packages/markflow-tui
