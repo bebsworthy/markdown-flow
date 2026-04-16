@@ -308,7 +308,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 **Acceptance criteria.** Given a fixture Binding array and three widths, snapshot output matches the mode × width matrix in mockups.md §15.
 
-### [ ] P3-T5 — App shell frame + mode-tab row
+### [x] P3-T5 — App shell frame + mode-tab row
 
 **Reference.** mockups.md §1, §4, §6 (top row + outer frame).
 
@@ -578,6 +578,7 @@ Every time the orchestrator finishes a task it appends one line here (most recen
 ```
 
 ```
+2026-04-16  P3-T5  299ef0e  app shell frame + mode-tab row (307 TUI tests, frame glyph fallback)
 2026-04-16  P3-T4  498bb8d  keybar primitive + responsive tiers (253 TUI tests, R1..R10 + 10×3 matrix)
 2026-04-16  P3-T3  5a39704  theme tokens, glyphs, capability detection (159 TUI tests)
 2026-04-16  P3-T2  68436c4  engine adapter (async iterable) + useEngineAdapter hook
