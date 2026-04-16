@@ -349,7 +349,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 **Acceptance criteria.** Matches mockups.md §2 layout to within column rounding.
 
-### [ ] P4-T3 — Add modal (fuzzy-find + path/URL tabs), empty state
+### [x] P4-T3 — Add modal (fuzzy-find + path/URL tabs), empty state
 
 **Reference.** features.md §3.1 (Adding from inside the TUI); mockups.md §2 (add-modal + empty-state mocks).
 
@@ -578,6 +578,7 @@ Every time the orchestrator finishes a task it appends one line here (most recen
 ```
 
 ```
+2026-04-16  P4-T3  7b1b723  add-workflow modal + launch-arg ingest + empty-state keybar (616 TUI tests, fuzzy walker + URL materialize)
 2026-04-16  P4-T2  d2a37cc  workflow browser pane with preview (502 TUI tests, two-pane layout + empty state)
 2026-04-16  P4-T1  660ff63  workflow registry persistence (390 TUI tests, atomic write + .bak rotation)
 2026-04-16  P3-T5  299ef0e  app shell frame + mode-tab row (307 TUI tests, frame glyph fallback)
