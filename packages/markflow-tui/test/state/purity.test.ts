@@ -46,6 +46,10 @@ const files = [
   // App-shell pure surface (P3-T5). NOTE: app-shell.tsx, mode-tabs.tsx are
   // NOT in this list — they import React/Ink by design.
   "../../src/components/app-shell-layout.ts",
+  // Registry pure surface (P4-T1). NOTE: store.ts, atomic-write.ts, index.ts
+  // are NOT in this list — they import node:fs/path/crypto by design.
+  "../../src/registry/types.ts",
+  "../../src/registry/helpers.ts",
 ];
 
 /**
@@ -146,5 +150,22 @@ describe("pure-module purity", () => {
     expect(typeof mod.composeTopRow).toBe("function");
     expect(typeof mod.pickFrameSlots).toBe("function");
     expect(typeof mod.pickActiveTabStyle).toBe("function");
+  });
+
+  it("registry types module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/registry/types.js");
+    // Type-only module — runtime exports empty.
+    expect(Object.keys(mod)).toEqual([]);
+  });
+
+  it("registry helpers module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/registry/helpers.js");
+    expect(typeof mod.parseRegistryJson).toBe("function");
+    expect(typeof mod.serializeRegistry).toBe("function");
+    expect(typeof mod.addEntry).toBe("function");
+    expect(typeof mod.removeEntry).toBe("function");
+    expect(typeof mod.isSameSource).toBe("function");
+    expect(typeof mod.sortByAddedAt).toBe("function");
+    expect(typeof mod.validateEntry).toBe("function");
   });
 });

@@ -15,7 +15,12 @@ import { ModeTabs } from "./components/mode-tabs.js";
 import { reducer, initialAppState } from "./state/reducer.js";
 
 export interface AppProps {
-  onQuit: () => void;
+  readonly onQuit: () => void;
+  readonly registryConfig?: {
+    readonly listPath: string | null;
+    readonly persist: boolean;
+  };
+  readonly initialLaunchArgs?: ReadonlyArray<string>;
 }
 
 export function App({ onQuit }: AppProps): React.ReactElement {
