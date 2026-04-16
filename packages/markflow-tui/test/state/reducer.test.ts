@@ -271,6 +271,62 @@ describe("reducer — P4-T3 addWorkflow overlay", () => {
   });
 });
 
+describe("RUNS_SORT_CYCLE", () => {
+  it("initial runsSort is { key: 'attention', direction: 'desc' }", () => {
+    expect(initialAppState.runsSort).toEqual({
+      key: "attention",
+      direction: "desc",
+    });
+  });
+
+  it("advances key attention → started (first step)", () => {
+    const s = reducer(initialAppState, { type: "RUNS_SORT_CYCLE" });
+    expect(s.runsSort).toEqual({ key: "started", direction: "desc" });
+  });
+
+  it("cycles through all 7 keys and wraps back to attention", () => {
+    const order = [
+      "attention",
+      "started",
+      "ended",
+      "elapsed",
+      "status",
+      "workflow",
+      "id",
+    ] as const;
+    let s = initialAppState;
+    for (let i = 0; i < order.length; i++) {
+      expect(s.runsSort.key).toBe(order[i]);
+      s = reducer(s, { type: "RUNS_SORT_CYCLE" });
+    }
+    // After the 7th cycle we should be back at "attention".
+    expect(s.runsSort.key).toBe("attention");
+  });
+
+  it("always keeps direction='desc'", () => {
+    let s = initialAppState;
+    for (let i = 0; i < 7; i++) {
+      s = reducer(s, { type: "RUNS_SORT_CYCLE" });
+      expect(s.runsSort.direction).toBe("desc");
+    }
+  });
+
+  it("does not touch unrelated state slices", () => {
+    const base: AppState = {
+      ...initialAppState,
+      filter: "foo",
+      selectedRunId: "r1",
+      selectedWorkflowId: "wf-1",
+    };
+    const s = reducer(base, { type: "RUNS_SORT_CYCLE" });
+    expect(s.filter).toBe("foo");
+    expect(s.selectedRunId).toBe("r1");
+    expect(s.selectedWorkflowId).toBe("wf-1");
+    expect(s.mode).toEqual(base.mode);
+    expect(s.overlay).toBeNull();
+  });
+});
+
 // -------- Purity: calling reducer twice with the same args yields deep-equal
 // output and never mutates the input. -------------------------------------
 describe("reducer purity", () => {

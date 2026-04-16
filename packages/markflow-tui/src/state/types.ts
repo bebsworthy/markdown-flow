@@ -13,9 +13,11 @@
 //
 // The `AddModalTab` import from `../add-modal/types.js` is type-only and
 // `../add-modal/types.ts` is itself a pure module (no runtime exports),
-// so this stays within the purity envelope.
+// so this stays within the purity envelope. The same applies to the
+// `RunsSortState` import from `../runs/types.js` (P5-T1).
 
 import type { AddModalTab } from "../add-modal/types.js";
+import type { RunsSortState } from "../runs/types.js";
 
 /** Which top-level area of the app is active. §5.1 "app mode" tree. */
 export type Mode =
@@ -87,6 +89,12 @@ export interface AppState {
   readonly filter: string;
   readonly selectedWorkflowId: string | null;
   readonly selectedRunId: string | null;
+  /**
+   * Current sort for the runs table (P5-T1). `key` cycles via the `s`
+   * binding (`RUNS_SORT_CYCLE`); `direction` stays `"desc"` for now —
+   * see docs/tui/plans/P5-T1.md §3.4 for the rationale.
+   */
+  readonly runsSort: RunsSortState;
 }
 
 /**
@@ -126,4 +134,8 @@ export type Action =
     }
   // Add-workflow modal tab toggle (P4-T3). No-op unless overlay is already
   // `addWorkflow`; see reducer.ts for the guard.
-  | { readonly type: "ADD_MODAL_SET_TAB"; readonly tab: AddModalTab };
+  | { readonly type: "ADD_MODAL_SET_TAB"; readonly tab: AddModalTab }
+  // Runs-table sort cycle (P5-T1). Advances `runsSort.key` through the
+  // documented order (attention → started → ended → elapsed → status →
+  // workflow → id → attention). Keeps direction at "desc".
+  | { readonly type: "RUNS_SORT_CYCLE" };

@@ -45,6 +45,10 @@
 //   overlay=resumeWizard   ──RESUME_WIZARD_SET_INPUT──▶ inputs[k]=v
 //   overlay=addWorkflow    ──ADD_MODAL_SET_TAB(tab)──▶ overlay.tab = tab
 //
+// Runs-table transitions (no mode change):
+//   *                  ──RUNS_SORT_CYCLE──▶ runsSort.key = cycleSortKey(key)
+//                                            (direction stays "desc")
+//
 // Cursor / filter transitions (no mode change):
 //   *                  ──SELECT_WORKFLOW(id)──▶ state.selectedWorkflowId=id
 //   *                  ──SELECT_RUN(id)──▶ state.selectedRunId=id
@@ -55,6 +59,7 @@
 
 import type { Action, AppState, BrowsingPane, ViewingFocus } from "./types.js";
 import type { AddModalTab } from "../add-modal/types.js";
+import { cycleSortKey } from "../runs/sort.js";
 
 /** Initial state — app starts on the workflow browser with no overlay. */
 export const initialAppState: AppState = {
@@ -63,6 +68,7 @@ export const initialAppState: AppState = {
   filter: "",
   selectedWorkflowId: null,
   selectedRunId: null,
+  runsSort: { key: "attention", direction: "desc" },
 };
 
 export function reducer(state: AppState, action: Action): AppState {
@@ -121,6 +127,8 @@ export function reducer(state: AppState, action: Action): AppState {
       return setResumeInput(state, action.key, action.value);
     case "ADD_MODAL_SET_TAB":
       return updateAddModalTab(state, action.tab);
+    case "RUNS_SORT_CYCLE":
+      return cycleRunsSort(state);
   }
 }
 
@@ -180,4 +188,10 @@ function updateAddModalTab(state: AppState, tab: AddModalTab): AppState {
   if (!ov || ov.kind !== "addWorkflow") return state;
   if (ov.tab === tab) return state;
   return { ...state, overlay: { ...ov, tab } };
+}
+
+function cycleRunsSort(state: AppState): AppState {
+  const next = cycleSortKey(state.runsSort.key);
+  if (next === state.runsSort.key) return state;
+  return { ...state, runsSort: { key: next, direction: "desc" } };
 }

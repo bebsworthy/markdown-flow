@@ -63,6 +63,12 @@ const files = [
   "../../src/add-modal/fuzzy.ts",
   // Empty-state keybar fixture (P4-T3). Pure declarative array of bindings.
   "../../src/components/keybar-fixtures/workflows-empty.ts",
+  // Runs-table pure surface (P5-T1). NOTE: runs/index.ts is a barrel and is
+  // NOT scanned (just re-exports), and runs-table*.tsx are Ink by design.
+  "../../src/runs/types.ts",
+  "../../src/runs/sort.ts",
+  "../../src/runs/columns.ts",
+  "../../src/runs/derive.ts",
 ];
 
 /**
@@ -227,5 +233,35 @@ describe("pure-module purity", () => {
       "../../src/components/keybar-fixtures/workflows-empty.js"
     );
     expect(Array.isArray(mod.WORKFLOWS_EMPTY_KEYBAR)).toBe(true);
+  });
+
+  it("runs types module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/runs/types.js");
+    // Type-only module — runtime exports empty.
+    expect(Object.keys(mod)).toEqual([]);
+  });
+
+  it("runs sort module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/runs/sort.js");
+    expect(typeof mod.attentionCompare).toBe("function");
+    expect(typeof mod.compareByKey).toBe("function");
+    expect(typeof mod.cycleSortKey).toBe("function");
+    expect(typeof mod.sortRows).toBe("function");
+  });
+
+  it("runs columns module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/runs/columns.js");
+    expect(Array.isArray(mod.COLUMNS_140)).toBe(true);
+    expect(Array.isArray(mod.COLUMNS_100)).toBe(true);
+    expect(Array.isArray(mod.COLUMNS_80)).toBe(true);
+    expect(typeof mod.pickColumnSet).toBe("function");
+  });
+
+  it("runs derive module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/runs/derive.js");
+    expect(typeof mod.toRunsTableRow).toBe("function");
+    expect(typeof mod.deriveStepLabel).toBe("function");
+    expect(typeof mod.deriveNote).toBe("function");
+    expect(typeof mod.formatElapsed).toBe("function");
   });
 });
