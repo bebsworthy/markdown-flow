@@ -233,7 +233,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 - TypeScript strict mode on; `npm run lint -w packages/markflow-tui` passes (lint = `tsc --noEmit`).
 - No runtime dep on anything beyond Ink + React + `markflow`.
 
-### [ ] P2-T2 — Unit + component test harness
+### [x] P2-T2 — Unit + component test harness
 
 **Reference.** testing.md §Recommended 5-layer stack (layers 1 + 2).
 
