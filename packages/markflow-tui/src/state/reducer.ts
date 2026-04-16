@@ -49,6 +49,20 @@
 //   *                  ──RUNS_SORT_CYCLE──▶ runsSort.key = cycleSortKey(key)
 //                                            (direction stays "desc")
 //
+// Runs filter transitions (no mode change):
+//   *                  ──RUNS_FILTER_OPEN──▶ runsFilter.open=true,
+//                                             draft seeded from applied.raw
+//   runsFilter.open    ──RUNS_FILTER_CLOSE──▶ runsFilter.open=false
+//                                              (applied preserved)
+//   runsFilter.open    ──RUNS_FILTER_INPUT(v)──▶ runsFilter.draft=v
+//                                                 (no reparse; closed = no-op)
+//   runsFilter.open    ──RUNS_FILTER_APPLY──▶ runsFilter.applied=parse(draft),
+//                                              open=false
+//   *                  ──RUNS_FILTER_CLEAR──▶ runsFilter = empty
+//
+// Runs archive transitions (no mode change):
+//   *                  ──RUNS_ARCHIVE_TOGGLE──▶ runsArchive.shown = !shown
+//
 // Cursor / filter transitions (no mode change):
 //   *                  ──SELECT_WORKFLOW(id)──▶ state.selectedWorkflowId=id
 //   *                  ──SELECT_RUN(id)──▶ state.selectedRunId=id
@@ -60,6 +74,8 @@
 import type { Action, AppState, BrowsingPane, ViewingFocus } from "./types.js";
 import type { AddModalTab } from "../add-modal/types.js";
 import { cycleSortKey } from "../runs/sort.js";
+import { parseFilterInput } from "../runs/filter.js";
+import { RUNS_ARCHIVE_DEFAULTS } from "../runs/types.js";
 
 /** Initial state — app starts on the workflow browser with no overlay. */
 export const initialAppState: AppState = {
@@ -69,6 +85,12 @@ export const initialAppState: AppState = {
   selectedWorkflowId: null,
   selectedRunId: null,
   runsSort: { key: "attention", direction: "desc" },
+  runsFilter: {
+    open: false,
+    draft: "",
+    applied: { raw: "", terms: [] },
+  },
+  runsArchive: RUNS_ARCHIVE_DEFAULTS,
 };
 
 export function reducer(state: AppState, action: Action): AppState {
@@ -129,6 +151,18 @@ export function reducer(state: AppState, action: Action): AppState {
       return updateAddModalTab(state, action.tab);
     case "RUNS_SORT_CYCLE":
       return cycleRunsSort(state);
+    case "RUNS_FILTER_OPEN":
+      return openRunsFilter(state);
+    case "RUNS_FILTER_CLOSE":
+      return closeRunsFilter(state);
+    case "RUNS_FILTER_INPUT":
+      return updateRunsFilterDraft(state, action.value);
+    case "RUNS_FILTER_APPLY":
+      return applyRunsFilter(state);
+    case "RUNS_FILTER_CLEAR":
+      return clearRunsFilter(state);
+    case "RUNS_ARCHIVE_TOGGLE":
+      return toggleRunsArchive(state);
   }
 }
 
@@ -194,4 +228,73 @@ function cycleRunsSort(state: AppState): AppState {
   const next = cycleSortKey(state.runsSort.key);
   if (next === state.runsSort.key) return state;
   return { ...state, runsSort: { key: next, direction: "desc" } };
+}
+
+function openRunsFilter(state: AppState): AppState {
+  if (state.runsFilter.open) return state;
+  return {
+    ...state,
+    runsFilter: {
+      ...state.runsFilter,
+      open: true,
+      draft: state.runsFilter.applied.raw,
+    },
+  };
+}
+
+function closeRunsFilter(state: AppState): AppState {
+  if (!state.runsFilter.open) return state;
+  return {
+    ...state,
+    runsFilter: { ...state.runsFilter, open: false },
+  };
+}
+
+function updateRunsFilterDraft(state: AppState, value: string): AppState {
+  if (!state.runsFilter.open) return state;
+  if (state.runsFilter.draft === value) return state;
+  return {
+    ...state,
+    runsFilter: { ...state.runsFilter, draft: value },
+  };
+}
+
+function applyRunsFilter(state: AppState): AppState {
+  if (!state.runsFilter.open) return state;
+  const parsed = parseFilterInput(state.runsFilter.draft);
+  return {
+    ...state,
+    runsFilter: {
+      open: false,
+      draft: state.runsFilter.draft,
+      applied: parsed,
+    },
+  };
+}
+
+function clearRunsFilter(state: AppState): AppState {
+  const isEmpty =
+    !state.runsFilter.open &&
+    state.runsFilter.draft === "" &&
+    state.runsFilter.applied.raw === "" &&
+    state.runsFilter.applied.terms.length === 0;
+  if (isEmpty) return state;
+  return {
+    ...state,
+    runsFilter: {
+      open: false,
+      draft: "",
+      applied: { raw: "", terms: [] },
+    },
+  };
+}
+
+function toggleRunsArchive(state: AppState): AppState {
+  return {
+    ...state,
+    runsArchive: {
+      ...state.runsArchive,
+      shown: !state.runsArchive.shown,
+    },
+  };
 }

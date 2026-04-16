@@ -69,6 +69,10 @@ const files = [
   "../../src/runs/sort.ts",
   "../../src/runs/columns.ts",
   "../../src/runs/derive.ts",
+  // P5-T2 pure modules — duration mirror, filter pipeline, virtualisation math.
+  "../../src/runs/duration.ts",
+  "../../src/runs/filter.ts",
+  "../../src/runs/window.ts",
 ];
 
 /**
@@ -237,8 +241,11 @@ describe("pure-module purity", () => {
 
   it("runs types module loads without Ink/React/fs", async () => {
     const mod = await import("../../src/runs/types.js");
-    // Type-only module — runtime exports empty.
-    expect(Object.keys(mod)).toEqual([]);
+    // P5-T2 added a single runtime const (`RUNS_ARCHIVE_DEFAULTS`) so the
+    // reducer + tests can share the defaults without mocking. Every other
+    // export remains type-only.
+    expect(Object.keys(mod)).toEqual(["RUNS_ARCHIVE_DEFAULTS"]);
+    expect(mod.RUNS_ARCHIVE_DEFAULTS).toBeDefined();
   });
 
   it("runs sort module loads without Ink/React/fs", async () => {
@@ -263,5 +270,25 @@ describe("pure-module purity", () => {
     expect(typeof mod.deriveStepLabel).toBe("function");
     expect(typeof mod.deriveNote).toBe("function");
     expect(typeof mod.formatElapsed).toBe("function");
+  });
+
+  it("runs duration module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/runs/duration.js");
+    expect(typeof mod.tryParseDurationMs).toBe("function");
+  });
+
+  it("runs filter module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/runs/filter.js");
+    expect(typeof mod.parseFilterInput).toBe("function");
+    expect(typeof mod.applyFilter).toBe("function");
+    expect(typeof mod.applyArchive).toBe("function");
+    expect(typeof mod.isArchived).toBe("function");
+  });
+
+  it("runs window module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/runs/window.js");
+    expect(typeof mod.computeWindow).toBe("function");
+    expect(typeof mod.sliceWindow).toBe("function");
+    expect(typeof mod.deriveVisibleRows).toBe("function");
   });
 });

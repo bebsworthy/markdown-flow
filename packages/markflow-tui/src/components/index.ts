@@ -35,4 +35,9 @@ export {
   type AddModalUrlTabProps,
 } from "./add-modal-url-tab.js";
 export { RunsTable, type RunsTableProps } from "./runs-table.js";
+export {
+  RunsFilterBar,
+  type RunsFilterBarProps,
+} from "./runs-filter-bar.js";
+export { RunsFooter, type RunsFooterProps } from "./runs-footer.js";
 export type { Binding, AppContext, KeySpec, Category } from "./types.js";

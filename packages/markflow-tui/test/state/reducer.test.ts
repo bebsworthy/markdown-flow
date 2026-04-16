@@ -327,6 +327,188 @@ describe("RUNS_SORT_CYCLE", () => {
   });
 });
 
+// -------- P5-T2: runs filter / archive actions --------------------------
+
+describe("initialAppState — P5-T2 slices", () => {
+  it("runsFilter starts closed with empty draft + applied", () => {
+    expect(initialAppState.runsFilter.open).toBe(false);
+    expect(initialAppState.runsFilter.draft).toBe("");
+    expect(initialAppState.runsFilter.applied.raw).toBe("");
+    expect(initialAppState.runsFilter.applied.terms).toEqual([]);
+  });
+
+  it("runsArchive defaults to RUNS_ARCHIVE_DEFAULTS shape", () => {
+    expect(initialAppState.runsArchive.shown).toBe(false);
+    expect(initialAppState.runsArchive.completeMaxAgeMs).toBe(86_400_000);
+    expect(initialAppState.runsArchive.errorMaxAgeMs).toBe(604_800_000);
+  });
+});
+
+describe("RUNS_FILTER_OPEN", () => {
+  it("opens the bar and seeds draft from applied.raw", () => {
+    const base: AppState = {
+      ...initialAppState,
+      runsFilter: {
+        open: false,
+        draft: "",
+        applied: {
+          raw: "status:running",
+          terms: [{ kind: "status", value: "running" }],
+        },
+      },
+    };
+    const s = reducer(base, { type: "RUNS_FILTER_OPEN" });
+    expect(s.runsFilter.open).toBe(true);
+    expect(s.runsFilter.draft).toBe("status:running");
+  });
+
+  it("is idempotent when already open", () => {
+    const base: AppState = {
+      ...initialAppState,
+      runsFilter: { open: true, draft: "abc", applied: { raw: "", terms: [] } },
+    };
+    const s = reducer(base, { type: "RUNS_FILTER_OPEN" });
+    expect(s).toBe(base);
+  });
+});
+
+describe("RUNS_FILTER_INPUT", () => {
+  it("updates the draft without reparsing", () => {
+    const base: AppState = {
+      ...initialAppState,
+      runsFilter: { open: true, draft: "", applied: { raw: "", terms: [] } },
+    };
+    const s = reducer(base, { type: "RUNS_FILTER_INPUT", value: "status:" });
+    expect(s.runsFilter.draft).toBe("status:");
+    // applied untouched — parser not run on INPUT.
+    expect(s.runsFilter.applied.terms).toEqual([]);
+  });
+
+  it("is a no-op when the bar is closed", () => {
+    const base: AppState = {
+      ...initialAppState,
+      runsFilter: { open: false, draft: "", applied: { raw: "", terms: [] } },
+    };
+    const s = reducer(base, { type: "RUNS_FILTER_INPUT", value: "abc" });
+    expect(s).toBe(base);
+  });
+});
+
+describe("RUNS_FILTER_APPLY", () => {
+  it("parses the draft, stores it in applied, closes the bar", () => {
+    const base: AppState = {
+      ...initialAppState,
+      runsFilter: {
+        open: true,
+        draft: "status:running",
+        applied: { raw: "", terms: [] },
+      },
+    };
+    const s = reducer(base, { type: "RUNS_FILTER_APPLY" });
+    expect(s.runsFilter.open).toBe(false);
+    expect(s.runsFilter.applied.raw).toBe("status:running");
+    expect(s.runsFilter.applied.terms).toEqual([
+      { kind: "status", value: "running" },
+    ]);
+  });
+
+  it("is a no-op when the bar is closed", () => {
+    const base = initialAppState;
+    const s = reducer(base, { type: "RUNS_FILTER_APPLY" });
+    expect(s).toBe(base);
+  });
+});
+
+describe("RUNS_FILTER_CLEAR", () => {
+  it("resets draft + applied, closes the bar", () => {
+    const base: AppState = {
+      ...initialAppState,
+      runsFilter: {
+        open: true,
+        draft: "abc",
+        applied: {
+          raw: "status:running",
+          terms: [{ kind: "status", value: "running" }],
+        },
+      },
+    };
+    const s = reducer(base, { type: "RUNS_FILTER_CLEAR" });
+    expect(s.runsFilter.open).toBe(false);
+    expect(s.runsFilter.draft).toBe("");
+    expect(s.runsFilter.applied.terms).toEqual([]);
+  });
+
+  it("is idempotent from the empty state", () => {
+    const base = initialAppState;
+    const s = reducer(base, { type: "RUNS_FILTER_CLEAR" });
+    expect(s).toBe(base);
+  });
+});
+
+describe("RUNS_FILTER_CLOSE", () => {
+  it("closes without clearing applied", () => {
+    const base: AppState = {
+      ...initialAppState,
+      runsFilter: {
+        open: true,
+        draft: "status:running",
+        applied: {
+          raw: "status:running",
+          terms: [{ kind: "status", value: "running" }],
+        },
+      },
+    };
+    const s = reducer(base, { type: "RUNS_FILTER_CLOSE" });
+    expect(s.runsFilter.open).toBe(false);
+    expect(s.runsFilter.applied.terms).toHaveLength(1);
+  });
+});
+
+describe("RUNS_ARCHIVE_TOGGLE", () => {
+  it("flips shown and preserves threshold fields", () => {
+    const s = reducer(initialAppState, { type: "RUNS_ARCHIVE_TOGGLE" });
+    expect(s.runsArchive.shown).toBe(true);
+    expect(s.runsArchive.completeMaxAgeMs).toBe(
+      initialAppState.runsArchive.completeMaxAgeMs,
+    );
+  });
+
+  it("two toggles return to identity (flipped shown twice)", () => {
+    const a = reducer(initialAppState, { type: "RUNS_ARCHIVE_TOGGLE" });
+    const b = reducer(a, { type: "RUNS_ARCHIVE_TOGGLE" });
+    expect(b.runsArchive.shown).toBe(initialAppState.runsArchive.shown);
+  });
+});
+
+describe("P5-T2 slice preservation across mode switches", () => {
+  it("runsFilter/runsArchive survive MODE_SHOW_WORKFLOWS", () => {
+    const base: AppState = {
+      ...initialAppState,
+      runsFilter: {
+        open: false,
+        draft: "",
+        applied: {
+          raw: "status:running",
+          terms: [{ kind: "status", value: "running" }],
+        },
+      },
+      runsArchive: { ...initialAppState.runsArchive, shown: true },
+    };
+    const s = reducer(base, { type: "MODE_SHOW_WORKFLOWS" });
+    expect(s.runsFilter.applied.raw).toBe("status:running");
+    expect(s.runsArchive.shown).toBe(true);
+  });
+
+  it("runsFilter/runsArchive survive MODE_OPEN_RUN", () => {
+    const base: AppState = {
+      ...initialAppState,
+      runsArchive: { ...initialAppState.runsArchive, shown: true },
+    };
+    const s = reducer(base, { type: "MODE_OPEN_RUN", runId: "r1" });
+    expect(s.runsArchive.shown).toBe(true);
+  });
+});
+
 // -------- Purity: calling reducer twice with the same args yields deep-equal
 // output and never mutates the input. -------------------------------------
 describe("reducer purity", () => {

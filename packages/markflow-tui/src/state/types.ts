@@ -17,7 +17,11 @@
 // `RunsSortState` import from `../runs/types.js` (P5-T1).
 
 import type { AddModalTab } from "../add-modal/types.js";
-import type { RunsSortState } from "../runs/types.js";
+import type {
+  RunsArchivePolicy,
+  RunsFilterState,
+  RunsSortState,
+} from "../runs/types.js";
 
 /** Which top-level area of the app is active. §5.1 "app mode" tree. */
 export type Mode =
@@ -95,6 +99,18 @@ export interface AppState {
    * see docs/tui/plans/P5-T1.md §3.4 for the rationale.
    */
   readonly runsSort: RunsSortState;
+  /**
+   * Runs-mode `/` filter bar state (P5-T2). Distinct from the legacy
+   * global `filter: string` field above which is used by the workflow
+   * browser only. See docs/tui/plans/P5-T2.md §2.5 for the compat rule.
+   */
+  readonly runsFilter: RunsFilterState;
+  /**
+   * Archive-toggle policy for the runs table (P5-T2). `shown === false`
+   * hides completions older than 24h + failures older than 7d. `a` flips
+   * `shown`. Thresholds default to `RUNS_ARCHIVE_DEFAULTS`.
+   */
+  readonly runsArchive: RunsArchivePolicy;
 }
 
 /**
@@ -138,4 +154,15 @@ export type Action =
   // Runs-table sort cycle (P5-T1). Advances `runsSort.key` through the
   // documented order (attention → started → ended → elapsed → status →
   // workflow → id → attention). Keeps direction at "desc".
-  | { readonly type: "RUNS_SORT_CYCLE" };
+  | { readonly type: "RUNS_SORT_CYCLE" }
+  // Runs-table filter bar actions (P5-T2). `OPEN` shows the bar and
+  // seeds `draft` from `applied.raw`; `INPUT` updates the draft only
+  // (no reparse); `APPLY` parses + closes; `CLEAR` resets both draft
+  // and applied; `CLOSE` hides without clearing.
+  | { readonly type: "RUNS_FILTER_OPEN" }
+  | { readonly type: "RUNS_FILTER_CLOSE" }
+  | { readonly type: "RUNS_FILTER_INPUT"; readonly value: string }
+  | { readonly type: "RUNS_FILTER_APPLY" }
+  | { readonly type: "RUNS_FILTER_CLEAR" }
+  // Runs-table archive toggle (P5-T2). Flips `runsArchive.shown`.
+  | { readonly type: "RUNS_ARCHIVE_TOGGLE" };

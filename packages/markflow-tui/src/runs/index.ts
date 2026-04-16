@@ -13,7 +13,14 @@ export type {
   RunsTableRow,
   RunsTableColumn,
   ColumnAlign,
+  RunsFilterTerm,
+  RunsFilterInput,
+  RunsFilterState,
+  RunsArchivePolicy,
+  RunsWindowState,
 } from "./types.js";
+
+export { RUNS_ARCHIVE_DEFAULTS } from "./types.js";
 
 export {
   SORT_KEY_ORDER,
@@ -48,3 +55,18 @@ export {
   toStatusCell,
   toRunsTableRow,
 } from "./derive.js";
+
+export { tryParseDurationMs } from "./duration.js";
+
+export {
+  parseFilterInput,
+  applyFilter,
+  isArchived,
+  applyArchive,
+} from "./filter.js";
+
+export {
+  computeWindow,
+  sliceWindow,
+  deriveVisibleRows,
+} from "./window.js";
