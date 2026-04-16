@@ -8,6 +8,14 @@ export {
   type RunManager,
 } from "./run-manager.js";
 export { replay, readEventLog, extractTokenCounter } from "./replay.js";
+export {
+  getTerminalNodes,
+  getUpstreamNodes,
+  isMergeNode,
+  getIncomingEdges,
+  getOutgoingEdges,
+} from "./graph.js";
+export { tokensByBatch } from "./queries.js";
 export { loadConfig, DEFAULT_CONFIG } from "./config.js";
 export * from "./types.js";
 export * from "./errors.js";

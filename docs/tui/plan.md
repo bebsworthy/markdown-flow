@@ -130,7 +130,7 @@ npm run build -w packages/markflow
 
 The TUI cannot start consuming `markflow` until these are exported. Land them in dependency order: pure utilities first, stateful helpers last.
 
-### [ ] P1-T1 — Re-export graph helpers and add batch membership query
+### [x] P1-T1 — Re-export graph helpers and add batch membership query
 
 **Reference.** features.md §7 rows "Graph helpers not re-exported" and "Batch membership query".
 
@@ -577,4 +577,6 @@ Every time the orchestrator finishes a task it appends one line here (most recen
 <ISO date>  <task-id>  <commit-sha>  <short note>
 ```
 
-*(empty — orchestrator appends below)*
+```
+2026-04-16  P0-T1  d59d00d  npm workspaces; engine → packages/markflow, TUI scaffold → packages/markflow-tui
+```
