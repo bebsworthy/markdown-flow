@@ -17,5 +17,6 @@ export {
 } from "./graph.js";
 export { tokensByBatch } from "./queries.js";
 export { loadConfig, DEFAULT_CONFIG } from "./config.js";
+export { getSidecarStream } from "./sidecar.js";
 export * from "./types.js";
 export * from "./errors.js";

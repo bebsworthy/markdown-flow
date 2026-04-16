@@ -148,7 +148,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 **Validation.** Engine suite green.
 
-### [ ] P1-T2 — Sidecar stream resolver
+### [x] P1-T2 — Sidecar stream resolver
 
 **Reference.** features.md §7 row "No sidecar resolver"; architecture in `docs/arch/event-sourced-run-log.md`.
 
@@ -578,5 +578,6 @@ Every time the orchestrator finishes a task it appends one line here (most recen
 ```
 
 ```
+2026-04-16  P1-T1  3aa29e8  re-export graph helpers; add tokensByBatch query
 2026-04-16  P0-T1  d59d00d  npm workspaces; engine → packages/markflow, TUI scaffold → packages/markflow-tui
 ```

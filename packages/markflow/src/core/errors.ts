@@ -78,3 +78,31 @@ export class WorkflowChangedError extends MarkflowError {
     this.missingNodeIds = missingNodeIds;
   }
 }
+
+/**
+ * Thrown by `getSidecarStream` when the requested sidecar transcript file
+ * cannot be located on disk. Distinguishes a "no such transcript" case
+ * (missing `output/` directory, no file matching the seq prefix, or a seq
+ * collision) from a generic Node `ENOENT`, so consumers can render a clean
+ * "no output yet" state without inspecting `err.code`.
+ */
+export class SidecarNotFoundError extends Error {
+  readonly runDir: string;
+  readonly seq: number;
+  readonly stream: "stdout" | "stderr";
+
+  constructor(
+    runDir: string,
+    seq: number,
+    stream: "stdout" | "stderr",
+    reason: string,
+  ) {
+    super(
+      `Sidecar not found: runDir=${runDir} seq=${seq} stream=${stream} (${reason})`,
+    );
+    this.name = "SidecarNotFoundError";
+    this.runDir = runDir;
+    this.seq = seq;
+    this.stream = stream;
+  }
+}
