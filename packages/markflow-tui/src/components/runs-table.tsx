@@ -6,21 +6,29 @@
 //   - windowed slice of `<RunsTableRow>` per row (virtualised)
 //   - `<RunsFooter>` showing N shown / M archived / a Show all
 //
-// Owns three key bindings:
-//   s  → RUNS_SORT_CYCLE     (suppressed while filter bar is open)
-//   /  → RUNS_FILTER_OPEN    (suppressed while filter bar is open)
-//   a  → RUNS_ARCHIVE_TOGGLE (suppressed while filter bar is open)
-//
-// Cursor movement (↑/↓/⏎) is still P5-T3; cursor is a prop defaulting to 0.
+// Owns key bindings:
+//   s          → RUNS_SORT_CYCLE
+//   /          → RUNS_FILTER_OPEN
+//   a          → RUNS_ARCHIVE_TOGGLE
+//   ↑ / k      → RUNS_CURSOR_MOVE(-1)
+//   ↓ / j      → RUNS_CURSOR_MOVE(+1)
+//   PgUp       → RUNS_CURSOR_PAGE(up, pageSize, rowCount)
+//   PgDn       → RUNS_CURSOR_PAGE(down, pageSize, rowCount)
+//   Home / g   → RUNS_CURSOR_HOME
+//   End / G    → RUNS_CURSOR_END(rowCount)
+//   Enter      → MODE_OPEN_RUN(rows[cursor].id)
+// All suppressed while the filter bar is open (the bar owns keys then)
+// or while `inputDisabled` is set.
 //
 // Authoritative references:
 //   - docs/tui/features.md §3.2
 //   - docs/tui/mockups.md §1 (top half)
 //   - docs/tui/plans/P5-T2.md §7, §8
+//   - docs/tui/plans/P5-T3.md §6 (cursor keybindings + gating)
 //
 // Width-as-prop: ink-testing-library does not expose a `cols` option, so
 // callers pass `width` explicitly. The app-shell threads
-// `useStdout().stdout.columns` through (wired in P5-T3).
+// `useStdout().stdout.columns` through.
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
@@ -39,6 +47,7 @@ import {
   deriveVisibleRows,
   sliceWindow,
 } from "../runs/window.js";
+import { reconcileCursorAfterRowsChange } from "../runs/cursor.js";
 import { RunsTableRow } from "./runs-table-row.js";
 import { RunsFilterBar } from "./runs-filter-bar.js";
 import { RunsFooter } from "./runs-footer.js";
@@ -50,15 +59,21 @@ export interface RunsTableProps {
   readonly runsFilter: RunsFilterState;
   readonly runsArchive: RunsArchivePolicy;
   readonly selectedRunId: string | null;
-  readonly cursor?: number;
+  /**
+   * Index into the sorted-filtered-archived row list. Threaded from
+   * `state.runsCursor`. Required as of P5-T3 — callers may pass `0` when
+   * they don't care, but they MUST pass something so cursor math stays
+   * deterministic.
+   */
+  readonly cursor: number;
   readonly width: number;
   readonly height?: number;
   readonly nowMs: number;
   readonly dispatch: (action: Action) => void;
   /**
-   * Disable ALL key bindings owned by this component (s, /, a). Tests
-   * set this so a sibling keybar fixture can own routing, and so
-   * snapshot tests don't race.
+   * Disable ALL key bindings owned by this component. Tests set this so
+   * a sibling keybar fixture can own routing, and so snapshot tests
+   * don't race.
    */
   readonly inputDisabled?: boolean;
   /**
@@ -89,30 +104,9 @@ function RunsTableImpl({
 }: RunsTableProps): React.ReactElement {
   const theme = useTheme();
   const paneHeight = height ?? DEFAULT_HEIGHT;
-  const cursorIndex = cursor ?? 0;
+  const cursorIndex = cursor;
 
   const [viewportOffset, setViewportOffset] = useState<number>(0);
-
-  // Key routing — s / / / a. Suppressed while the filter bar is open so
-  // the bar owns keystrokes (plan §5.3). Also suppressed by the
-  // `inputDisabled` prop — preserves the P5-T1 test precedent.
-  useInput(
-    (input, _key) => {
-      if (input === "s") {
-        dispatch({ type: "RUNS_SORT_CYCLE" });
-        return;
-      }
-      if (input === "/") {
-        dispatch({ type: "RUNS_FILTER_OPEN" });
-        return;
-      }
-      if (input === "a") {
-        dispatch({ type: "RUNS_ARCHIVE_TOGGLE" });
-        return;
-      }
-    },
-    { isActive: !inputDisabled && !runsFilter.open },
-  );
 
   // ---------------------------------------------------------------------
   // Filter → archive → sort pipeline (memoised)
@@ -159,6 +153,121 @@ function RunsTableImpl({
   useEffect(() => {
     setViewportOffset(0);
   }, [runsFilter.applied, runsArchive.shown]);
+
+  // ---------------------------------------------------------------------
+  // Cursor reconciliation (P5-T3 §4.5)
+  //
+  // When the sorted row set changes (filter apply, archive toggle, new
+  // rows from the feed), re-place the cursor: prefer preserving the
+  // selected run-id, fall back to clamping to the last visible index.
+  // The reducer does not know `rows.length` so this runs at the component
+  // layer; the dispatched `RUNS_CURSOR_JUMP` is a no-op when the target
+  // already equals `state.runsCursor`, keeping the effect idempotent.
+  // ---------------------------------------------------------------------
+  useEffect(() => {
+    const next = reconcileCursorAfterRowsChange(
+      cursorIndex,
+      selectedRunId,
+      sortedRows,
+    );
+    if (next !== cursorIndex) {
+      dispatch({ type: "RUNS_CURSOR_JUMP", index: next });
+    }
+  }, [sortedRows, cursorIndex, selectedRunId, dispatch]);
+
+  // ---------------------------------------------------------------------
+  // Derived selection: whenever the row under the *clamped* cursor has a
+  // different id from `state.selectedRunId`, emit `RUNS_SELECT`. Using
+  // `windowState.cursor` guarantees the index is within bounds even when
+  // the raw `state.runsCursor` is momentarily stale. The reducer coerces
+  // `RUNS_SELECT` to a no-op when the id matches, so the loop is bounded.
+  // ---------------------------------------------------------------------
+  const derivedSelected =
+    sortedRows.length > 0 ? sortedRows[windowState.cursor]?.id ?? null : null;
+  useEffect(() => {
+    if (derivedSelected !== selectedRunId) {
+      dispatch({ type: "RUNS_SELECT", runId: derivedSelected });
+    }
+  }, [derivedSelected, selectedRunId, dispatch]);
+
+  // ---------------------------------------------------------------------
+  // Key routing
+  //
+  // Single `useInput` for all component-owned keys. Suppressed while the
+  // filter bar is open (it owns keystrokes) or while `inputDisabled` is
+  // set. Each branch dispatches a single action and returns — keystrokes
+  // never fall through to sibling handlers.
+  // ---------------------------------------------------------------------
+  useInput(
+    (input, key) => {
+      // Existing component-owned letter keys.
+      if (input === "s") {
+        dispatch({ type: "RUNS_SORT_CYCLE" });
+        return;
+      }
+      if (input === "/") {
+        dispatch({ type: "RUNS_FILTER_OPEN" });
+        return;
+      }
+      if (input === "a") {
+        dispatch({ type: "RUNS_ARCHIVE_TOGGLE" });
+        return;
+      }
+
+      // Cursor movement.
+      if (key.upArrow || input === "k") {
+        dispatch({ type: "RUNS_CURSOR_MOVE", delta: -1 });
+        return;
+      }
+      if (key.downArrow || input === "j") {
+        dispatch({ type: "RUNS_CURSOR_MOVE", delta: +1 });
+        return;
+      }
+      if (key.pageUp) {
+        if (visibleRows > 0 && sortedRows.length > 0) {
+          dispatch({
+            type: "RUNS_CURSOR_PAGE",
+            direction: "up",
+            pageSize: visibleRows,
+            rowCount: sortedRows.length,
+          });
+        }
+        return;
+      }
+      if (key.pageDown) {
+        if (visibleRows > 0 && sortedRows.length > 0) {
+          dispatch({
+            type: "RUNS_CURSOR_PAGE",
+            direction: "down",
+            pageSize: visibleRows,
+            rowCount: sortedRows.length,
+          });
+        }
+        return;
+      }
+      if (input === "g") {
+        dispatch({ type: "RUNS_CURSOR_HOME" });
+        return;
+      }
+      if (input === "G") {
+        dispatch({
+          type: "RUNS_CURSOR_END",
+          rowCount: sortedRows.length,
+        });
+        return;
+      }
+
+      // Enter — zoom into RUN mode on the currently selected row.
+      if (key.return) {
+        const id = sortedRows[windowState.cursor]?.id;
+        if (id !== undefined && id.length > 0) {
+          dispatch({ type: "MODE_OPEN_RUN", runId: id });
+        }
+        return;
+      }
+    },
+    { isActive: !inputDisabled && !runsFilter.open },
+  );
 
   const windowSlice = useMemo(
     () => sliceWindow(sortedRows, windowState),

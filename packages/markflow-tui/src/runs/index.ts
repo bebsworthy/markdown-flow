@@ -70,3 +70,11 @@ export {
   sliceWindow,
   deriveVisibleRows,
 } from "./window.js";
+
+export {
+  clampCursor,
+  moveCursor,
+  jumpCursorTo,
+  rowIdAtCursor,
+  reconcileCursorAfterRowsChange,
+} from "./cursor.js";

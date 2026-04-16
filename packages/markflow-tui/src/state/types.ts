@@ -111,6 +111,14 @@ export interface AppState {
    * `shown`. Thresholds default to `RUNS_ARCHIVE_DEFAULTS`.
    */
   readonly runsArchive: RunsArchivePolicy;
+  /**
+   * Index into the sorted-filtered-archived runs row list (P5-T3). Always
+   * non-negative; the upper bound is enforced at the component layer
+   * (the reducer does not know `rows.length`). Paired with `selectedRunId`
+   * which stores the logical run-id the bottom pane / RUN mode follows.
+   * See docs/tui/plans/P5-T3.md §2.
+   */
+  readonly runsCursor: number;
 }
 
 /**
@@ -165,4 +173,17 @@ export type Action =
   | { readonly type: "RUNS_FILTER_APPLY" }
   | { readonly type: "RUNS_FILTER_CLEAR" }
   // Runs-table archive toggle (P5-T2). Flips `runsArchive.shown`.
-  | { readonly type: "RUNS_ARCHIVE_TOGGLE" };
+  | { readonly type: "RUNS_ARCHIVE_TOGGLE" }
+  // Runs-table cursor / selection actions (P5-T3). See
+  // docs/tui/plans/P5-T3.md §2.4 for payload rationale.
+  | { readonly type: "RUNS_CURSOR_MOVE"; readonly delta: number }
+  | { readonly type: "RUNS_CURSOR_JUMP"; readonly index: number }
+  | { readonly type: "RUNS_CURSOR_HOME" }
+  | { readonly type: "RUNS_CURSOR_END"; readonly rowCount: number }
+  | {
+      readonly type: "RUNS_CURSOR_PAGE";
+      readonly direction: "up" | "down";
+      readonly pageSize: number;
+      readonly rowCount: number;
+    }
+  | { readonly type: "RUNS_SELECT"; readonly runId: string | null };

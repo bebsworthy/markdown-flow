@@ -63,6 +63,17 @@
 // Runs archive transitions (no mode change):
 //   *                  ──RUNS_ARCHIVE_TOGGLE──▶ runsArchive.shown = !shown
 //
+// Runs cursor transitions (no mode change; scoped to browsing.runs):
+//   browsing.runs      ──RUNS_CURSOR_MOVE(delta)──▶ runsCursor = max(0, cursor + delta)
+//   browsing.runs      ──RUNS_CURSOR_JUMP(index)──▶ runsCursor = max(0, index)
+//   browsing.runs      ──RUNS_CURSOR_HOME──▶ runsCursor = 0
+//   browsing.runs      ──RUNS_CURSOR_END(rowCount)──▶ runsCursor = max(0, rowCount - 1)
+//   browsing.runs      ──RUNS_CURSOR_PAGE(dir, size, rc)──▶ clamp(cursor ± size, 0, rc-1)
+//
+// Runs selection (no mode change):
+//   *                  ──RUNS_SELECT(runId)──▶ selectedRunId = runId
+//                                                (no-op in viewing.* when runId === null)
+//
 // Cursor / filter transitions (no mode change):
 //   *                  ──SELECT_WORKFLOW(id)──▶ state.selectedWorkflowId=id
 //   *                  ──SELECT_RUN(id)──▶ state.selectedRunId=id
@@ -91,6 +102,7 @@ export const initialAppState: AppState = {
     applied: { raw: "", terms: [] },
   },
   runsArchive: RUNS_ARCHIVE_DEFAULTS,
+  runsCursor: 0,
 };
 
 export function reducer(state: AppState, action: Action): AppState {
@@ -101,6 +113,7 @@ export function reducer(state: AppState, action: Action): AppState {
     case "MODE_SHOW_RUNS":
       return withMode(state, { kind: "browsing", pane: "runs" });
     case "MODE_OPEN_RUN":
+      if (action.runId === "") return state;
       return {
         ...state,
         mode: {
@@ -163,6 +176,18 @@ export function reducer(state: AppState, action: Action): AppState {
       return clearRunsFilter(state);
     case "RUNS_ARCHIVE_TOGGLE":
       return toggleRunsArchive(state);
+    case "RUNS_CURSOR_MOVE":
+      return moveRunsCursor(state, action.delta);
+    case "RUNS_CURSOR_JUMP":
+      return jumpRunsCursor(state, action.index);
+    case "RUNS_CURSOR_HOME":
+      return homeRunsCursor(state);
+    case "RUNS_CURSOR_END":
+      return endRunsCursor(state, action.rowCount);
+    case "RUNS_CURSOR_PAGE":
+      return pageRunsCursor(state, action);
+    case "RUNS_SELECT":
+      return selectRun(state, action.runId);
   }
 }
 
@@ -297,4 +322,61 @@ function toggleRunsArchive(state: AppState): AppState {
       shown: !state.runsArchive.shown,
     },
   };
+}
+
+// --- Runs cursor / selection helpers (P5-T3) -------------------------------
+
+function isBrowsingRuns(state: AppState): boolean {
+  return state.mode.kind === "browsing" && state.mode.pane === "runs";
+}
+
+function moveRunsCursor(state: AppState, delta: number): AppState {
+  if (!isBrowsingRuns(state)) return state;
+  if (delta === 0) return state;
+  const next = Math.max(0, state.runsCursor + Math.trunc(delta));
+  return next === state.runsCursor ? state : { ...state, runsCursor: next };
+}
+
+function jumpRunsCursor(state: AppState, index: number): AppState {
+  if (!isBrowsingRuns(state)) return state;
+  const next = Math.max(0, Math.trunc(index));
+  return next === state.runsCursor ? state : { ...state, runsCursor: next };
+}
+
+function homeRunsCursor(state: AppState): AppState {
+  if (!isBrowsingRuns(state)) return state;
+  return state.runsCursor === 0 ? state : { ...state, runsCursor: 0 };
+}
+
+function endRunsCursor(state: AppState, rowCount: number): AppState {
+  if (!isBrowsingRuns(state)) return state;
+  if (rowCount <= 0) {
+    return state.runsCursor === 0 ? state : { ...state, runsCursor: 0 };
+  }
+  const next = Math.max(0, Math.trunc(rowCount) - 1);
+  return next === state.runsCursor ? state : { ...state, runsCursor: next };
+}
+
+function pageRunsCursor(
+  state: AppState,
+  a: {
+    readonly direction: "up" | "down";
+    readonly pageSize: number;
+    readonly rowCount: number;
+  },
+): AppState {
+  if (!isBrowsingRuns(state)) return state;
+  if (a.pageSize <= 0 || a.rowCount <= 0) return state;
+  const size = Math.trunc(a.pageSize);
+  const rc = Math.trunc(a.rowCount);
+  const signed = a.direction === "up" ? -size : size;
+  const next = Math.max(0, Math.min(rc - 1, state.runsCursor + signed));
+  return next === state.runsCursor ? state : { ...state, runsCursor: next };
+}
+
+function selectRun(state: AppState, runId: string | null): AppState {
+  // Guard: in viewing.*, never clear selection — preserves the zoom target.
+  if (state.mode.kind === "viewing" && runId === null) return state;
+  if (state.selectedRunId === runId) return state;
+  return { ...state, selectedRunId: runId };
 }

@@ -20,6 +20,7 @@ import { EventEmitter } from "node:events";
 import { ThemeProvider } from "../../src/theme/context.js";
 import { buildTheme } from "../../src/theme/theme.js";
 import { AppShell } from "../../src/components/app-shell.js";
+import type { AppState } from "../../src/state/types.js";
 
 // ---------------------------------------------------------------------------
 // Wide-terminal test harness
@@ -94,6 +95,8 @@ function renderShell(props: {
   top?: React.ReactNode;
   bottom?: React.ReactNode;
   keybar?: React.ReactNode;
+  mode?: AppState["mode"];
+  selectedRunId?: string | null;
 }): { lastFrame: () => string; unmount: () => void } {
   const theme = buildTheme({
     color: props.color ?? false,
@@ -110,6 +113,10 @@ function renderShell(props: {
         top={props.top ?? <Text> </Text>}
         bottom={props.bottom ?? <Text> </Text>}
         {...(props.keybar !== undefined ? { keybar: props.keybar } : {})}
+        {...(props.mode !== undefined ? { mode: props.mode } : {})}
+        {...(props.selectedRunId !== undefined
+          ? { selectedRunId: props.selectedRunId }
+          : {})}
       />
     </ThemeProvider>,
     width,
@@ -270,6 +277,23 @@ describe("AppShell", () => {
       expect((lines[i] ?? "").startsWith("\u2551")).toBe(true);
     }
   });
+
+  // -------- P5-T3: title pill in different modes ------------------------
+  //
+  // The baked-in title text in the top edge is computed from `mode` +
+  // `selectedRunId` via the pure `frameTitle` / `activeTabFromMode`
+  // helpers, which are covered byte-exact in
+  // `test/components/app-shell-layout.test.ts`. The visual overlay by
+  // `<ModeTabs>` then paints over the same columns with inverse video —
+  // so at the Ink render layer here we cannot observe the pill text
+  // directly (any placeholder overlay we pass repaints the same cells).
+  //
+  // Instead, the integration-layer coverage for mode-driven title
+  // changes lives in `test/app/mode-transitions.test.tsx`, where the
+  // whole `<App>` is rendered end-to-end (including the real
+  // `<ModeTabs>` subtree). The pill behaviour across
+  // browsing.workflows / browsing.runs (hide-RUN) / viewing (RUN pill)
+  // is asserted there.
 
   it("byte-exact ASCII frame chrome at 140x8 matches the fallback shell (no box drawing)", () => {
     const { lastFrame, unmount } = renderShell({

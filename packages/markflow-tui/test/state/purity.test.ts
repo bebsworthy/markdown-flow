@@ -73,6 +73,8 @@ const files = [
   "../../src/runs/duration.ts",
   "../../src/runs/filter.ts",
   "../../src/runs/window.ts",
+  // P5-T3 pure module — cursor math for the runs table.
+  "../../src/runs/cursor.ts",
 ];
 
 /**
@@ -290,5 +292,14 @@ describe("pure-module purity", () => {
     expect(typeof mod.computeWindow).toBe("function");
     expect(typeof mod.sliceWindow).toBe("function");
     expect(typeof mod.deriveVisibleRows).toBe("function");
+  });
+
+  it("runs cursor module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/runs/cursor.js");
+    expect(typeof mod.clampCursor).toBe("function");
+    expect(typeof mod.moveCursor).toBe("function");
+    expect(typeof mod.jumpCursorTo).toBe("function");
+    expect(typeof mod.rowIdAtCursor).toBe("function");
+    expect(typeof mod.reconcileCursorAfterRowsChange).toBe("function");
   });
 });

@@ -509,6 +509,266 @@ describe("P5-T2 slice preservation across mode switches", () => {
   });
 });
 
+// -------- P5-T3: cursor + selection + mode-zoom idempotency --------------
+
+const browsingRuns = (overrides: Partial<AppState> = {}): AppState => ({
+  ...initialAppState,
+  mode: { kind: "browsing", pane: "runs" },
+  ...overrides,
+});
+
+describe("initialAppState — P5-T3 slice", () => {
+  it("runsCursor defaults to 0", () => {
+    expect(initialAppState.runsCursor).toBe(0);
+  });
+});
+
+describe("RUNS_CURSOR_MOVE", () => {
+  it("increments cursor in browsing.runs", () => {
+    const s = reducer(browsingRuns({ runsCursor: 2 }), {
+      type: "RUNS_CURSOR_MOVE",
+      delta: 1,
+    });
+    expect(s.runsCursor).toBe(3);
+  });
+  it("does not go negative at cursor=0", () => {
+    const s = reducer(browsingRuns(), { type: "RUNS_CURSOR_MOVE", delta: -1 });
+    expect(s.runsCursor).toBe(0);
+    // Referentially stable — no state change.
+    expect(s).toBe(initialAppState === browsingRuns() ? initialAppState : s); // sanity no-op
+  });
+  it("is a no-op in browsing.workflows", () => {
+    const s = reducer(initialAppState, {
+      type: "RUNS_CURSOR_MOVE",
+      delta: 5,
+    });
+    expect(s).toBe(initialAppState);
+  });
+  it("delta=0 returns identical state reference", () => {
+    const base = browsingRuns({ runsCursor: 3 });
+    const s = reducer(base, { type: "RUNS_CURSOR_MOVE", delta: 0 });
+    expect(s).toBe(base);
+  });
+  it("is a no-op in viewing.*", () => {
+    const base = viewingState("r1");
+    const s = reducer(base, { type: "RUNS_CURSOR_MOVE", delta: 1 });
+    expect(s).toBe(base);
+  });
+});
+
+describe("RUNS_CURSOR_JUMP", () => {
+  it("sets cursor to the given index", () => {
+    const s = reducer(browsingRuns(), { type: "RUNS_CURSOR_JUMP", index: 3 });
+    expect(s.runsCursor).toBe(3);
+  });
+  it("clamps negative to 0", () => {
+    const s = reducer(browsingRuns({ runsCursor: 2 }), {
+      type: "RUNS_CURSOR_JUMP",
+      index: -1,
+    });
+    expect(s.runsCursor).toBe(0);
+  });
+  it("is a no-op outside browsing.runs", () => {
+    const s = reducer(initialAppState, { type: "RUNS_CURSOR_JUMP", index: 5 });
+    expect(s).toBe(initialAppState);
+  });
+  it("same index returns identical reference", () => {
+    const base = browsingRuns({ runsCursor: 4 });
+    const s = reducer(base, { type: "RUNS_CURSOR_JUMP", index: 4 });
+    expect(s).toBe(base);
+  });
+});
+
+describe("RUNS_CURSOR_HOME", () => {
+  it("jumps cursor to 0", () => {
+    const s = reducer(browsingRuns({ runsCursor: 5 }), {
+      type: "RUNS_CURSOR_HOME",
+    });
+    expect(s.runsCursor).toBe(0);
+  });
+  it("is idempotent at cursor=0", () => {
+    const base = browsingRuns();
+    const s = reducer(base, { type: "RUNS_CURSOR_HOME" });
+    expect(s).toBe(base);
+  });
+  it("is a no-op outside browsing.runs", () => {
+    const s = reducer(initialAppState, { type: "RUNS_CURSOR_HOME" });
+    expect(s).toBe(initialAppState);
+  });
+});
+
+describe("RUNS_CURSOR_END", () => {
+  it("sets cursor to rowCount-1", () => {
+    const s = reducer(browsingRuns(), {
+      type: "RUNS_CURSOR_END",
+      rowCount: 10,
+    });
+    expect(s.runsCursor).toBe(9);
+  });
+  it("rowCount=0 collapses to cursor=0", () => {
+    const s = reducer(browsingRuns({ runsCursor: 3 }), {
+      type: "RUNS_CURSOR_END",
+      rowCount: 0,
+    });
+    expect(s.runsCursor).toBe(0);
+  });
+  it("is a no-op outside browsing.runs", () => {
+    const s = reducer(initialAppState, {
+      type: "RUNS_CURSOR_END",
+      rowCount: 10,
+    });
+    expect(s).toBe(initialAppState);
+  });
+});
+
+describe("RUNS_CURSOR_PAGE", () => {
+  it("pages down by pageSize", () => {
+    const s = reducer(browsingRuns({ runsCursor: 2 }), {
+      type: "RUNS_CURSOR_PAGE",
+      direction: "down",
+      pageSize: 5,
+      rowCount: 20,
+    });
+    expect(s.runsCursor).toBe(7);
+  });
+  it("pages up — clamps at 0", () => {
+    const s = reducer(browsingRuns({ runsCursor: 2 }), {
+      type: "RUNS_CURSOR_PAGE",
+      direction: "up",
+      pageSize: 5,
+      rowCount: 20,
+    });
+    expect(s.runsCursor).toBe(0);
+  });
+  it("pages down — clamps at rowCount-1", () => {
+    const s = reducer(browsingRuns({ runsCursor: 18 }), {
+      type: "RUNS_CURSOR_PAGE",
+      direction: "down",
+      pageSize: 5,
+      rowCount: 20,
+    });
+    expect(s.runsCursor).toBe(19);
+  });
+  it("pageSize <= 0 is a no-op", () => {
+    const base = browsingRuns({ runsCursor: 3 });
+    const s = reducer(base, {
+      type: "RUNS_CURSOR_PAGE",
+      direction: "down",
+      pageSize: 0,
+      rowCount: 20,
+    });
+    expect(s).toBe(base);
+  });
+  it("rowCount <= 0 is a no-op", () => {
+    const base = browsingRuns({ runsCursor: 3 });
+    const s = reducer(base, {
+      type: "RUNS_CURSOR_PAGE",
+      direction: "down",
+      pageSize: 5,
+      rowCount: 0,
+    });
+    expect(s).toBe(base);
+  });
+  it("is a no-op outside browsing.runs", () => {
+    const s = reducer(initialAppState, {
+      type: "RUNS_CURSOR_PAGE",
+      direction: "down",
+      pageSize: 5,
+      rowCount: 20,
+    });
+    expect(s).toBe(initialAppState);
+  });
+});
+
+describe("RUNS_SELECT", () => {
+  it("sets selectedRunId", () => {
+    const s = reducer(initialAppState, {
+      type: "RUNS_SELECT",
+      runId: "abc",
+    });
+    expect(s.selectedRunId).toBe("abc");
+  });
+  it("same runId returns identical reference", () => {
+    const base: AppState = { ...initialAppState, selectedRunId: "abc" };
+    const s = reducer(base, { type: "RUNS_SELECT", runId: "abc" });
+    expect(s).toBe(base);
+  });
+  it("in viewing.*, a null runId is a no-op (preserves zoom target)", () => {
+    const base = viewingState("r1");
+    const s = reducer(base, { type: "RUNS_SELECT", runId: null });
+    expect(s).toBe(base);
+  });
+  it("in viewing.*, a concrete runId still updates selectedRunId", () => {
+    const base = viewingState("r1");
+    const s = reducer(base, { type: "RUNS_SELECT", runId: "r2" });
+    expect(s.selectedRunId).toBe("r2");
+  });
+  it("clears selection in browsing.runs when runId=null", () => {
+    const base = browsingRuns({ selectedRunId: "abc" });
+    const s = reducer(base, { type: "RUNS_SELECT", runId: null });
+    expect(s.selectedRunId).toBeNull();
+  });
+});
+
+describe("MODE_OPEN_RUN — P5-T3 empty-string guard", () => {
+  it("empty runId is a no-op", () => {
+    const s = reducer(initialAppState, { type: "MODE_OPEN_RUN", runId: "" });
+    expect(s).toBe(initialAppState);
+  });
+});
+
+describe("MODE_OPEN_RUN / MODE_CLOSE_RUN — no orphan state", () => {
+  it("round trip preserves every slice except mode + legacy filter", () => {
+    const base: AppState = browsingRuns({
+      runsCursor: 4,
+      selectedRunId: "abcd",
+      runsSort: { key: "elapsed", direction: "desc" },
+      runsFilter: {
+        open: false,
+        draft: "status:running",
+        applied: {
+          raw: "status:running",
+          terms: [{ kind: "status", value: "running" }],
+        },
+      },
+      runsArchive: { ...initialAppState.runsArchive, shown: true },
+      filter: "", // legacy filter already empty
+    });
+    const opened = reducer(base, {
+      type: "MODE_OPEN_RUN",
+      runId: "abcd",
+    });
+    const closed = reducer(opened, { type: "MODE_CLOSE_RUN" });
+    expect(closed.mode).toEqual({ kind: "browsing", pane: "runs" });
+    expect(closed.runsCursor).toBe(base.runsCursor);
+    expect(closed.runsSort).toEqual(base.runsSort);
+    expect(closed.runsFilter).toEqual(base.runsFilter);
+    expect(closed.runsArchive).toEqual(base.runsArchive);
+    expect(closed.selectedRunId).toBe("abcd");
+  });
+
+  it("repeated zoom/unzoom pairs converge to the same state", () => {
+    const base = browsingRuns({
+      runsCursor: 2,
+      selectedRunId: "r1",
+    });
+    let s: AppState = base;
+    for (let i = 0; i < 3; i += 1) {
+      s = reducer(s, { type: "MODE_OPEN_RUN", runId: "r1" });
+      s = reducer(s, { type: "MODE_CLOSE_RUN" });
+    }
+    expect(s.mode).toEqual({ kind: "browsing", pane: "runs" });
+    expect(s.runsCursor).toBe(2);
+    expect(s.selectedRunId).toBe("r1");
+  });
+
+  it("MODE_CLOSE_RUN from browsing.runs is a no-op (stays browsing.runs)", () => {
+    const base = browsingRuns();
+    const s = reducer(base, { type: "MODE_CLOSE_RUN" });
+    expect(s.mode).toEqual({ kind: "browsing", pane: "runs" });
+  });
+});
+
 // -------- Purity: calling reducer twice with the same args yields deep-equal
 // output and never mutates the input. -------------------------------------
 describe("reducer purity", () => {

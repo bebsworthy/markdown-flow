@@ -40,4 +40,8 @@ export {
   type RunsFilterBarProps,
 } from "./runs-filter-bar.js";
 export { RunsFooter, type RunsFooterProps } from "./runs-footer.js";
+export {
+  RunDetailPlaceholder,
+  type RunDetailPlaceholderProps,
+} from "./run-detail-placeholder.js";
 export type { Binding, AppContext, KeySpec, Category } from "./types.js";

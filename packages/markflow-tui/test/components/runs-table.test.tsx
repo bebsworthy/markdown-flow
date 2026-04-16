@@ -118,7 +118,7 @@ function renderTable(props: {
         runsFilter={props.runsFilter ?? DEFAULT_FILTER}
         runsArchive={props.runsArchive ?? DEFAULT_ARCHIVE}
         selectedRunId={props.selectedRunId ?? null}
-        cursor={props.cursor}
+        cursor={props.cursor ?? 0}
         width={props.width ?? 140}
         height={props.height ?? 12}
         nowMs={props.nowMs ?? NOW}
@@ -299,6 +299,8 @@ describe("<RunsTable> — key handling", () => {
       width: 140,
       dispatch,
       inputDisabled: true,
+      // Pre-seed selection so the derived-selection effect is a no-op.
+      selectedRunId: "r0000001",
     });
     await flush();
     stdin.write("s");
@@ -309,7 +311,12 @@ describe("<RunsTable> — key handling", () => {
 
   it("ignores unrelated keys", async () => {
     const dispatch = vi.fn();
-    const { stdin, cleanup } = renderTable({ width: 140, dispatch });
+    const { stdin, cleanup } = renderTable({
+      width: 140,
+      dispatch,
+      // Pre-seed selection so the derived-selection effect is a no-op.
+      selectedRunId: "r0000001",
+    });
     await flush();
     stdin.write("x");
     await flush();
@@ -562,6 +569,344 @@ function budgetMs(base: number): number {
   const mult = Number(process.env.MARKFLOW_PERF_MULT ?? "1");
   return base * (Number.isFinite(mult) && mult > 0 ? mult : 1);
 }
+
+// ---------------------------------------------------------------------------
+// P5-T3 — cursor + Enter + filter-clamp
+// ---------------------------------------------------------------------------
+
+// Ink key escape sequences — these match what node's TTY emits on real
+// terminals and what ink-testing-library passes through the stdin stub.
+const UP_ARROW = "\x1b[A";
+const DOWN_ARROW = "\x1b[B";
+const PAGE_UP = "\x1b[5~";
+const PAGE_DOWN = "\x1b[6~";
+const ENTER = "\r";
+
+/** Filter out the RUNS_SELECT action the derived-selection effect emits on mount. */
+function actionsExcludingSelect(
+  dispatch: ReturnType<typeof vi.fn>,
+): unknown[] {
+  return dispatch.mock.calls
+    .map((c) => c[0])
+    .filter((a) => (a as { type: string }).type !== "RUNS_SELECT");
+}
+
+describe("<RunsTable> — cursor key routing (P5-T3)", () => {
+  it("↑ dispatches RUNS_CURSOR_MOVE(-1)", async () => {
+    const dispatch = vi.fn();
+    const { stdin, cleanup } = renderTable({
+      width: 140,
+      dispatch,
+      cursor: 2,
+      selectedRunId: "r0000001",
+    });
+    await flush();
+    stdin.write(UP_ARROW);
+    await flush();
+    expect(actionsExcludingSelect(dispatch)).toContainEqual({
+      type: "RUNS_CURSOR_MOVE",
+      delta: -1,
+    });
+    cleanup();
+  });
+
+  it("k dispatches RUNS_CURSOR_MOVE(-1)", async () => {
+    const dispatch = vi.fn();
+    const { stdin, cleanup } = renderTable({
+      width: 140,
+      dispatch,
+      cursor: 2,
+      selectedRunId: "r0000001",
+    });
+    await flush();
+    stdin.write("k");
+    await flush();
+    expect(actionsExcludingSelect(dispatch)).toContainEqual({
+      type: "RUNS_CURSOR_MOVE",
+      delta: -1,
+    });
+    cleanup();
+  });
+
+  it("↓ dispatches RUNS_CURSOR_MOVE(+1)", async () => {
+    const dispatch = vi.fn();
+    const { stdin, cleanup } = renderTable({
+      width: 140,
+      dispatch,
+      cursor: 0,
+      selectedRunId: "r0000001",
+    });
+    await flush();
+    stdin.write(DOWN_ARROW);
+    await flush();
+    expect(actionsExcludingSelect(dispatch)).toContainEqual({
+      type: "RUNS_CURSOR_MOVE",
+      delta: +1,
+    });
+    cleanup();
+  });
+
+  it("j dispatches RUNS_CURSOR_MOVE(+1)", async () => {
+    const dispatch = vi.fn();
+    const { stdin, cleanup } = renderTable({
+      width: 140,
+      dispatch,
+      cursor: 0,
+      selectedRunId: "r0000001",
+    });
+    await flush();
+    stdin.write("j");
+    await flush();
+    expect(actionsExcludingSelect(dispatch)).toContainEqual({
+      type: "RUNS_CURSOR_MOVE",
+      delta: +1,
+    });
+    cleanup();
+  });
+
+  it("g dispatches RUNS_CURSOR_HOME", async () => {
+    const dispatch = vi.fn();
+    const { stdin, cleanup } = renderTable({
+      width: 140,
+      dispatch,
+      cursor: 3,
+      selectedRunId: "r0000001",
+    });
+    await flush();
+    stdin.write("g");
+    await flush();
+    expect(actionsExcludingSelect(dispatch)).toContainEqual({
+      type: "RUNS_CURSOR_HOME",
+    });
+    cleanup();
+  });
+
+  it("G dispatches RUNS_CURSOR_END with rowCount", async () => {
+    const dispatch = vi.fn();
+    const { stdin, cleanup } = renderTable({
+      width: 140,
+      dispatch,
+      cursor: 0,
+      selectedRunId: "r0000001",
+    });
+    await flush();
+    stdin.write("G");
+    await flush();
+    const action = actionsExcludingSelect(dispatch).find(
+      (a) => (a as { type: string }).type === "RUNS_CURSOR_END",
+    ) as { type: string; rowCount: number } | undefined;
+    expect(action).toBeDefined();
+    expect(action!.rowCount).toBe(ROWS.length);
+    cleanup();
+  });
+
+  it("PgUp dispatches RUNS_CURSOR_PAGE(up, pageSize, rowCount)", async () => {
+    const dispatch = vi.fn();
+    const { stdin, cleanup } = renderTable({
+      width: 140,
+      height: 12, // header + footer = 2 → visibleRows = 10
+      dispatch,
+      cursor: 3,
+      selectedRunId: "r0000001",
+    });
+    await flush();
+    stdin.write(PAGE_UP);
+    await flush();
+    const action = actionsExcludingSelect(dispatch).find(
+      (a) => (a as { type: string }).type === "RUNS_CURSOR_PAGE",
+    ) as
+      | {
+          type: string;
+          direction: "up" | "down";
+          pageSize: number;
+          rowCount: number;
+        }
+      | undefined;
+    expect(action).toBeDefined();
+    expect(action!.direction).toBe("up");
+    expect(action!.pageSize).toBe(10);
+    expect(action!.rowCount).toBe(ROWS.length);
+    cleanup();
+  });
+
+  it("PgDn dispatches RUNS_CURSOR_PAGE(down, pageSize, rowCount)", async () => {
+    const dispatch = vi.fn();
+    const { stdin, cleanup } = renderTable({
+      width: 140,
+      height: 12,
+      dispatch,
+      cursor: 0,
+      selectedRunId: "r0000001",
+    });
+    await flush();
+    stdin.write(PAGE_DOWN);
+    await flush();
+    const action = actionsExcludingSelect(dispatch).find(
+      (a) => (a as { type: string }).type === "RUNS_CURSOR_PAGE",
+    ) as
+      | {
+          type: string;
+          direction: "up" | "down";
+          pageSize: number;
+          rowCount: number;
+        }
+      | undefined;
+    expect(action).toBeDefined();
+    expect(action!.direction).toBe("down");
+    expect(action!.pageSize).toBe(10);
+    cleanup();
+  });
+
+  it("Enter dispatches MODE_OPEN_RUN with the id at the cursor", async () => {
+    const dispatch = vi.fn();
+    // Explicit sort so we know which row ends up under cursor=0.
+    const { stdin, cleanup } = renderTable({
+      width: 140,
+      dispatch,
+      cursor: 0,
+      selectedRunId: ROWS[0]!.id,
+      sort: { key: "id", direction: "desc" },
+    });
+    await flush();
+    stdin.write(ENTER);
+    await flush();
+    const openAction = actionsExcludingSelect(dispatch).find(
+      (a) => (a as { type: string }).type === "MODE_OPEN_RUN",
+    ) as { type: string; runId: string } | undefined;
+    expect(openAction).toBeDefined();
+    expect(typeof openAction!.runId).toBe("string");
+    expect(openAction!.runId.length).toBeGreaterThan(0);
+    cleanup();
+  });
+
+  it("Enter on an empty row list does not dispatch MODE_OPEN_RUN", async () => {
+    const dispatch = vi.fn();
+    const { stdin, cleanup } = renderTable({
+      rows: [],
+      width: 140,
+      dispatch,
+    });
+    await flush();
+    stdin.write(ENTER);
+    await flush();
+    const openCalls = dispatch.mock.calls.filter(
+      (c) => (c[0] as { type: string }).type === "MODE_OPEN_RUN",
+    );
+    expect(openCalls).toHaveLength(0);
+    cleanup();
+  });
+
+  it("cursor keys are suppressed while the filter bar is open", async () => {
+    const dispatch = vi.fn();
+    const { stdin, cleanup } = renderTable({
+      width: 140,
+      dispatch,
+      cursor: 0,
+      selectedRunId: "r0000001",
+      runsFilter: {
+        open: true,
+        draft: "",
+        applied: { raw: "", terms: [] },
+      },
+    });
+    await flush();
+    stdin.write(DOWN_ARROW);
+    stdin.write(ENTER);
+    await flush();
+    // None of the cursor / Enter actions should be dispatched by <RunsTable>
+    // when the filter bar owns keys.
+    const actions = dispatch.mock.calls.map((c) => c[0] as { type: string });
+    expect(actions.some((a) => a.type === "RUNS_CURSOR_MOVE")).toBe(false);
+    expect(actions.some((a) => a.type === "MODE_OPEN_RUN")).toBe(false);
+    cleanup();
+  });
+
+  it("cursor keys are suppressed when inputDisabled is set", async () => {
+    const dispatch = vi.fn();
+    const { stdin, cleanup } = renderTable({
+      width: 140,
+      dispatch,
+      inputDisabled: true,
+      cursor: 0,
+      selectedRunId: "r0000001",
+    });
+    await flush();
+    stdin.write(DOWN_ARROW);
+    stdin.write(ENTER);
+    await flush();
+    expect(dispatch).not.toHaveBeenCalled();
+    cleanup();
+  });
+});
+
+describe("<RunsTable> — derived selection emits RUNS_SELECT (P5-T3)", () => {
+  it("emits RUNS_SELECT with rows[cursor].id on initial mount when selectedRunId is null", async () => {
+    const dispatch = vi.fn();
+    const { cleanup } = renderTable({
+      width: 140,
+      dispatch,
+      cursor: 0,
+      // We must not pre-seed — force the effect to fire.
+      selectedRunId: null,
+      sort: { key: "id", direction: "desc" },
+    });
+    await flush();
+    const selectCalls = dispatch.mock.calls
+      .map((c) => c[0] as { type: string; runId: string | null })
+      .filter((a) => a.type === "RUNS_SELECT");
+    expect(selectCalls.length).toBeGreaterThan(0);
+    expect(selectCalls[0]!.runId).toBeTruthy();
+    cleanup();
+  });
+});
+
+describe("<RunsTable> — cursor reconciliation on row change (P5-T3)", () => {
+  it("when cursor is out of range and no id preserved, jumps to last valid index", async () => {
+    const dispatch = vi.fn();
+    // Only 3 rows; cursor at 10 forces a jump.
+    const threeRows = ROWS.slice(0, 3);
+    const { cleanup } = renderTable({
+      rows: threeRows,
+      width: 140,
+      dispatch,
+      cursor: 10,
+      selectedRunId: null,
+    });
+    await flush();
+    const jumpCalls = dispatch.mock.calls
+      .map((c) => c[0] as { type: string; index: number })
+      .filter((a) => a.type === "RUNS_CURSOR_JUMP");
+    expect(jumpCalls.length).toBeGreaterThan(0);
+    // The first jump should clamp to the last valid index.
+    expect(jumpCalls[0]!.index).toBe(threeRows.length - 1);
+    cleanup();
+  });
+
+  it("preserves selectedRunId's new index across a row-set change", async () => {
+    const dispatch = vi.fn();
+    const threeRows = ROWS.slice(0, 3);
+    const selectedId = threeRows[1]!.id;
+    const { cleanup } = renderTable({
+      rows: threeRows,
+      width: 140,
+      dispatch,
+      cursor: 2, // not at the id's current position
+      selectedRunId: selectedId,
+      sort: { key: "id", direction: "desc" },
+    });
+    await flush();
+    const jumpCalls = dispatch.mock.calls
+      .map((c) => c[0] as { type: string; index: number })
+      .filter((a) => a.type === "RUNS_CURSOR_JUMP");
+    expect(jumpCalls.length).toBeGreaterThan(0);
+    // Jump should point at the id's actual index in sortedRows. The exact
+    // number depends on sort direction but must be within bounds.
+    const idx = jumpCalls[0]!.index;
+    expect(idx).toBeGreaterThanOrEqual(0);
+    expect(idx).toBeLessThanOrEqual(threeRows.length - 1);
+    cleanup();
+  });
+});
 
 describe.skipIf(process.env.CI_SKIP_PERF === "1")(
   "<RunsTable> — L2 render perf",

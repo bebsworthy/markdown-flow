@@ -17,6 +17,7 @@
 import React, {
   useCallback,
   useEffect,
+  useMemo,
   useReducer,
   useRef,
   useState,
@@ -29,6 +30,9 @@ import { WorkflowBrowser } from "./components/workflow-browser.js";
 import { AddWorkflowModal } from "./components/add-workflow-modal.js";
 import { Keybar } from "./components/keybar.js";
 import { WORKFLOWS_EMPTY_KEYBAR } from "./components/keybar-fixtures/workflows-empty.js";
+import { RunsTable } from "./components/runs-table.js";
+import { RunDetailPlaceholder } from "./components/run-detail-placeholder.js";
+import { pickFrameSlots } from "./components/app-shell-layout.js";
 import { reducer, initialAppState } from "./state/reducer.js";
 import {
   addEntry,
@@ -40,6 +44,7 @@ import {
 import { ingestUrl } from "./add-modal/url-ingest.js";
 import type { RegistryState } from "./registry/types.js";
 import type { UrlIngestResult } from "./add-modal/types.js";
+import type { RunsTableRow } from "./runs/types.js";
 
 export interface AppProps {
   readonly onQuit: () => void;
@@ -56,6 +61,13 @@ export interface AppProps {
     url: string,
     baseDir: string,
   ) => Promise<UrlIngestResult>;
+  /**
+   * Test seam — seeds the runs-table feed that production will wire to
+   * `runs.watch()` in P6-T0. When undefined, the feed is empty (the
+   * current production behaviour). When provided, rows are passed
+   * through verbatim — no sort/filter pre-processing.
+   */
+  readonly initialRunRows?: ReadonlyArray<RunsTableRow>;
 }
 
 export function App({
@@ -63,6 +75,7 @@ export function App({
   registryConfig,
   initialLaunchArgs,
   urlIngestor,
+  initialRunRows,
 }: AppProps): React.ReactElement {
   const [state, dispatch] = useReducer(reducer, initialAppState);
   const { stdout } = useStdout();
@@ -173,10 +186,29 @@ export function App({
     })();
   }, [registryLoaded, initialLaunchArgs, urlIngestor, onAddEntry]);
 
-  // ---- Global quit binding ----------------------------------------------
+  // ---- Global key bindings ----------------------------------------------
+  //
+  // Esc precedence (plan §6.1 / §8):
+  //   1. overlay open       → owned by overlay components (this hook returns early).
+  //   2. runsFilter.open    → owned by <RunsFilterBar>'s own useInput (LIFO).
+  //   3. mode = viewing.*   → dispatch MODE_CLOSE_RUN.
+  //   4. otherwise          → no-op.
+  //
+  // `q` retains its legacy scaffold behaviour (app-quit) in every non-overlay
+  // context. Rebinding `q` to "Back" inside RUN mode is a Phase-6 follow-up
+  // (see plan §6.2).
 
-  useInput((input) => {
-    if (state.overlay !== null) return; // overlays own their key routing
+  useInput((input, key) => {
+    if (state.overlay !== null) return;
+    if (state.runsFilter.open) {
+      // Filter bar handler runs first via LIFO; this is a belt-and-suspenders
+      // guard so a stray Esc never closes RUN mode when the bar is open.
+      return;
+    }
+    if (key.escape && state.mode.kind === "viewing") {
+      dispatch({ type: "MODE_CLOSE_RUN" });
+      return;
+    }
     if (input === "q") {
       onQuit();
     }
@@ -185,8 +217,32 @@ export function App({
   // ---- Rendering --------------------------------------------------------
 
   const persist = registryConfig?.persist ?? true;
-  const topSlot =
-    state.mode.kind === "browsing" && state.mode.pane === "workflows" ? (
+
+  // Runs-table feed — wired to an empty array for this task. The live
+  // adapter subscription lands in P6-T0 (plan §11.4). Tests may seed
+  // the feed via the `initialRunRows` prop.
+  // TODO(P6-T0): thread `runs.watch()` output through here.
+  const runRows = useMemo<ReadonlyArray<RunsTableRow>>(
+    () => initialRunRows ?? [],
+    [initialRunRows],
+  );
+  const rowsById = useMemo<ReadonlySet<string>>(() => {
+    const s = new Set<string>();
+    for (const r of runRows) s.add(r.id);
+    return s;
+  }, [runRows]);
+
+  const shellWidth = stdout?.columns ?? 80;
+  const shellHeight = stdout?.rows ?? 30;
+  const innerWidth = Math.max(0, shellWidth - 2);
+  const { topRows: topSlotRows, bottomRows: bottomSlotRows } =
+    pickFrameSlots(shellHeight);
+  const nowMs = Date.now();
+
+  let topSlot: React.ReactNode;
+  let bottomSlot: React.ReactNode;
+  if (state.mode.kind === "browsing" && state.mode.pane === "workflows") {
+    topSlot = (
       <WorkflowBrowser
         registryState={registryState}
         registryConfig={{
@@ -200,9 +256,51 @@ export function App({
           void onRemoveEntry(source);
         }}
       />
-    ) : (
-      <Text>markflow-tui · scaffold</Text>
     );
+    bottomSlot = <Text> </Text>;
+  } else if (state.mode.kind === "browsing" && state.mode.pane === "runs") {
+    topSlot = (
+      <RunsTable
+        rows={runRows}
+        sort={state.runsSort}
+        runsFilter={state.runsFilter}
+        runsArchive={state.runsArchive}
+        selectedRunId={state.selectedRunId}
+        cursor={state.runsCursor}
+        width={innerWidth}
+        height={topSlotRows}
+        nowMs={nowMs}
+        dispatch={dispatch}
+      />
+    );
+    bottomSlot = (
+      <RunDetailPlaceholder
+        mode="follow"
+        selectedRunId={state.selectedRunId}
+        runExists={
+          state.selectedRunId !== null && rowsById.has(state.selectedRunId)
+        }
+        width={innerWidth}
+        height={bottomSlotRows}
+      />
+    );
+  } else if (state.mode.kind === "viewing") {
+    // Zoom: hide the runs table entirely (top slot becomes blank chrome)
+    // and fill the full body with the placeholder.
+    topSlot = null;
+    bottomSlot = (
+      <RunDetailPlaceholder
+        mode="zoom"
+        selectedRunId={state.mode.runId}
+        runExists={rowsById.has(state.mode.runId)}
+        width={innerWidth}
+        height={topSlotRows + bottomSlotRows}
+      />
+    );
+  } else {
+    topSlot = <Text>markflow-tui \u00b7 scaffold</Text>;
+    bottomSlot = <Text> </Text>;
+  }
 
   const showEmptyKeybar =
     registryState.entries.length === 0 &&
@@ -249,7 +347,7 @@ export function App({
           />
         }
         top={topSlot}
-        bottom={<Text> </Text>}
+        bottom={bottomSlot}
         keybar={keybarSlot}
       />
       {state.overlay?.kind === "addWorkflow" ? (
