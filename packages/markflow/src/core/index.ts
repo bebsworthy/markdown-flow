@@ -8,6 +8,7 @@ export {
   type RunManager,
 } from "./run-manager.js";
 export { replay, readEventLog, extractTokenCounter } from "./replay.js";
+export { tailEventLog } from "./tail-event-log.js";
 export {
   getTerminalNodes,
   getUpstreamNodes,
