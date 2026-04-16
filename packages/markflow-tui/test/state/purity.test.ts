@@ -50,6 +50,12 @@ const files = [
   // are NOT in this list — they import node:fs/path/crypto by design.
   "../../src/registry/types.ts",
   "../../src/registry/helpers.ts",
+  // Browser pure surface (P4-T2). NOTE: resolver.ts and index.ts are NOT in
+  // this list — resolver imports node:fs/path + engine by design; index.ts
+  // re-exports resolver so it is also not pure.
+  "../../src/browser/types.ts",
+  "../../src/browser/preview-layout.ts",
+  "../../src/browser/list-layout.ts",
 ];
 
 /**
@@ -167,5 +173,33 @@ describe("pure-module purity", () => {
     expect(typeof mod.isSameSource).toBe("function");
     expect(typeof mod.sortByAddedAt).toBe("function");
     expect(typeof mod.validateEntry).toBe("function");
+  });
+
+  it("browser types module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/browser/types.js");
+    // Type-only module — runtime exports empty.
+    expect(Object.keys(mod)).toEqual([]);
+  });
+
+  it("browser preview-layout module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/browser/preview-layout.js");
+    expect(typeof mod.formatInputsSummary).toBe("function");
+    expect(typeof mod.formatFlowSummary).toBe("function");
+    expect(typeof mod.formatDiagnostics).toBe("function");
+    expect(typeof mod.countSteps).toBe("function");
+    expect(typeof mod.formatStepCountLine).toBe("function");
+    expect(typeof mod.formatSourceBadge).toBe("function");
+    expect(typeof mod.formatStatusFlag).toBe("function");
+    expect(typeof mod.formatDurationShort).toBe("function");
+    expect(typeof mod.formatEntryId).toBe("function");
+  });
+
+  it("browser list-layout module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/browser/list-layout.js");
+    expect(typeof mod.composeListRows).toBe("function");
+    expect(typeof mod.pickBadgeColumnWidth).toBe("function");
+    expect(typeof mod.truncateSource).toBe("function");
+    expect(typeof mod.formatListFooter).toBe("function");
+    expect(typeof mod.formatListTitle).toBe("function");
   });
 });

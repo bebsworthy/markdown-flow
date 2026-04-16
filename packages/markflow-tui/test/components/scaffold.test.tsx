@@ -4,9 +4,16 @@ import { render } from "ink-testing-library";
 import { App } from "../../src/app.js";
 
 describe("scaffold App", () => {
-  it("renders the scaffold text", () => {
-    const { lastFrame } = render(<App onQuit={() => {}} />);
-    expect(lastFrame()).toContain("markflow-tui · scaffold");
+  it("renders the browser empty-state on first launch (no registry entries)", () => {
+    // With P4-T2, the default mode `browsing.workflows` mounts the
+    // <WorkflowBrowser>. An empty registry yields the empty-state panel.
+    const { lastFrame } = render(
+      <App
+        onQuit={() => {}}
+        registryConfig={{ listPath: null, persist: false }}
+      />,
+    );
+    expect(lastFrame()).toContain("No workflows registered yet.");
   });
 
   it("calls onQuit when q is pressed", async () => {
