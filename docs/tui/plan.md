@@ -213,7 +213,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 ## Phase 2 — TUI package scaffolding
 
-### [ ] P2-T1 — Ink project skeleton, build config, binary entrypoint
+### [x] P2-T1 — Ink project skeleton, build config, binary entrypoint
 
 **Reference.** features.md §6.1 (Stack), §6.5 (Packaging).
 

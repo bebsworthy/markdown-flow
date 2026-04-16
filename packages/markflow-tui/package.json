@@ -2,13 +2,31 @@
   "name": "markflow-tui",
   "version": "0.0.0",
   "private": true,
-  "description": "Terminal UI for the markflow workflow engine (scaffold — no implementation yet).",
+  "description": "Terminal UI for the markflow workflow engine.",
   "type": "module",
   "bin": {
     "markflow-tui": "./dist/cli.js"
   },
-  "scripts": {},
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx watch src/cli.tsx",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "dependencies": {
-    "markflow": "*"
+    "markflow": "*",
+    "ink": "^5.0.1",
+    "@inkjs/ui": "^2.0.0",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.12",
+    "ink-testing-library": "^4.0.0",
+    "tsup": "^8.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
   }
 }
