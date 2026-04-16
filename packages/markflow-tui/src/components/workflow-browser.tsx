@@ -31,7 +31,7 @@ export interface WorkflowBrowserProps {
   readonly registryConfig: RegistryConfig;
   /** Current selection id from AppState.selectedWorkflowId. */
   readonly selectedWorkflowId: string | null;
-  /** Dispatches SELECT_WORKFLOW + (TODO P4-T3) add/remove actions. */
+  /** Dispatches SELECT_WORKFLOW + add-overlay actions. */
   readonly dispatch: (action: Action) => void;
   /** Pane width override for tests. Defaults to 140. */
   readonly width?: number;
@@ -43,6 +43,12 @@ export interface WorkflowBrowserProps {
   ) => Promise<ReadonlyArray<ResolvedEntry>>;
   /** Base dir for resolver; defaults to cwd. Tests override to point at tmpdir. */
   readonly resolverBaseDir?: string;
+  /**
+   * Callback fired when the user presses `d` on a selected row.
+   * App wires it to `removeEntry` + `saveRegistry`. Optional — browser no-ops
+   * if not provided so older call sites (mid-migration) keep working.
+   */
+  readonly onRemoveEntry?: (source: string) => void;
 }
 
 const DEFAULT_WIDTH = 140;
@@ -58,6 +64,7 @@ function WorkflowBrowserImpl({
   height,
   resolver,
   resolverBaseDir,
+  onRemoveEntry,
 }: WorkflowBrowserProps): React.ReactElement {
   const theme = useTheme();
   const paneWidth = width ?? DEFAULT_WIDTH;
@@ -112,6 +119,15 @@ function WorkflowBrowserImpl({
   }, [resolved, selectedWorkflowId]);
 
   useInput((input, key) => {
+    // `a` opens the add modal even when the registry is empty — that's the
+    // whole point of the empty-state onboarding flow.
+    if (input === "a") {
+      dispatch({
+        type: "OVERLAY_OPEN",
+        overlay: { kind: "addWorkflow", tab: "fuzzy" },
+      });
+      return;
+    }
     if (resolved.length === 0) return;
     const curr = selectedIndex < 0 ? 0 : selectedIndex;
     if (key.downArrow || input === "j") {
@@ -131,10 +147,11 @@ function WorkflowBrowserImpl({
       dispatch({ type: "SELECT_WORKFLOW", workflowId: id });
       return;
     }
-    // 🟡 TODO P4-T3 — add modal
-    if (input === "a") return;
-    // 🟡 TODO P4-T3 — remove entry
-    if (input === "d") return;
+    if (input === "d") {
+      const row = resolved[curr];
+      if (row && onRemoveEntry) onRemoveEntry(row.entry.source);
+      return;
+    }
     // 🟡 TODO P5 — run workflow
     if (input === "r") return;
     // 🟡 TODO future — edit in $EDITOR

@@ -56,6 +56,13 @@ const files = [
   "../../src/browser/types.ts",
   "../../src/browser/preview-layout.ts",
   "../../src/browser/list-layout.ts",
+  // Add-modal pure surface (P4-T3). NOTE: walker.ts, validate-candidate.ts,
+  // url-ingest.ts, and index.ts are NOT in this list — they import node:fs/
+  // path / engine / global fetch by design.
+  "../../src/add-modal/types.ts",
+  "../../src/add-modal/fuzzy.ts",
+  // Empty-state keybar fixture (P4-T3). Pure declarative array of bindings.
+  "../../src/components/keybar-fixtures/workflows-empty.ts",
 ];
 
 /**
@@ -201,5 +208,24 @@ describe("pure-module purity", () => {
     expect(typeof mod.truncateSource).toBe("function");
     expect(typeof mod.formatListFooter).toBe("function");
     expect(typeof mod.formatListTitle).toBe("function");
+  });
+
+  it("add-modal types module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/add-modal/types.js");
+    // Type-only module — runtime exports empty.
+    expect(Object.keys(mod)).toEqual([]);
+  });
+
+  it("add-modal fuzzy module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/add-modal/fuzzy.js");
+    expect(typeof mod.rankCandidates).toBe("function");
+    expect(typeof mod.scoreSubsequence).toBe("function");
+  });
+
+  it("workflows-empty keybar fixture loads without Ink/React/fs", async () => {
+    const mod = await import(
+      "../../src/components/keybar-fixtures/workflows-empty.js"
+    );
+    expect(Array.isArray(mod.WORKFLOWS_EMPTY_KEYBAR)).toBe(true);
   });
 });

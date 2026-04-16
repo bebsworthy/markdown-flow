@@ -244,7 +244,7 @@ describe("WorkflowBrowser", () => {
     });
   });
 
-  it("'a' is captured but dispatches nothing (P4-T3 stub)", async () => {
+  it("'a' dispatches OVERLAY_OPEN with addWorkflow overlay", async () => {
     const entries = makeEntries(["./a.md"]);
     const resolved = [
       makeResolved({ entry: entries[0]!, id: entries[0]!.source }),
@@ -267,10 +267,65 @@ describe("WorkflowBrowser", () => {
     dispatch.mockClear();
     stdin.write("a");
     await flush();
-    expect(dispatch).not.toHaveBeenCalled();
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "OVERLAY_OPEN",
+      overlay: { kind: "addWorkflow", tab: "fuzzy" },
+    });
   });
 
-  it("'d' is captured but dispatches nothing (P4-T3 stub)", async () => {
+  it("'a' opens the add overlay even when the registry is empty", async () => {
+    const dispatch = vi.fn();
+    const { stdin } = render(
+      <ThemeProvider>
+        <WorkflowBrowser
+          registryState={makeRegistry([])}
+          registryConfig={config}
+          selectedWorkflowId={null}
+          dispatch={dispatch}
+          width={80}
+          height={15}
+          resolver={staticResolver([])}
+        />
+      </ThemeProvider>,
+    );
+    await flush();
+    dispatch.mockClear();
+    stdin.write("a");
+    await flush();
+    expect(dispatch).toHaveBeenCalledWith({
+      type: "OVERLAY_OPEN",
+      overlay: { kind: "addWorkflow", tab: "fuzzy" },
+    });
+  });
+
+  it("'d' calls onRemoveEntry with the selected row's source", async () => {
+    const entries = makeEntries(["./a.md"]);
+    const resolved = [
+      makeResolved({ entry: entries[0]!, id: entries[0]!.source }),
+    ];
+    const dispatch = vi.fn();
+    const onRemoveEntry = vi.fn();
+    const { stdin } = render(
+      <ThemeProvider>
+        <WorkflowBrowser
+          registryState={makeRegistry(entries)}
+          registryConfig={config}
+          selectedWorkflowId={entries[0]!.source}
+          dispatch={dispatch}
+          width={100}
+          height={15}
+          resolver={staticResolver(resolved)}
+          onRemoveEntry={onRemoveEntry}
+        />
+      </ThemeProvider>,
+    );
+    await flush();
+    stdin.write("d");
+    await flush();
+    expect(onRemoveEntry).toHaveBeenCalledWith("./a.md");
+  });
+
+  it("'d' is a no-op when onRemoveEntry is not provided", async () => {
     const entries = makeEntries(["./a.md"]);
     const resolved = [
       makeResolved({ entry: entries[0]!, id: entries[0]!.source }),
@@ -291,7 +346,7 @@ describe("WorkflowBrowser", () => {
     );
     await flush();
     dispatch.mockClear();
-    stdin.write("d");
+    expect(() => stdin.write("d")).not.toThrow();
     await flush();
     expect(dispatch).not.toHaveBeenCalled();
   });

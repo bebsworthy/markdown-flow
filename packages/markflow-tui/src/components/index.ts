@@ -22,4 +22,16 @@ export {
   WorkflowBrowserEmpty,
   type WorkflowBrowserEmptyProps,
 } from "./workflow-browser-empty.js";
+export {
+  AddWorkflowModal,
+  type AddWorkflowModalProps,
+} from "./add-workflow-modal.js";
+export {
+  AddModalFuzzyTab,
+  type AddModalFuzzyTabProps,
+} from "./add-modal-fuzzy-tab.js";
+export {
+  AddModalUrlTab,
+  type AddModalUrlTabProps,
+} from "./add-modal-url-tab.js";
 export type { Binding, AppContext, KeySpec, Category } from "./types.js";

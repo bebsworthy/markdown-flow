@@ -212,6 +212,65 @@ describe("RESUME_WIZARD_SET_INPUT", () => {
   });
 });
 
+describe("reducer — P4-T3 addWorkflow overlay", () => {
+  it("OVERLAY_OPEN with addWorkflow sets overlay.kind='addWorkflow', tab='fuzzy'", () => {
+    const s = reducer(initialAppState, {
+      type: "OVERLAY_OPEN",
+      overlay: { kind: "addWorkflow", tab: "fuzzy" },
+    });
+    expect(s.overlay).toEqual({ kind: "addWorkflow", tab: "fuzzy" });
+  });
+
+  it("OVERLAY_OPEN with addWorkflow + tab='url' preserves tab", () => {
+    const s = reducer(initialAppState, {
+      type: "OVERLAY_OPEN",
+      overlay: { kind: "addWorkflow", tab: "url" },
+    });
+    expect(s.overlay).toEqual({ kind: "addWorkflow", tab: "url" });
+  });
+
+  it("ADD_MODAL_SET_TAB flips tab from 'fuzzy' to 'url'", () => {
+    const base = withOverlay(initialAppState, {
+      kind: "addWorkflow",
+      tab: "fuzzy",
+    });
+    const s = reducer(base, { type: "ADD_MODAL_SET_TAB", tab: "url" });
+    expect(s.overlay).toEqual({ kind: "addWorkflow", tab: "url" });
+  });
+
+  it("ADD_MODAL_SET_TAB with same tab returns identical state reference", () => {
+    const base = withOverlay(initialAppState, {
+      kind: "addWorkflow",
+      tab: "fuzzy",
+    });
+    const s = reducer(base, { type: "ADD_MODAL_SET_TAB", tab: "fuzzy" });
+    expect(s).toBe(base);
+  });
+
+  it("ADD_MODAL_SET_TAB when overlay is null is a no-op", () => {
+    const s = reducer(initialAppState, {
+      type: "ADD_MODAL_SET_TAB",
+      tab: "url",
+    });
+    expect(s).toBe(initialAppState);
+  });
+
+  it("ADD_MODAL_SET_TAB when overlay.kind is not addWorkflow is a no-op", () => {
+    const base = withOverlay(initialAppState, { kind: "help" });
+    const s = reducer(base, { type: "ADD_MODAL_SET_TAB", tab: "url" });
+    expect(s).toBe(base);
+  });
+
+  it("OVERLAY_CLOSE clears addWorkflow overlay", () => {
+    const base = withOverlay(initialAppState, {
+      kind: "addWorkflow",
+      tab: "fuzzy",
+    });
+    const s = reducer(base, { type: "OVERLAY_CLOSE" });
+    expect(s.overlay).toBeNull();
+  });
+});
+
 // -------- Purity: calling reducer twice with the same args yields deep-equal
 // output and never mutates the input. -------------------------------------
 describe("reducer purity", () => {

@@ -10,6 +10,12 @@
 // PURITY NOTE: this module MUST NOT import from `ink`, `react`, `node:*`,
 // `fs`, `path`, or any other I/O / rendering surface. It declares types
 // only; the companion `reducer.ts` must honour the same constraint.
+//
+// The `AddModalTab` import from `../add-modal/types.js` is type-only and
+// `../add-modal/types.ts` is itself a pure module (no runtime exports),
+// so this stays within the purity envelope.
+
+import type { AddModalTab } from "../add-modal/types.js";
 
 /** Which top-level area of the app is active. §5.1 "app mode" tree. */
 export type Mode =
@@ -54,7 +60,12 @@ export type Overlay =
     }
   | { readonly kind: "confirmCancel"; readonly runId: string }
   | { readonly kind: "commandPalette"; readonly query: string }
-  | { readonly kind: "help" };
+  | { readonly kind: "help" }
+  // Add-workflow modal (P4-T3). The tab is the only piece of modal state
+  // threaded through the reducer — all other ephemeral state (query text,
+  // walker results, URL input, ingest in-flight flag, root picker) lives
+  // as component-local `useState` inside <AddWorkflowModal>.
+  | { readonly kind: "addWorkflow"; readonly tab: AddModalTab };
 
 /**
  * Top-level app state. §6.2 "single source of truth".
@@ -112,4 +123,7 @@ export type Action =
       readonly type: "RESUME_WIZARD_SET_INPUT";
       readonly key: string;
       readonly value: string;
-    };
+    }
+  // Add-workflow modal tab toggle (P4-T3). No-op unless overlay is already
+  // `addWorkflow`; see reducer.ts for the guard.
+  | { readonly type: "ADD_MODAL_SET_TAB"; readonly tab: AddModalTab };

@@ -43,6 +43,7 @@
 //   overlay=commandPalette ──COMMAND_PALETTE_QUERY──▶ overlay=commandPalette(query=…)
 //   overlay=resumeWizard   ──RESUME_WIZARD_TOGGLE_RERUN──▶ rerun ± nodeId
 //   overlay=resumeWizard   ──RESUME_WIZARD_SET_INPUT──▶ inputs[k]=v
+//   overlay=addWorkflow    ──ADD_MODAL_SET_TAB(tab)──▶ overlay.tab = tab
 //
 // Cursor / filter transitions (no mode change):
 //   *                  ──SELECT_WORKFLOW(id)──▶ state.selectedWorkflowId=id
@@ -53,6 +54,7 @@
 // =============================================================================
 
 import type { Action, AppState, BrowsingPane, ViewingFocus } from "./types.js";
+import type { AddModalTab } from "../add-modal/types.js";
 
 /** Initial state — app starts on the workflow browser with no overlay. */
 export const initialAppState: AppState = {
@@ -117,6 +119,8 @@ export function reducer(state: AppState, action: Action): AppState {
       return toggleResumeRerun(state, action.nodeId);
     case "RESUME_WIZARD_SET_INPUT":
       return setResumeInput(state, action.key, action.value);
+    case "ADD_MODAL_SET_TAB":
+      return updateAddModalTab(state, action.tab);
   }
 }
 
@@ -169,4 +173,11 @@ function setResumeInput(state: AppState, key: string, value: string): AppState {
     ...state,
     overlay: { ...ov, inputs: { ...ov.inputs, [key]: value } },
   };
+}
+
+function updateAddModalTab(state: AppState, tab: AddModalTab): AppState {
+  const ov = state.overlay;
+  if (!ov || ov.kind !== "addWorkflow") return state;
+  if (ov.tab === tab) return state;
+  return { ...state, overlay: { ...ov, tab } };
 }
