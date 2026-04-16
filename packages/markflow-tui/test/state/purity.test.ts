@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
 // NOTE: this TEST file is allowed to touch node:fs because it's a *lint*.
-// The SUT (src/state/reducer.ts, src/state/types.ts) must not.
+// The SUT (src/state/*.ts, src/engine/*.ts) must not.
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -15,7 +15,6 @@ const FORBIDDEN = [
   /\bfrom\s+["']ink\//,
   /\bfrom\s+["']react["']/,
   /\bfrom\s+["']react\//,
-  /\bfrom\s+["']node:/,
   /\bfrom\s+["']fs["']/,
   /\bfrom\s+["']fs\//,
   /\bfrom\s+["']path["']/,
@@ -24,14 +23,44 @@ const FORBIDDEN = [
   /\bimport\(\s*["']react["']/,
 ];
 
-const files = ["../../src/state/reducer.ts", "../../src/state/types.ts"];
+const files = [
+  "../../src/state/reducer.ts",
+  "../../src/state/types.ts",
+  // Engine adapter + reducer — same no-React rule, but node:path is allowed
+  // for adapter.ts only. See NODE_PATH_ONLY below.
+  "../../src/engine/types.ts",
+  "../../src/engine/reducer.ts",
+  "../../src/engine/adapter.ts",
+  "../../src/engine/index.ts",
+];
 
-describe("reducer / types purity", () => {
+/**
+ * Files that are allowed to touch `node:path` (deterministic, side-effect-
+ * free). Every other `node:*` import is still forbidden for these modules.
+ */
+const NODE_PATH_ONLY: ReadonlySet<string> = new Set([
+  "../../src/engine/adapter.ts",
+]);
+
+const NODE_ANY = /\bfrom\s+["']node:([a-zA-Z_/-]+)["']/g;
+
+describe("pure-module purity", () => {
   for (const rel of files) {
     it(`${rel} has no forbidden imports`, () => {
       const source = readFileSync(resolve(__dirname, rel), "utf8");
       for (const re of FORBIDDEN) {
         expect(source).not.toMatch(re);
+      }
+      // Scan every `node:*` import: only `node:path` is allowed, and only
+      // in files listed in NODE_PATH_ONLY.
+      const matches = [...source.matchAll(NODE_ANY)];
+      for (const m of matches) {
+        const spec = m[1];
+        const allowed = NODE_PATH_ONLY.has(rel) && spec === "path";
+        expect(
+          allowed,
+          `${rel} imports node:${spec} which is not in the allowlist`,
+        ).toBe(true);
       }
     });
   }
@@ -40,5 +69,17 @@ describe("reducer / types purity", () => {
     const mod = await import("../../src/state/reducer.js");
     expect(typeof mod.reducer).toBe("function");
     expect(mod.initialAppState).toBeDefined();
+  });
+
+  it("engine adapter loads without Ink/React", async () => {
+    const mod = await import("../../src/engine/adapter.js");
+    expect(typeof mod.createEngineAdapter).toBe("function");
+  });
+
+  it("engine reducer loads without Ink/React", async () => {
+    const mod = await import("../../src/engine/reducer.js");
+    expect(typeof mod.engineReducer).toBe("function");
+    expect(typeof mod.toEngineAction).toBe("function");
+    expect(mod.initialEngineState).toBeDefined();
   });
 });
