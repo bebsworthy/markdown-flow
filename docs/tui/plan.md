@@ -392,7 +392,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 **Acceptance criteria.** 10 k fixture renders without jank (measured via a perf test in vitest — assert render < 16ms / frame).
 
-### [ ] P5-T3 — Mode wiring + cursor follow-selection
+### [x] P5-T3 — Mode wiring + cursor follow-selection
 
 **Reference.** features.md §5.1 (IA); mockups.md §1 (cursor live-updates bottom pane).
 
@@ -578,6 +578,7 @@ Every time the orchestrator finishes a task it appends one line here (most recen
 ```
 
 ```
+2026-04-16  P5-T3  3d087c8  mode wiring + cursor follow-selection (926 TUI tests, zoom/unzoom + filter-clamp)
 2026-04-16  P5-T2  67c3a51  filter + archive + virtualised runs table (838 TUI tests, perf budgets on 10k fixture)
 2026-04-16  P5-T1  f46414b  runs table component (709 TUI tests, attention-first sort + theme glyphs + column-drop tiers)
 2026-04-16  P4-T3  7b1b723  add-workflow modal + launch-arg ingest + empty-state keybar (616 TUI tests, fuzzy walker + URL materialize)
