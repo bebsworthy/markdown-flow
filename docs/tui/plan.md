@@ -335,7 +335,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 **Acceptance criteria.** Round-trip add → save → load preserves entries. Corrupt file starts empty list and preserves corrupted file at `.markflow-tui.json.bak`.
 
-### [ ] P4-T2 — Workflow browser pane with preview
+### [x] P4-T2 — Workflow browser pane with preview
 
 **Reference.** features.md §3.1 (Display paragraph); mockups.md §2.
 
@@ -578,6 +578,7 @@ Every time the orchestrator finishes a task it appends one line here (most recen
 ```
 
 ```
+2026-04-16  P4-T2  d2a37cc  workflow browser pane with preview (502 TUI tests, two-pane layout + empty state)
 2026-04-16  P4-T1  660ff63  workflow registry persistence (390 TUI tests, atomic write + .bak rotation)
 2026-04-16  P3-T5  299ef0e  app shell frame + mode-tab row (307 TUI tests, frame glyph fallback)
 2026-04-16  P3-T4  498bb8d  keybar primitive + responsive tiers (253 TUI tests, R1..R10 + 10×3 matrix)
