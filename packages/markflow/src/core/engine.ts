@@ -210,71 +210,80 @@ export class WorkflowEngine {
     }
 
     try {
-      if (!resume) {
-        // Find start nodes and create initial tokens
-        const startNodes = getStartNodes(this.def.graph);
-        if (startNodes.length === 0) {
-          throw new ExecutionError("Workflow has no start nodes (no nodes without incoming edges)");
+      try {
+        if (!resume) {
+          // Find start nodes and create initial tokens
+          const startNodes = getStartNodes(this.def.graph);
+          if (startNodes.length === 0) {
+            throw new ExecutionError("Workflow has no start nodes (no nodes without incoming edges)");
+          }
+
+          for (const nodeId of startNodes) {
+            await this.createToken(nodeId);
+          }
         }
 
-        for (const nodeId of startNodes) {
-          await this.createToken(nodeId);
+        // Main execution loop
+        await this.runLoop();
+
+        // Suspended (at least one token in `waiting` state) — clean exit without
+        // `workflow:complete`. Persisted status goes to "suspended" so `ls`/`show`
+        // and the CLI exit-code contract distinguish it from "complete"/"error".
+        const hasWaiting = [...this.tokens.values()].some(
+          (t) => t.state === "waiting",
+        );
+        if (hasWaiting) {
+          await runManager.completeRun(this.runDir.id, "suspended");
+          this.status = "suspended";
+          return {
+            id: this.runDir.id,
+            workflowName: this.def.name,
+            sourceFile: this.def.sourceFile,
+            status: "suspended",
+            startedAt: this.runDir.id,
+            steps: this.completedResults,
+          };
         }
-      }
 
-      // Main execution loop
-      await this.runLoop();
+        // Complete
+        await runManager.completeRun(this.runDir.id, "complete");
+        this.status = "complete";
+        await this.emit({
+          type: "workflow:complete",
+          results: this.completedResults,
+        });
 
-      // Suspended (at least one token in `waiting` state) — clean exit without
-      // `workflow:complete`. Persisted status goes to "suspended" so `ls`/`show`
-      // and the CLI exit-code contract distinguish it from "complete"/"error".
-      const hasWaiting = [...this.tokens.values()].some(
-        (t) => t.state === "waiting",
-      );
-      if (hasWaiting) {
-        await runManager.completeRun(this.runDir.id, "suspended");
-        this.status = "suspended";
         return {
           id: this.runDir.id,
           workflowName: this.def.name,
           sourceFile: this.def.sourceFile,
-          status: "suspended",
+          status: "complete",
+          startedAt: this.runDir.id,
+          steps: this.completedResults,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const runManager2 = createRunManager(this.options.runsDir);
+        await runManager2.completeRun(this.runDir.id, "error");
+        this.status = "error";
+        await this.emit({ type: "workflow:error", error: message });
+
+        return {
+          id: this.runDir.id,
+          workflowName: this.def.name,
+          sourceFile: this.def.sourceFile,
+          status: "error",
           startedAt: this.runDir.id,
           steps: this.completedResults,
         };
       }
-
-      // Complete
-      await runManager.completeRun(this.runDir.id, "complete");
-      this.status = "complete";
-      await this.emit({
-        type: "workflow:complete",
-        results: this.completedResults,
-      });
-
-      return {
-        id: this.runDir.id,
-        workflowName: this.def.name,
-        sourceFile: this.def.sourceFile,
-        status: "complete",
-        startedAt: this.runDir.id,
-        steps: this.completedResults,
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const runManager2 = createRunManager(this.options.runsDir);
-      await runManager2.completeRun(this.runDir.id, "error");
-      this.status = "error";
-      await this.emit({ type: "workflow:error", error: message });
-
-      return {
-        id: this.runDir.id,
-        workflowName: this.def.name,
-        sourceFile: this.def.sourceFile,
-        status: "error",
-        startedAt: this.runDir.id,
-        steps: this.completedResults,
-      };
+    } finally {
+      // Exactly one release per `openExistingRun` — terminal status,
+      // suspend, workflow:error, and unexpected throws all land here.
+      // Swallow release errors so the primary result/throw propagates.
+      if (resume) {
+        await resume.release().catch(() => {});
+      }
     }
   }
 

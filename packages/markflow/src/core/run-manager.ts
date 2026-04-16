@@ -7,6 +7,7 @@ import {
   type EventLogger,
 } from "./event-logger.js";
 import { extractTokenCounter, readEventLog, replay } from "./replay.js";
+import { acquireRunLock } from "./run-lock.js";
 import type {
   EngineSnapshot,
   RunInfo,
@@ -40,6 +41,14 @@ export interface ResumeHandle {
   snapshot: EngineSnapshot;
   lastSeq: number;
   tokenCounter: number;
+  /**
+   * Release the exclusive on-disk lock acquired by `openExistingRun`.
+   * Idempotent: safe to call more than once, and safe to call after the
+   * process-exit sweep has already removed the lock file. The engine's
+   * `start()` `finally` block is the canonical caller on every terminal
+   * path.
+   */
+  release: () => Promise<void>;
 }
 
 /**
@@ -144,43 +153,53 @@ export function createRunManager(runsDir = "./runs"): RunManager {
       // gives a clearer error for a missing run directory.
       await access(join(runPath, "events.jsonl"));
 
-      const events = await readEventLog(runPath);
-      const snapshot = replay(events);
-      const lastSeq = events.length === 0 ? 0 : events[events.length - 1].seq;
-      const tokenCounter = extractTokenCounter(events);
+      // Acquire the exclusive lock *before* reading events so two concurrent
+      // resumers can't both fold the log and append divergent state. Any
+      // throw in the projection path below must release the lock.
+      const release = await acquireRunLock(runPath);
 
-      const workdirPath = join(runPath, "workdir");
-      // Reopen workdir without recreating (safe even if the directory already
-      // exists — `mkdir -p` equivalent).
-      await mkdir(workdirPath, { recursive: true });
-
-      const runDir: RunDirectory = {
-        id,
-        path: runPath,
-        workdirPath,
-        events: createEventLoggerFromExisting(runPath, lastSeq),
-      };
-
-      // Flip meta.status back to "running" so `getRun`/`listRuns` reflect the
-      // resumed state. On completion the engine will call `completeRun` with
-      // the new terminal status.
       try {
-        const metaRaw = await readFile(join(runPath, "meta.json"), "utf-8");
-        const meta = JSON.parse(metaRaw) as RunMeta;
-        if (meta.status !== "running") {
-          meta.status = "running";
-          delete meta.completedAt;
-          await writeFile(
-            join(runPath, "meta.json"),
-            JSON.stringify(meta, null, 2),
-            "utf-8",
-          );
-        }
-      } catch {
-        // meta.json is a write-through cache; absence shouldn't block resume.
-      }
+        const events = await readEventLog(runPath);
+        const snapshot = replay(events);
+        const lastSeq = events.length === 0 ? 0 : events[events.length - 1].seq;
+        const tokenCounter = extractTokenCounter(events);
 
-      return { runDir, snapshot, lastSeq, tokenCounter };
+        const workdirPath = join(runPath, "workdir");
+        // Reopen workdir without recreating (safe even if the directory already
+        // exists — `mkdir -p` equivalent).
+        await mkdir(workdirPath, { recursive: true });
+
+        const runDir: RunDirectory = {
+          id,
+          path: runPath,
+          workdirPath,
+          events: createEventLoggerFromExisting(runPath, lastSeq),
+        };
+
+        // Flip meta.status back to "running" so `getRun`/`listRuns` reflect the
+        // resumed state. On completion the engine will call `completeRun` with
+        // the new terminal status.
+        try {
+          const metaRaw = await readFile(join(runPath, "meta.json"), "utf-8");
+          const meta = JSON.parse(metaRaw) as RunMeta;
+          if (meta.status !== "running") {
+            meta.status = "running";
+            delete meta.completedAt;
+            await writeFile(
+              join(runPath, "meta.json"),
+              JSON.stringify(meta, null, 2),
+              "utf-8",
+            );
+          }
+        } catch {
+          // meta.json is a write-through cache; absence shouldn't block resume.
+        }
+
+        return { runDir, snapshot, lastSeq, tokenCounter, release };
+      } catch (err) {
+        await release();
+        throw err;
+      }
     },
 
     async listRuns(): Promise<RunInfo[]> {

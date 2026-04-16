@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { access, mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -13,6 +13,7 @@ import {
 } from "../../src/core/index.js";
 import type { EngineEvent } from "../../src/core/index.js";
 import { WorkflowChangedError } from "../../src/core/errors.js";
+import { lockPathFor } from "../../src/core/run-lock.js";
 
 const FIXTURES = join(import.meta.dirname, "../fixtures");
 
@@ -182,6 +183,38 @@ describe("engine resume", () => {
     const after = await readEventLog(join(runsDir, fresh.id));
     expect(after.some((e) => e.type === "run:resumed")).toBe(false);
     expect(after[after.length - 1].seq).toBe(lastSeqBefore);
+  });
+
+  it("engine-finally releases the run lock on successful resume", async () => {
+    const def = parseWorkflowFromString(LINEAR);
+    const fresh = await executeWorkflow(def, { runsDir });
+
+    // Truncate mid-flight so resume has real work to do (not just an empty
+    // run that would short-circuit). Use the same shape as earlier tests.
+    const fullLog = await readEventLog(join(runsDir, fresh.id));
+    const runningIdxs = fullLog
+      .map((e, i) => (e.type === "token:state" && e.to === "running" ? i : -1))
+      .filter((i) => i >= 0);
+    expect(runningIdxs.length).toBeGreaterThanOrEqual(2);
+    const truncated = fullLog.slice(0, runningIdxs[1]);
+    await writeFile(
+      join(runsDir, fresh.id, "events.jsonl"),
+      truncated.map((e) => JSON.stringify(e)).join("\n") + "\n",
+      "utf-8",
+    );
+
+    const manager = createRunManager(runsDir);
+    const handle = await manager.openExistingRun(fresh.id);
+
+    const lockPath = lockPathFor(join(runsDir, fresh.id));
+    // Lock is held between openExistingRun and the engine's finally.
+    await expect(access(lockPath)).resolves.toBeUndefined();
+
+    await executeWorkflow(def, { runsDir, resumeFrom: handle });
+
+    // After executeWorkflow returns the engine's finally must have released
+    // the lock, so the `.lock` directory is gone.
+    await expect(access(lockPath)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("replay folds token:reset back to pending with no edge/result", async () => {

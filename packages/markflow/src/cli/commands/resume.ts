@@ -7,6 +7,7 @@ import {
   parseWorkflow,
   replay,
   readEventLog,
+  RunLockedError,
   type EngineEvent,
 } from "../../core/index.js";
 import { parseInputFlags } from "../workspace.js";
@@ -46,7 +47,21 @@ export async function resumeCommand(
   }
 
   const manager = createRunManager(runsDir);
-  const handle = await manager.openExistingRun(runId);
+  let handle;
+  try {
+    handle = await manager.openExistingRun(runId);
+  } catch (err) {
+    if (err instanceof RunLockedError) {
+      console.error(
+        chalk.red(
+          `error: run ${err.runId} is already being resumed. ` +
+            `If this is stale, remove ${err.lockPath} manually.`,
+        ),
+      );
+      process.exit(1);
+    }
+    throw err;
+  }
 
   const meta = await manager.getRun(runId);
   if (!meta) {

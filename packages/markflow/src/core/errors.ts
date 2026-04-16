@@ -80,6 +80,27 @@ export class WorkflowChangedError extends MarkflowError {
 }
 
 /**
+ * Thrown by `openExistingRun` when another process (or another call in the
+ * same process) already holds the exclusive on-disk lock at `runs/<id>/.lock`.
+ * Callers surface this as a clean CLI message pointing at `lockPath` so a
+ * stale lock can be removed manually.
+ */
+export class RunLockedError extends MarkflowError {
+  readonly runId: string;
+  readonly lockPath: string;
+  readonly holderPid?: number;
+
+  constructor(runId: string, lockPath: string, holderPid?: number) {
+    const who = holderPid ? ` (held by pid ${holderPid})` : "";
+    super("RUN_LOCKED", `Run ${runId} is already being resumed${who}`);
+    this.name = "RunLockedError";
+    this.runId = runId;
+    this.lockPath = lockPath;
+    this.holderPid = holderPid;
+  }
+}
+
+/**
  * Thrown by `getSidecarStream` when the requested sidecar transcript file
  * cannot be located on disk. Distinguishes a "no such transcript" case
  * (missing `output/` directory, no file matching the seq prefix, or a seq
