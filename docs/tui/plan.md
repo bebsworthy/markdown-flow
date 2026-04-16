@@ -578,7 +578,8 @@ Every time the orchestrator finishes a task it appends one line here (most recen
 ```
 
 ```
-2026-04-16  P1-T5  ce910a1  concurrent-resume file lock + RunLockedError
+2026-04-16  P2-T1  c317501  scaffold Ink project; tsconfig.base.json + src/
+2026-04-16  P1-T5  14b5bdc  concurrent-resume file lock + RunLockedError
 2026-04-16  P1-T4  2ca0e61  add RunManager.watch() streaming RunEvents
 2026-04-16  P1-T3  0439eb5  add tailEventLog async iterable over events.jsonl
 2026-04-16  P1-T2  a3864cc  add getSidecarStream resolver + SidecarNotFoundError
