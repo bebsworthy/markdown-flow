@@ -261,7 +261,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 ## Phase 3 — TUI foundation
 
-### [ ] P3-T1 — Core state model, reducer, mode FSM
+### [x] P3-T1 — Core state model, reducer, mode FSM
 
 **Reference.** features.md §5.1 (IA), §6.2 (Data flow), §6.3 (Mode FSM sketch).
 
@@ -578,6 +578,7 @@ Every time the orchestrator finishes a task it appends one line here (most recen
 ```
 
 ```
+2026-04-16  P3-T1  fec45c3  AppState types + pure reducer FSM (40 TUI tests)
 2026-04-16  P2-T3  c89ad8e  GitHub Actions CI (engine + tui) + VHS scaffold
 2026-04-16  P2-T2  525e0d7  vitest + ink-testing-library test harness
 2026-04-16  P2-T1  c317501  scaffold Ink project; tsconfig.base.json + src/
