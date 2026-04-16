@@ -1,7 +1,11 @@
 # Dependencies & build output
 node_modules/
-dist/
+/dist/
 *.tsbuildinfo
+packages/*/node_modules/
+packages/*/dist/*
+packages/*/*.tsbuildinfo
+!packages/markflow-tui/dist/cli.js
 
 # Packaged tarballs
 *.tgz

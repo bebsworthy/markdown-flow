@@ -1,0 +1,14 @@
+{
+  "name": "markflow-tui",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Terminal UI for the markflow workflow engine (scaffold — no implementation yet).",
+  "type": "module",
+  "bin": {
+    "markflow-tui": "./dist/cli.js"
+  },
+  "scripts": {},
+  "dependencies": {
+    "markflow": "*"
+  }
+}

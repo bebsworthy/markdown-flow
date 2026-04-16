@@ -1,43 +1,16 @@
 {
-  "name": "markflow",
-  "version": "0.1.0",
-  "description": "Workflow engine driven by Markdown + Mermaid flowcharts",
-  "type": "module",
-  "main": "dist/core/index.js",
-  "types": "dist/core/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/core/index.js",
-      "types": "./dist/core/index.d.ts"
-    }
-  },
-  "bin": {
-    "markflow": "./dist/cli/index.js"
-  },
+  "name": "markflow-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "markflow monorepo — engine (packages/markflow) and TUI (packages/markflow-tui).",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
-    "build": "tsup",
-    "dev": "tsx src/cli/index.ts",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@emily/mermaid-ast": "npm:@jsr/emily__mermaid-ast@^0.8.2",
-    "chalk": "^5.3.0",
-    "js-yaml": "^4.1.1",
-    "liquidjs": "^10.25.5",
-    "remark-parse": "^11.0.0",
-    "unified": "^11.0.0",
-    "unist-util-visit": "^5.0.0",
-    "yargs": "^17.7.0"
-  },
-  "devDependencies": {
-    "@types/js-yaml": "^4.0.9",
-    "@types/node": "^22.0.0",
-    "@types/yargs": "^17.0.0",
-    "tsup": "^8.0.0",
-    "tsx": "^4.0.0",
-    "typescript": "^5.5.0",
-    "vitest": "^2.0.0"
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:watch": "npm run test:watch --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "dev": "npm run dev -w packages/markflow"
   }
 }

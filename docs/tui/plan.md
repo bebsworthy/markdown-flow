@@ -94,7 +94,7 @@ Any task that modifies the public API of `markflow` must also run the full engin
 
 ## Phase 0 — Monorepo setup
 
-### [ ] P0-T1 — Convert repo to npm workspaces with two packages
+### [x] P0-T1 — Convert repo to npm workspaces with two packages
 
 **Reference.** features.md §6.5 "Packaging & distribution".
 
