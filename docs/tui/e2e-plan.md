@@ -62,7 +62,7 @@
 | T0003 | `Ctrl-C` from any mode tears down the PTY and exits 130; no dangling child processes. | combray raw-mode discipline; features.md §6.2 | [x] |
 | T0004 | `markflow-tui nonexistent.md` reports the resolve failure inline in the registry list with `✗` badge and does not crash. | mockups.md §2 | [x] |
 | T0005 | `markflow-tui <dir-containing-.markflow.json>` registers the dir as a `[workspace]` entry. | features.md §3.1 launch | [x] |
-| T0006 | `markflow-tui <glob>` (e.g. `fixtures/*.md`) registers each resolved file once. | features.md §3.1 launch | [ ] |
+| T0006 | `markflow-tui <glob>` (e.g. `fixtures/*.md`) registers each resolved file once. | features.md §3.1 launch | [x] |
 | T0007 | Re-launching with the same positional arg is idempotent — registry file contains one entry, not duplicates. | features.md §3.1 persistence | [x] |
 | T0008 | `--no-save` launch does not write `./.markflow-tui.json`; entries live for the session only. | features.md §3.1 launch | [x] |
 | T0009 | `--list <path>` reads/writes the alternate list file. | features.md §3.1 launch | [x] |
@@ -391,7 +391,7 @@ Update this table after each test lands.
 
 | Group | Total | Done |
 |---|---|---|
-| 1 Launch & lifecycle | 13 | 10 |
+| 1 Launch & lifecycle | 13 | 11 |
 | 2 Workflow browser | 11 | 0 |
 | 3 Add modal | 11 | 0 |
 | 4 Runs table | 15 | 0 |
