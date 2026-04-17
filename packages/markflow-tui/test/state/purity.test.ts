@@ -97,6 +97,16 @@ const files = [
   "../../src/log/select.ts",
   // P6-T3 keybar fixtures — data-only.
   "../../src/components/keybar-fixtures/log.ts",
+  // P6-T4 pure modules — events tab surface.
+  "../../src/events/types.ts",
+  "../../src/events/format.ts",
+  "../../src/events/filter.ts",
+  "../../src/events/reducer.ts",
+  "../../src/events/derive.ts",
+  "../../src/events/merge.ts",
+  // P6-T4 keybar fixtures — data-only.
+  "../../src/components/keybar-fixtures/graph.ts",
+  "../../src/components/keybar-fixtures/events.ts",
 ];
 
 /**
@@ -448,6 +458,61 @@ describe("pure-module purity", () => {
     const mod = await import("../../src/components/keybar-fixtures/log.js");
     expect(Array.isArray(mod.LOG_FOLLOWING_KEYBAR)).toBe(true);
     expect(Array.isArray(mod.LOG_PAUSED_KEYBAR)).toBe(true);
+  });
+
+  // -------------------------------------------------------------------
+  // P6-T4 events tab pure surface
+  // -------------------------------------------------------------------
+
+  it("events types module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/events/types.js");
+    expect(Object.keys(mod)).toEqual([]);
+  });
+
+  it("events filter module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/events/filter.js");
+    expect(typeof mod.groupForType).toBe("function");
+    expect(typeof mod.matchesFilter).toBe("function");
+    expect(typeof mod.eventNodeId).toBe("function");
+  });
+
+  it("events format module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/events/format.js");
+    expect(typeof mod.formatEventRow).toBe("function");
+    expect(typeof mod.formatEventTimestamp).toBe("function");
+    expect(typeof mod.formatEventKind).toBe("function");
+    expect(typeof mod.summariseEvent).toBe("function");
+    expect(typeof mod.buildSearchHaystack).toBe("function");
+    expect(typeof mod.roleForGroup).toBe("function");
+  });
+
+  it("events reducer module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/events/reducer.js");
+    expect(typeof mod.eventsReducer).toBe("function");
+    expect(mod.initialEventsPanelState).toBeDefined();
+    expect(typeof mod.eventsSincePause).toBe("function");
+  });
+
+  it("events derive module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/events/derive.js");
+    expect(typeof mod.deriveEventsModel).toBe("function");
+    expect(typeof mod.emptyReasonLabel).toBe("function");
+  });
+
+  it("events merge module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/events/merge.js");
+    expect(typeof mod.mergeEventSources).toBe("function");
+  });
+
+  it("graph keybar fixture loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/components/keybar-fixtures/graph.js");
+    expect(Array.isArray(mod.GRAPH_KEYBAR)).toBe(true);
+  });
+
+  it("events keybar fixture loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/components/keybar-fixtures/events.js");
+    expect(Array.isArray(mod.EVENTS_FOLLOWING_KEYBAR)).toBe(true);
+    expect(Array.isArray(mod.EVENTS_PAUSED_KEYBAR)).toBe(true);
   });
 
   it("steps detail module loads without Ink/React/fs", async () => {

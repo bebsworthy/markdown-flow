@@ -56,7 +56,7 @@ function selectLogOverride(
   ctx: AppContext,
 ): {
   readonly bindings: ReadonlyArray<Binding>;
-  readonly prefix: { readonly full: string; readonly short: string };
+  readonly prefix?: { readonly full: string; readonly short: string };
 } | null {
   if (ctx.mode.kind !== "viewing") return null;
   if (ctx.mode.focus !== "log") return null;

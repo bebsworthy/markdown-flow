@@ -147,6 +147,10 @@ describe("App — step table in RUN mode (P6-T1)", () => {
     await flush();
     stdin.write(ENTER);
     await flush();
+    // P6-T4: default zoom focus is `graph` (full-pane); switch to `detail`
+    // (key `2`) so the detail panel is visible in the bottom slot.
+    stdin.write("2");
+    await flush();
 
     const frame = stripAnsi(lastFrame() ?? "");
     // Detail panel defaults to the first row (view-layer fallback) so the
@@ -163,6 +167,10 @@ describe("App — step table in RUN mode (P6-T1)", () => {
     stdin.write(KEY_RUNS);
     await flush();
     stdin.write(ENTER);
+    await flush();
+    // P6-T4: default zoom focus is `graph` (full-pane); switch to `detail`
+    // (key `2`) so the step-table empty state renders in the top slot.
+    stdin.write("2");
     await flush();
 
     const frame = stripAnsi(lastFrame() ?? "");

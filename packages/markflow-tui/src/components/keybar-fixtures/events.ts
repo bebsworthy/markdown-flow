@@ -1,36 +1,35 @@
-// src/components/keybar-fixtures/log.ts
+// src/components/keybar-fixtures/events.ts
 //
-// Keybar fixtures for the streaming log pane (P6-T3). Two variants cover
-// the follow and paused states per mockups.md §8 / §9 / §15.
+// Keybar fixtures for the RUN-mode Events tab (P6-T4). Two variants cover
+// follow and paused states, matching the LOG precedent from P6-T3.
 //
-// PURITY NOTE: data-only. Must not import from react / ink / node:*.
+// PURITY NOTE: data-only. No react/ink/node:*.
 
 import type { Binding } from "../types.js";
 
-/** Fixture when the log pane is following the live tail. */
-export const LOG_FOLLOWING_KEYBAR: ReadonlyArray<Binding> = [
+export const EVENTS_FOLLOWING_KEYBAR: ReadonlyArray<Binding> = [
   {
-    keys: ["w"],
-    label: "Wrap",
+    keys: ["f"],
+    label: "Follow",
     when: () => true,
     action: () => {
-      /* owned by <LogPanelView> useInput */
+      /* owned by <EventsPanelView>. */
     },
   },
   {
-    keys: ["t"],
-    label: "Timestamps",
+    keys: ["k"],
+    label: "Kind",
     when: () => true,
     action: () => {
-      /* no-op — deferred (plan §9 D10). */
+      /* owned by <EventsPanelView>. */
     },
   },
   {
-    keys: ["s"],
-    label: "Stream",
+    keys: ["n"],
+    label: "Node",
     when: () => true,
     action: () => {
-      /* owned by <LogPanelView> — cycles stdout/stderr/both (P6-T4). */
+      /* deferred — currently no-op. */
     },
   },
   {
@@ -38,7 +37,7 @@ export const LOG_FOLLOWING_KEYBAR: ReadonlyArray<Binding> = [
     label: "Search",
     when: () => true,
     action: () => {
-      /* reserved for a later task. */
+      /* owned by <EventsPanelView>. */
     },
   },
   {
@@ -51,14 +50,13 @@ export const LOG_FOLLOWING_KEYBAR: ReadonlyArray<Binding> = [
   },
 ];
 
-/** Fixture when the log pane is paused (scroll above last line). */
-export const LOG_PAUSED_KEYBAR: ReadonlyArray<Binding> = [
+export const EVENTS_PAUSED_KEYBAR: ReadonlyArray<Binding> = [
   {
     keys: ["F"],
     label: "Resume follow",
     when: () => true,
     action: () => {
-      /* owned by <LogPanelView>. */
+      /* owned by <EventsPanelView>. */
     },
   },
   {
@@ -66,7 +64,7 @@ export const LOG_PAUSED_KEYBAR: ReadonlyArray<Binding> = [
     label: "Jump to head",
     when: () => true,
     action: () => {
-      /* owned by <LogPanelView>. */
+      /* owned by <EventsPanelView>. */
     },
   },
   {
@@ -74,15 +72,15 @@ export const LOG_PAUSED_KEYBAR: ReadonlyArray<Binding> = [
     label: "Jump to top",
     when: () => true,
     action: () => {
-      /* owned by <LogPanelView>. */
+      /* owned by <EventsPanelView>. */
     },
   },
   {
-    keys: ["w"],
-    label: "Wrap",
+    keys: ["k"],
+    label: "Kind",
     when: () => true,
     action: () => {
-      /* owned by <LogPanelView>. */
+      /* owned by <EventsPanelView>. */
     },
   },
   {
@@ -90,7 +88,7 @@ export const LOG_PAUSED_KEYBAR: ReadonlyArray<Binding> = [
     label: "Search",
     when: () => true,
     action: () => {
-      /* reserved. */
+      /* owned by <EventsPanelView>. */
     },
   },
   {

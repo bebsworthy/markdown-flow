@@ -33,8 +33,8 @@ import { WORKFLOWS_EMPTY_KEYBAR } from "./components/keybar-fixtures/workflows-e
 import { RunsTable } from "./components/runs-table.js";
 import { RunDetailPlaceholder } from "./components/run-detail-placeholder.js";
 import { StepTableView } from "./components/step-table-view.js";
-import { StepDetailPanelView } from "./components/step-detail-panel-view.js";
-import { LogPanelView } from "./components/log-panel-view.js";
+import { GraphPanelView } from "./components/graph-panel-view.js";
+import { ViewingBottomSlot } from "./components/viewing-panes.js";
 import { pickFrameSlots } from "./components/app-shell-layout.js";
 import { reducer, initialAppState } from "./state/reducer.js";
 import { initialEngineState } from "./engine/reducer.js";
@@ -227,7 +227,7 @@ export function App({
       return;
     }
     if (key.escape && state.mode.kind === "viewing") {
-      if (state.mode.focus === "log") {
+      if (state.mode.focus !== "graph") {
         dispatch({ type: "FOCUS_VIEWING_PANE", focus: "graph" });
         return;
       }
@@ -235,13 +235,22 @@ export function App({
       return;
     }
     if (state.mode.kind === "viewing") {
-      // Tab-switching keystrokes in viewing mode (P6-T3).
+      // Tab-switching keystrokes in viewing mode (P6-T4 — re-keyed from
+      // P6-T3). `1/2/3/4` map to graph/detail/log/events respectively.
+      if (input === "1") {
+        dispatch({ type: "FOCUS_VIEWING_PANE", focus: "graph" });
+        return;
+      }
       if (input === "2") {
+        dispatch({ type: "FOCUS_VIEWING_PANE", focus: "detail" });
+        return;
+      }
+      if (input === "3") {
         dispatch({ type: "FOCUS_VIEWING_PANE", focus: "log" });
         return;
       }
-      if (input === "d") {
-        dispatch({ type: "FOCUS_VIEWING_PANE", focus: "detail" });
+      if (input === "4") {
+        dispatch({ type: "FOCUS_VIEWING_PANE", focus: "events" });
         return;
       }
     }
@@ -321,33 +330,37 @@ export function App({
       />
     );
   } else if (state.mode.kind === "viewing") {
-    // Zoom: top slot renders the per-run step table; bottom slot renders
-    // the step detail panel (P6-T2).
-    topSlot = (
-      <StepTableView
-        runId={state.mode.runId}
-        engineState={effectiveEngineState}
-        selectedStepId={state.selectedStepId}
-        width={innerWidth}
-        height={topSlotRows}
-        nowMs={nowMs}
-      />
-    );
-    if (state.mode.focus === "log") {
-      bottomSlot = (
-        <LogPanelView
-          runsDir={runsDir ?? null}
+    // Zoom: when focus === "graph" the Graph pane consumes the full canvas
+    // (top + bottom). All other focuses keep the split layout — step table
+    // on top, focused pane on bottom, panes mounted persistently so
+    // pane-local state survives tab switches. (P6-T4)
+    if (state.mode.focus === "graph") {
+      topSlot = (
+        <GraphPanelView
           runId={state.mode.runId}
           selectedStepId={state.selectedStepId}
           engineState={effectiveEngineState}
           width={innerWidth}
-          height={bottomSlotRows}
+          height={topSlotRows + bottomSlotRows}
           nowMs={nowMs}
         />
       );
+      bottomSlot = <Text> </Text>;
     } else {
+      topSlot = (
+        <StepTableView
+          runId={state.mode.runId}
+          engineState={effectiveEngineState}
+          selectedStepId={state.selectedStepId}
+          width={innerWidth}
+          height={topSlotRows}
+          nowMs={nowMs}
+        />
+      );
       bottomSlot = (
-        <StepDetailPanelView
+        <ViewingBottomSlot
+          focus={state.mode.focus}
+          runsDir={runsDir ?? null}
           runId={state.mode.runId}
           selectedStepId={state.selectedStepId}
           engineState={effectiveEngineState}

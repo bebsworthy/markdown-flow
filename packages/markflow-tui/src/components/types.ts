@@ -61,6 +61,9 @@ export interface AppContext {
   readonly isFollowing: boolean;
   /** True while the log panel wraps long lines. */
   readonly isWrapped: boolean;
+  /** True while the Events pane is following the live tail (P6-T4).
+   *  Optional — callers outside `viewing.events` need not supply it. */
+  readonly eventsIsFollowing?: boolean;
   /**
    * Generic payload threaded to `toggleLabel`. For the log `f` binding
    * this is `isFollowing`; for the `w` binding it is `isWrapped`. The

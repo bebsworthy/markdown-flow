@@ -15,6 +15,7 @@ import type { EngineState, LiveRunSnapshot } from "../../src/engine/types.js";
 const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 const KEY_RUNS = "2";
+const KEY_DETAIL = "2"; // P6-T4: `2` in viewing mode → detail focus
 const ENTER = "\r";
 const ESC = "\x1b";
 const NOW = Date.parse("2026-04-17T12:00:00Z");
@@ -93,6 +94,8 @@ describe("App — RUN-mode detail panel (P6-T2)", () => {
     await flush();
     stdin.write(ENTER);
     await flush();
+    stdin.write(KEY_DETAIL);
+    await flush();
 
     const frame = stripAnsi(lastFrame() ?? "");
     // Detail panel headline for the first row (`build` node).
@@ -128,6 +131,8 @@ describe("App — RUN-mode detail panel (P6-T2)", () => {
     await flush();
     stdin.write(ENTER);
     await flush();
+    stdin.write(KEY_DETAIL);
+    await flush();
 
     const frame = stripAnsi(lastFrame() ?? "");
     // Without rows/tokens the panel renders its empty-state copy.
@@ -143,6 +148,8 @@ describe("App — RUN-mode detail panel (P6-T2)", () => {
     stdin.write(KEY_RUNS);
     await flush();
     stdin.write(ENTER);
+    await flush();
+    stdin.write(KEY_DETAIL);
     await flush();
 
     const frame = stripAnsi(lastFrame() ?? "");

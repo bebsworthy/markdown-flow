@@ -46,6 +46,10 @@ export interface LogPanelViewProps {
   readonly nowMs: number;
   /** Test seam — overrides `getSidecarStream`. */
   readonly streamFactory?: StreamFactory;
+  /** When false, keybindings are suppressed. Defaults to true. Used by
+   *  <ViewingBottomSlot> so the Log pane doesn't consume input while the
+   *  user is on a different tab. */
+  readonly active?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -83,6 +87,7 @@ function LogPanelViewImpl({
   width,
   height,
   streamFactory,
+  active,
 }: LogPanelViewProps): React.ReactElement {
   const [logState, dispatch] = useReducer(logReducer, initialLogPanelState);
 
@@ -210,10 +215,13 @@ function LogPanelViewImpl({
   });
 
   // --- Keybindings --------------------------------------------------------
-  useInput((input, key) => {
-    const act = keyToAction(input, key, logState);
-    if (act) dispatch(act);
-  });
+  useInput(
+    (input, key) => {
+      const act = keyToAction(input, key, logState);
+      if (act) dispatch(act);
+    },
+    { isActive: active !== false },
+  );
 
   // --- Model + render ------------------------------------------------------
   const model = useMemo(
@@ -265,9 +273,12 @@ function keyToAction(
   if (input === "w") return { type: "SET_WRAP", wrap: !state.settings.wrap };
   if (input === "t")
     return { type: "SET_TIMESTAMPS", timestamps: !state.settings.timestamps };
-  if (input === "1") return { type: "SET_STREAM_FILTER", filter: "stdout" };
-  if (input === "2") return { type: "SET_STREAM_FILTER", filter: "stderr" };
-  if (input === "3") return { type: "SET_STREAM_FILTER", filter: "both" };
+  if (input === "s") {
+    const cur = state.settings.streamFilter;
+    const next =
+      cur === "both" ? "stdout" : cur === "stdout" ? "stderr" : "both";
+    return { type: "SET_STREAM_FILTER", filter: next };
+  }
   return null;
 }
 

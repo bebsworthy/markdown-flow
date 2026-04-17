@@ -18,8 +18,8 @@ import type {
 const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 const KEY_RUNS = "2";
-const KEY_LOG = "2"; // `2` in viewing mode → log focus
-const KEY_DETAIL = "d";
+const KEY_LOG = "3"; // P6-T4: `3` in viewing mode → log focus
+const KEY_DETAIL = "2"; // P6-T4: `2` → detail focus
 const ENTER = "\r";
 const ESC = "\x1b";
 const NOW = Date.parse("2026-04-17T12:00:00Z");
@@ -82,7 +82,7 @@ function buildEngineState(runId: string): EngineState {
 }
 
 describe("App — RUN-mode log panel (P6-T3)", () => {
-  it("pressing `2` in viewing mode swaps bottom slot to the log pane", async () => {
+  it("pressing `3` in viewing mode swaps bottom slot to the log pane", async () => {
     const { stdin, lastFrame, unmount } = render(
       <App
         onQuit={() => {}}
@@ -96,16 +96,19 @@ describe("App — RUN-mode log panel (P6-T3)", () => {
     await flush();
     stdin.write(ENTER);
     await flush();
-    // Detail panel renders by default
+    // Default focus is "graph" (P6-T4) — graph panel renders the tree.
     let frame = stripAnsi(lastFrame() ?? "");
+    expect(frame).toContain("Graph");
+
+    // `2` → detail first so we can see the detail panel then flip to log.
+    stdin.write(KEY_DETAIL);
+    await flush();
+    frame = stripAnsi(lastFrame() ?? "");
     expect(frame).toContain("script (bash)");
 
     stdin.write(KEY_LOG);
     await flush();
     frame = stripAnsi(lastFrame() ?? "");
-    // Log panel either shows the header or "pending" empty state — runsDir
-    // is unset so sidecar reads are skipped; the ring hasn't got step:output
-    // events for our token, so the panel lands in the empty/pending path.
     expect(frame).toMatch(/Log|log not yet available|select a step/);
     expect(frame).not.toContain("script (bash)");
     unmount();
@@ -130,13 +133,13 @@ describe("App — RUN-mode log panel (P6-T3)", () => {
     stdin.write(ESC);
     await flush();
     const frame = stripAnsi(lastFrame() ?? "");
-    // Detail panel returns (via graph focus → detail panel fallback: the
-    // viewing.* branch renders the detail panel when focus !== "log").
-    expect(frame).toContain("script (bash)");
+    // Graph pane renders after Esc — its header ("Graph · ...") is the
+    // canonical marker.
+    expect(frame).toContain("Graph");
     unmount();
   });
 
-  it("pressing `d` returns to detail focus", async () => {
+  it("pressing `2` returns to detail focus", async () => {
     const { stdin, lastFrame, unmount } = render(
       <App
         onQuit={() => {}}

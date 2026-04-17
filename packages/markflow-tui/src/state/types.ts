@@ -31,8 +31,9 @@ export type Mode =
 /** Sub-panes of `browsing` mode. §5.1. */
 export type BrowsingPane = "workflows" | "runs";
 
-/** Sub-panes of `viewing` mode. §5.1 / §6.3. */
-export type ViewingFocus = "graph" | "detail" | "log";
+/** Sub-panes of `viewing` mode. §5.1 / §6.3. Widened in P6-T4 to include
+ *  the Events tab — the raw `EngineEvent` stream for the selected run. */
+export type ViewingFocus = "graph" | "detail" | "log" | "events";
 
 /**
  * Focus is the keyboard target **within** the current Mode.

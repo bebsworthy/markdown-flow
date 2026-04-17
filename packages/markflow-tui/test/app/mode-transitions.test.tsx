@@ -128,6 +128,10 @@ describe("App — mode transitions (P5-T3)", () => {
     // Enter zooms on the cursor row (first row → abcd1234).
     stdin.write(ENTER);
     await flush();
+    // P6-T4: default zoom focus is `graph` (full-pane); switch to `detail`
+    // (key `2`) so the step-table / detail-panel copy is visible.
+    stdin.write("2");
+    await flush();
 
     const zoomedFrame = stripAnsi(lastFrame() ?? "");
     const zoomedTop = firstLine(zoomedFrame);

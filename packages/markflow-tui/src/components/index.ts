@@ -65,4 +65,21 @@ export {
   type LogPanelViewProps,
   type LogPaneStatus,
 } from "./log-panel-view.js";
+export { GraphPanel, type GraphPanelProps } from "./graph-panel.js";
+export {
+  GraphPanelView,
+  type GraphPanelViewProps,
+} from "./graph-panel-view.js";
+export { EventsPanel, type EventsPanelProps } from "./events-panel.js";
+export {
+  EventsPanelView,
+  EventsPaneStatusContext,
+  useEventsPaneStatus,
+  type EventsPanelViewProps,
+  type EventsPaneStatus,
+} from "./events-panel-view.js";
+export {
+  ViewingBottomSlot,
+  type ViewingBottomSlotProps,
+} from "./viewing-panes.js";
 export type { Binding, AppContext, KeySpec, Category } from "./types.js";
