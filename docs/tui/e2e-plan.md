@@ -63,7 +63,7 @@
 | T0004 | `markflow-tui nonexistent.md` reports the resolve failure inline in the registry list with `✗` badge and does not crash. | mockups.md §2 | [x] |
 | T0005 | `markflow-tui <dir-containing-.markflow.json>` registers the dir as a `[workspace]` entry. | features.md §3.1 launch | [x] |
 | T0006 | `markflow-tui <glob>` (e.g. `fixtures/*.md`) registers each resolved file once. | features.md §3.1 launch | [ ] |
-| T0007 | Re-launching with the same positional arg is idempotent — registry file contains one entry, not duplicates. | features.md §3.1 persistence | [ ] |
+| T0007 | Re-launching with the same positional arg is idempotent — registry file contains one entry, not duplicates. | features.md §3.1 persistence | [x] |
 | T0008 | `--no-save` launch does not write `./.markflow-tui.json`; entries live for the session only. | features.md §3.1 launch | [ ] |
 | T0009 | `--list <path>` reads/writes the alternate list file. | features.md §3.1 launch | [ ] |
 | T0010 | A SIGWINCH during startup does not corrupt the first render (regression for Ink alt-screen race). | features.md §6.2 | [ ] |
@@ -391,7 +391,7 @@ Update this table after each test lands.
 
 | Group | Total | Done |
 |---|---|---|
-| 1 Launch & lifecycle | 13 | 5 |
+| 1 Launch & lifecycle | 13 | 6 |
 | 2 Workflow browser | 11 | 0 |
 | 3 Add modal | 11 | 0 |
 | 4 Runs table | 15 | 0 |
@@ -412,7 +412,7 @@ Update this table after each test lands.
 | 19 Engine integration | 6 | 0 |
 | 20 Registry | 4 | 0 |
 | 21 Exit discipline | 3 | 0 |
-| **Total** | **180** | **5** |
+| **Total** | **180** | **6** |
 
 ---
 
