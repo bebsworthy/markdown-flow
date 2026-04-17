@@ -32,10 +32,10 @@ function renderTab(p: {
 }
 
 describe("AddModalUrlTab", () => {
-  it("renders the prompt and empty URL field", () => {
+  it("renders the prompt and empty input field", () => {
     const frame = renderTab({});
-    expect(frame).toContain("Paste a workflow URL");
-    expect(frame).toContain("url:");
+    expect(frame).toContain("Enter a path, glob, or URL");
+    expect(frame).toContain("path:");
   });
 
   it("echoes the current URL text back to the user", () => {
@@ -43,14 +43,14 @@ describe("AddModalUrlTab", () => {
     expect(frame).toContain("https://example.com/flow.md");
   });
 
-  it("shows the prefix hint when the URL lacks http:// or https://", () => {
-    const frame = renderTab({ url: "ftp://nope" });
-    expect(frame).toContain("expected http:// or https://");
+  it("does not show prefix hint for path-like input", () => {
+    const frame = renderTab({ url: "/some/path.md" });
+    expect(frame).not.toContain("expected http");
   });
 
-  it("hides the prefix hint once the URL starts with http://", () => {
+  it("does not show prefix hint for URL input", () => {
     const frame = renderTab({ url: "http://example.com/flow.md" });
-    expect(frame).not.toContain("expected http:// or https://");
+    expect(frame).not.toContain("expected http");
   });
 
   it("renders 'Fetching…' while ingesting=true", () => {

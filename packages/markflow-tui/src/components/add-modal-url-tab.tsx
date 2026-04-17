@@ -24,26 +24,15 @@ function AddModalUrlTabImpl({
   width,
 }: AddModalUrlTabProps): React.ReactElement {
   const theme = useTheme();
-  const prefixValid =
-    url.length === 0 || /^https?:\/\//i.test(url);
 
   return (
     <Box flexDirection="column" width={width}>
-      <Text>Paste a workflow URL (http or https).</Text>
+      <Text>Enter a path, glob, or URL (http/https).</Text>
       <Text> </Text>
       <Box>
-        <Text>url:  </Text>
+        <Text>path: </Text>
         <Text inverse>{url || " "}</Text>
       </Box>
-
-      {!prefixValid ? (
-        <Text
-          color={theme.colors.danger.color}
-          dimColor={theme.colors.danger.dim === true}
-        >
-          {"  expected http:// or https://"}
-        </Text>
-      ) : null}
 
       {ingesting ? (
         <Text

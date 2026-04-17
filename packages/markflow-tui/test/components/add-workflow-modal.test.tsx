@@ -142,8 +142,8 @@ describe("AddWorkflowModal — layout", () => {
   it("renders the URL tab when tab='url'", async () => {
     const { frame } = renderModal({ tab: "url" });
     await flush();
-    expect(frame()).toContain("Paste a workflow URL");
-    expect(frame()).toContain("url:");
+    expect(frame()).toContain("Enter a path, glob, or URL");
+    expect(frame()).toContain("path:");
   });
 });
 
@@ -260,7 +260,7 @@ describe("AddWorkflowModal — key routing", () => {
 // ---------------------------------------------------------------------------
 
 describe("AddWorkflowModal — URL tab", () => {
-  it("rejects a URL without http:// or https:// prefix", async () => {
+  it("treats non-URL input as a path and calls onSubmit", async () => {
     const ingestor = vi.fn(
       async (_url: string, _baseDir: string): Promise<UrlIngestResult> => ({
         ok: true,
@@ -268,17 +268,19 @@ describe("AddWorkflowModal — URL tab", () => {
         workflowPath: "/ignored/flow.md",
       }),
     );
-    const { stdin, frame } = renderModal({
+    const onSubmit = vi.fn();
+    const { stdin } = renderModal({
       tab: "url",
       ingestor,
+      onSubmit,
     });
     await flush();
-    stdin.write("ftp://nope");
+    stdin.write("/some/path.md");
     await flush();
     stdin.write("\r"); // Enter
     await flush(5);
     expect(ingestor).not.toHaveBeenCalled();
-    expect(frame()).toContain("expected http:// or https://");
+    expect(onSubmit).toHaveBeenCalledWith("/some/path.md");
   });
 
   it("Enter on a valid URL calls ingestor + onSubmit(workspaceDir)", async () => {
