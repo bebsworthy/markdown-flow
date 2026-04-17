@@ -64,6 +64,7 @@ export type Overlay =
       readonly runId: string;
       readonly rerun: ReadonlySet<string>;
       readonly inputs: Readonly<Record<string, string>>;
+      readonly state: "idle" | "submitting";
     }
   | { readonly kind: "confirmCancel"; readonly runId: string }
   | { readonly kind: "commandPalette"; readonly query: string }
@@ -168,6 +169,11 @@ export type Action =
       readonly key: string;
       readonly value: string;
     }
+  // Resume wizard submit-gate (P7-T2). `SUBMIT_START` flips
+  // `overlay.state` to `"submitting"` (guards double-submit);
+  // `SUBMIT_DONE` closes the overlay unconditionally.
+  | { readonly type: "RESUME_WIZARD_SUBMIT_START" }
+  | { readonly type: "RESUME_WIZARD_SUBMIT_DONE" }
   // Add-workflow modal tab toggle (P4-T3). No-op unless overlay is already
   // `addWorkflow`; see reducer.ts for the guard.
   | { readonly type: "ADD_MODAL_SET_TAB"; readonly tab: AddModalTab }

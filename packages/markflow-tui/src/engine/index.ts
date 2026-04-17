@@ -7,6 +7,8 @@
 export { createEngineAdapter } from "./adapter.js";
 export { decideApproval } from "./decide.js";
 export type { DecideApprovalOptions } from "./decide.js";
+export { resumeRun } from "./resume.js";
+export type { ResumeRunOptions } from "./resume.js";
 export {
   engineReducer,
   initialEngineState,

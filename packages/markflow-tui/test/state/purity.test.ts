@@ -113,6 +113,12 @@ const files = [
   "../../src/approval/reducer.ts",
   "../../src/approval/index.ts",
   "../../src/components/keybar-fixtures/approval.ts",
+  // P7-T2 resume pure modules + fixture.
+  "../../src/resume/types.ts",
+  "../../src/resume/derive.ts",
+  "../../src/resume/reducer.ts",
+  "../../src/resume/index.ts",
+  "../../src/components/keybar-fixtures/resume.ts",
 ];
 
 /**
@@ -548,6 +554,35 @@ describe("pure-module purity", () => {
       "../../src/components/keybar-fixtures/approval.js"
     );
     expect(Array.isArray(mod.APPROVAL_KEYBAR)).toBe(true);
+  });
+
+  // -------------------------------------------------------------------
+  // P7-T2 resume pure surface
+  // -------------------------------------------------------------------
+
+  it("resume types module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/resume/types.js");
+    expect(Object.keys(mod)).toEqual([]);
+  });
+
+  it("resume derive module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/resume/derive.js");
+    expect(typeof mod.deriveResumableRun).toBe("function");
+    expect(typeof mod.deriveRerunNodes).toBe("function");
+    expect(typeof mod.deriveInputRows).toBe("function");
+    expect(typeof mod.findFailingNode).toBe("function");
+    expect(typeof mod.isRunResumable).toBe("function");
+  });
+
+  it("resume reducer module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/resume/reducer.js");
+    expect(typeof mod.resumeFormReducer).toBe("function");
+    expect(typeof mod.initialResumeFormState).toBe("function");
+  });
+
+  it("resume keybar fixture loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/components/keybar-fixtures/resume.js");
+    expect(Array.isArray(mod.RESUME_KEYBAR)).toBe(true);
   });
 
   it("steps detail module loads without Ink/React/fs", async () => {

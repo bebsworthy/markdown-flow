@@ -31,13 +31,29 @@ import { AddWorkflowModal } from "./components/add-workflow-modal.js";
 import { Keybar } from "./components/keybar.js";
 import { WORKFLOWS_EMPTY_KEYBAR } from "./components/keybar-fixtures/workflows-empty.js";
 import { APPROVAL_KEYBAR } from "./components/keybar-fixtures/approval.js";
+import { RESUME_KEYBAR } from "./components/keybar-fixtures/resume.js";
 import { ApprovalModal } from "./components/approval-modal.js";
+import { ResumeWizardModal } from "./components/resume-wizard-modal.js";
 import {
   countPendingApprovalsByRun,
   findPendingApproval,
 } from "./approval/index.js";
 import type { ApprovalSubmitResult } from "./approval/types.js";
 import { decideApproval as defaultDecideApproval } from "./engine/decide.js";
+import { resumeRun as defaultResumeRun } from "./engine/resume.js";
+import {
+  deriveInputRows,
+  deriveRerunNodes,
+  deriveResumableRun,
+  findFailingNode,
+  isRunResumable,
+} from "./resume/index.js";
+import type {
+  InputRow,
+  RerunNode,
+  ResumableRun,
+  ResumeSubmitResult,
+} from "./resume/types.js";
 import { RunsTable } from "./components/runs-table.js";
 import { RunDetailPlaceholder } from "./components/run-detail-placeholder.js";
 import { StepTableView } from "./components/step-table-view.js";
@@ -106,6 +122,23 @@ export interface AppProps {
     readonly choice: string;
     readonly decidedBy?: string;
   }) => Promise<ApprovalSubmitResult>;
+  /**
+   * Test seam — overrides the `resumeRun` call used by the resume wizard.
+   * Production defaults to the real engine bridge (`src/engine/resume.ts`).
+   */
+  readonly resumeRun?: (args: {
+    readonly runsDir: string;
+    readonly runId: string;
+    readonly rerunNodes: readonly string[];
+    readonly inputOverrides: Readonly<Record<string, string>>;
+  }) => Promise<ResumeSubmitResult>;
+  /**
+   * Test seam — optional override for the parsed workflow passed to the
+   * resume wizard modal. Production leaves this undefined; the modal does
+   * not currently use workflow fields beyond input declarations, which are
+   * sourced via `deriveInputRows(workflow, events)`.
+   */
+  readonly resumeWorkflow?: import("markflow").WorkflowDefinition | null;
 }
 
 export function App({
@@ -117,6 +150,8 @@ export function App({
   engineState,
   runsDir,
   decideApproval,
+  resumeRun,
+  resumeWorkflow,
 }: AppProps): React.ReactElement {
   const effectiveEngineState: EngineState = engineState ?? initialEngineState;
   const [state, dispatch] = useReducer(reducer, initialAppState);
@@ -149,6 +184,27 @@ export function App({
       : Array.from(pendingCountsByRun.values()).reduce((a, b) => a + b, 0);
 
   const decide = decideApproval ?? defaultDecideApproval;
+  const resume = resumeRun ?? defaultResumeRun;
+
+  // ---- Resume wizard derivations (P7-T2) -------------------------------
+  const activeRun = effectiveEngineState.activeRun;
+  const activeRunInfo = activeRun?.info ?? null;
+  const runResumable: boolean =
+    state.mode.kind === "viewing" &&
+    activeRun !== null &&
+    activeRun.runId === state.mode.runId &&
+    isRunResumable(activeRunInfo);
+
+  let resumableRun: ResumableRun | null = null;
+  let rerunNodes: readonly RerunNode[] = [];
+  let inputRows: readonly InputRow[] = [];
+  if (runResumable && activeRun && activeRunInfo) {
+    resumableRun = deriveResumableRun(activeRunInfo, activeRun.events);
+    rerunNodes = deriveRerunNodes(activeRunInfo, activeRun.events);
+    if (resumeWorkflow) {
+      inputRows = deriveInputRows(resumeWorkflow, activeRun.events);
+    }
+  }
 
   const [registryState, setRegistryState] = useState<RegistryState>({
     entries: [],
@@ -357,6 +413,25 @@ export function App({
         }
       }
     }
+    // `R` Re-run — opens the resume wizard on a terminal-state active run.
+    if (input === "R" && state.mode.kind === "viewing" && runResumable) {
+      const info = activeRunInfo;
+      const active = effectiveEngineState.activeRun;
+      if (info && active) {
+        const failing = findFailingNode(info, active.events);
+        dispatch({
+          type: "OVERLAY_OPEN",
+          overlay: {
+            kind: "resumeWizard",
+            runId: active.runId,
+            rerun: new Set<string>(failing ? [failing] : []),
+            inputs: {},
+            state: "idle",
+          },
+        });
+        return;
+      }
+    }
     if (input === "q") {
       onQuit();
     }
@@ -484,6 +559,7 @@ export function App({
     state.mode.pane === "workflows";
 
   const approvalOverlayOpen = state.overlay?.kind === "approval";
+  const resumeOverlayOpen = state.overlay?.kind === "resumeWizard";
   const keybarSlot = approvalOverlayOpen ? (
     <Keybar
       bindings={APPROVAL_KEYBAR}
@@ -495,9 +571,26 @@ export function App({
         isWrapped: false,
         toggleState: { pendingApprovalsCount: pendingApprovalsCount },
         pendingApprovalsCount,
+        runResumable,
       }}
       width={stdout?.columns ?? 80}
       modePill="APPROVAL"
+    />
+  ) : resumeOverlayOpen ? (
+    <Keybar
+      bindings={RESUME_KEYBAR}
+      ctx={{
+        mode: state.mode,
+        overlay: state.overlay,
+        approvalsPending: pendingApprovalsCount > 0,
+        isFollowing: false,
+        isWrapped: false,
+        toggleState: { pendingApprovalsCount },
+        pendingApprovalsCount,
+        runResumable,
+      }}
+      width={stdout?.columns ?? 80}
+      modePill="RESUME"
     />
   ) : showEmptyKeybar ? (
     <Keybar
@@ -510,6 +603,7 @@ export function App({
         isWrapped: false,
         toggleState: { pendingApprovalsCount },
         pendingApprovalsCount,
+        runResumable,
       }}
       width={stdout?.columns ?? 80}
       modePill="WORKFLOWS"
@@ -581,6 +675,54 @@ export function App({
               }
               dispatch({ type: "OVERLAY_CLOSE" });
             }}
+            width={modalWidth}
+            height={modalHeight}
+          />
+        </Box>
+      ) : null}
+      {state.overlay?.kind === "resumeWizard" && resumableRun ? (
+        <Box
+          marginTop={-(stdout?.rows ?? 30)}
+          flexDirection="column"
+          alignItems="center"
+        >
+          <ResumeWizardModal
+            run={resumableRun}
+            workflow={resumeWorkflow ?? null}
+            nodes={rerunNodes}
+            inputs={inputRows}
+            rerun={state.overlay.rerun}
+            inputOverrides={state.overlay.inputs}
+            onToggleRerun={(nodeId) =>
+              dispatch({ type: "RESUME_WIZARD_TOGGLE_RERUN", nodeId })
+            }
+            onSetInput={(key, value) =>
+              dispatch({ type: "RESUME_WIZARD_SET_INPUT", key, value })
+            }
+            onConfirm={async () => {
+              if (!runsDir) {
+                return {
+                  kind: "error",
+                  message: "runsDir is not configured",
+                };
+              }
+              const ov = state.overlay;
+              if (ov?.kind !== "resumeWizard") {
+                return { kind: "error", message: "overlay closed" };
+              }
+              dispatch({ type: "RESUME_WIZARD_SUBMIT_START" });
+              const result = await resume({
+                runsDir,
+                runId: ov.runId,
+                rerunNodes: Array.from(ov.rerun),
+                inputOverrides: ov.inputs,
+              });
+              if (result.kind === "ok" || result.kind === "notResumable") {
+                dispatch({ type: "RESUME_WIZARD_SUBMIT_DONE" });
+              }
+              return result;
+            }}
+            onCancel={() => dispatch({ type: "OVERLAY_CLOSE" })}
             width={modalWidth}
             height={modalHeight}
           />

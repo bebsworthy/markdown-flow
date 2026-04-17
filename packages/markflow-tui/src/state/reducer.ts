@@ -165,6 +165,10 @@ export function reducer(state: AppState, action: Action): AppState {
       return toggleResumeRerun(state, action.nodeId);
     case "RESUME_WIZARD_SET_INPUT":
       return setResumeInput(state, action.key, action.value);
+    case "RESUME_WIZARD_SUBMIT_START":
+      return startResumeSubmit(state);
+    case "RESUME_WIZARD_SUBMIT_DONE":
+      return finishResumeSubmit(state);
     case "ADD_MODAL_SET_TAB":
       return updateAddModalTab(state, action.tab);
     case "RUNS_SORT_CYCLE":
@@ -239,6 +243,7 @@ function updatePaletteQuery(state: AppState, query: string): AppState {
 function toggleResumeRerun(state: AppState, nodeId: string): AppState {
   const ov = state.overlay;
   if (!ov || ov.kind !== "resumeWizard") return state;
+  if (ov.state === "submitting") return state;
   const next = new Set(ov.rerun);
   if (next.has(nodeId)) next.delete(nodeId);
   else next.add(nodeId);
@@ -248,10 +253,24 @@ function toggleResumeRerun(state: AppState, nodeId: string): AppState {
 function setResumeInput(state: AppState, key: string, value: string): AppState {
   const ov = state.overlay;
   if (!ov || ov.kind !== "resumeWizard") return state;
+  if (ov.state === "submitting") return state;
   return {
     ...state,
     overlay: { ...ov, inputs: { ...ov.inputs, [key]: value } },
   };
+}
+
+function startResumeSubmit(state: AppState): AppState {
+  const ov = state.overlay;
+  if (!ov || ov.kind !== "resumeWizard") return state;
+  if (ov.state === "submitting") return state;
+  return { ...state, overlay: { ...ov, state: "submitting" } };
+}
+
+function finishResumeSubmit(state: AppState): AppState {
+  const ov = state.overlay;
+  if (!ov || ov.kind !== "resumeWizard") return state;
+  return { ...state, overlay: null };
 }
 
 function updateAddModalTab(state: AppState, tab: AddModalTab): AppState {

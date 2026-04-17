@@ -44,9 +44,12 @@ export const GRAPH_KEYBAR: ReadonlyArray<Binding> = [
   {
     keys: ["R"],
     label: "Re-run",
-    when: () => true,
+    // Hide-don't-grey (features.md §5.6 rule 5): the binding is suppressed
+    // entirely unless the active run is resumable (status in
+    // {"error","suspended"}). Surfaced through `ctx.runResumable` (P7-T2).
+    when: (ctx) => ctx.runResumable === true,
     action: () => {
-      /* deferred. */
+      /* owned by app.tsx global `R` handler (P7-T2). */
     },
   },
   {

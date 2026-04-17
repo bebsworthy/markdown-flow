@@ -125,7 +125,7 @@ describe("FILTER_SET / FILTER_CLEAR", () => {
 describe("OVERLAY_OPEN / OVERLAY_CLOSE", () => {
   const overlays: Overlay[] = [
     { kind: "approval", runId: "r1", nodeId: "n1", state: "idle" },
-    { kind: "resumeWizard", runId: "r1", rerun: new Set(["n1"]), inputs: { KEY: "v" } },
+    { kind: "resumeWizard", runId: "r1", rerun: new Set(["n1"]), inputs: { KEY: "v" }, state: "idle" },
     { kind: "confirmCancel", runId: "r1" },
     { kind: "commandPalette", query: "" },
     { kind: "help" },
@@ -184,7 +184,7 @@ describe("COMMAND_PALETTE_QUERY", () => {
 describe("RESUME_WIZARD_TOGGLE_RERUN", () => {
   it("adds a node id to the rerun set", () => {
     const base = withOverlay(initialAppState, {
-      kind: "resumeWizard", runId: "r1", rerun: new Set(), inputs: {},
+      kind: "resumeWizard", runId: "r1", rerun: new Set(), inputs: {}, state: "idle",
     });
     const s = reducer(base, { type: "RESUME_WIZARD_TOGGLE_RERUN", nodeId: "build" });
     expect(s.overlay).toMatchObject({ kind: "resumeWizard" });
@@ -193,22 +193,70 @@ describe("RESUME_WIZARD_TOGGLE_RERUN", () => {
   });
   it("removes the node id on the second toggle", () => {
     const base = withOverlay(initialAppState, {
-      kind: "resumeWizard", runId: "r1", rerun: new Set(["build"]), inputs: {},
+      kind: "resumeWizard", runId: "r1", rerun: new Set(["build"]), inputs: {}, state: "idle",
     });
     const s = reducer(base, { type: "RESUME_WIZARD_TOGGLE_RERUN", nodeId: "build" });
     const ov = s.overlay as { rerun: ReadonlySet<string> };
     expect(ov.rerun.size).toBe(0);
+  });
+  it("is a no-op while overlay.state === 'submitting'", () => {
+    const base = withOverlay(initialAppState, {
+      kind: "resumeWizard", runId: "r1", rerun: new Set(), inputs: {}, state: "submitting",
+    });
+    const s = reducer(base, { type: "RESUME_WIZARD_TOGGLE_RERUN", nodeId: "build" });
+    expect(s).toBe(base);
   });
 });
 
 describe("RESUME_WIZARD_SET_INPUT", () => {
   it("sets an input value", () => {
     const base = withOverlay(initialAppState, {
-      kind: "resumeWizard", runId: "r1", rerun: new Set(), inputs: {},
+      kind: "resumeWizard", runId: "r1", rerun: new Set(), inputs: {}, state: "idle",
     });
     const s = reducer(base, { type: "RESUME_WIZARD_SET_INPUT", key: "KEY", value: "v" });
     const ov = s.overlay as { inputs: Record<string, string> };
     expect(ov.inputs).toEqual({ KEY: "v" });
+  });
+  it("is a no-op while overlay.state === 'submitting'", () => {
+    const base = withOverlay(initialAppState, {
+      kind: "resumeWizard", runId: "r1", rerun: new Set(), inputs: {}, state: "submitting",
+    });
+    const s = reducer(base, { type: "RESUME_WIZARD_SET_INPUT", key: "K", value: "v" });
+    expect(s).toBe(base);
+  });
+});
+
+describe("RESUME_WIZARD_SUBMIT_START / SUBMIT_DONE (P7-T2)", () => {
+  it("SUBMIT_START flips overlay.state to 'submitting'", () => {
+    const base = withOverlay(initialAppState, {
+      kind: "resumeWizard", runId: "r1", rerun: new Set(), inputs: {}, state: "idle",
+    });
+    const s = reducer(base, { type: "RESUME_WIZARD_SUBMIT_START" });
+    expect(s.overlay).toMatchObject({ kind: "resumeWizard", state: "submitting" });
+  });
+  it("SUBMIT_START is idempotent while already submitting", () => {
+    const base = withOverlay(initialAppState, {
+      kind: "resumeWizard", runId: "r1", rerun: new Set(), inputs: {}, state: "submitting",
+    });
+    const s = reducer(base, { type: "RESUME_WIZARD_SUBMIT_START" });
+    expect(s).toBe(base);
+  });
+  it("SUBMIT_START is a no-op when the overlay is not the wizard", () => {
+    const base = withOverlay(initialAppState, { kind: "help" });
+    const s = reducer(base, { type: "RESUME_WIZARD_SUBMIT_START" });
+    expect(s).toBe(base);
+  });
+  it("SUBMIT_DONE clears the overlay", () => {
+    const base = withOverlay(initialAppState, {
+      kind: "resumeWizard", runId: "r1", rerun: new Set(), inputs: {}, state: "submitting",
+    });
+    const s = reducer(base, { type: "RESUME_WIZARD_SUBMIT_DONE" });
+    expect(s.overlay).toBeNull();
+  });
+  it("SUBMIT_DONE is a no-op when overlay is not the wizard", () => {
+    const base = withOverlay(initialAppState, { kind: "help" });
+    const s = reducer(base, { type: "RESUME_WIZARD_SUBMIT_DONE" });
+    expect(s).toBe(base);
   });
 });
 

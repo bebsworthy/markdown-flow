@@ -71,6 +71,14 @@ export interface AppContext {
    */
   readonly pendingApprovalsCount?: number;
   /**
+   * True when the active run (in `viewing.*`) is resumable — status is
+   * `"error"` or `"suspended"`. Set by `<App>` from `effectiveEngineState`
+   * when `mode.kind === "viewing"` and the active run matches. Used by the
+   * `R Re-run` binding's `when(ctx)` predicate (hide-don't-grey). Defaults
+   * to `false` when omitted.
+   */
+  readonly runResumable?: boolean;
+  /**
    * Generic payload threaded to `toggleLabel`. For the log `f` binding
    * this is `isFollowing`; for the `w` binding it is `isWrapped`. The
    * binding author picks which field to narrow, so the type is `unknown`.

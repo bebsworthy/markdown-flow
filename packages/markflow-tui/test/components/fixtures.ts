@@ -78,6 +78,7 @@ export const resumeCtx: AppContext = {
     runId: "r1",
     rerun: new Set(),
     inputs: {},
+    state: "idle",
   },
   approvalsPending: false,
   isFollowing: false,
