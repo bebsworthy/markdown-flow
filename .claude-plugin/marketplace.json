@@ -1,0 +1,14 @@
+{
+  "name": "markflow",
+  "owner": {
+    "name": "markflow",
+    "url": "https://github.com/bebsworthy/markdown-flow"
+  },
+  "plugins": [
+    {
+      "name": "markflow",
+      "source": "./plugins/markflow",
+      "description": "Author markflow workflows — a skill that helps Claude write correct, well-structured workflow .md files (Mermaid flow + script/agent steps), with validation via the markflow CLI."
+    }
+  ]
+}
