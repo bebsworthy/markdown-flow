@@ -65,6 +65,12 @@ export interface AppContext {
    *  Optional — callers outside `viewing.events` need not supply it. */
   readonly eventsIsFollowing?: boolean;
   /**
+   * Count of pending approvals relevant to the current view (P7-T1).
+   * Used by the `a Approve (N)` binding's `when(ctx)` predicate
+   * (hide-don't-grey) and its `toggleLabel`. Defaults to 0 when omitted.
+   */
+  readonly pendingApprovalsCount?: number;
+  /**
    * Generic payload threaded to `toggleLabel`. For the log `f` binding
    * this is `isFollowing`; for the `w` binding it is `isWrapped`. The
    * binding author picks which field to narrow, so the type is `unknown`.

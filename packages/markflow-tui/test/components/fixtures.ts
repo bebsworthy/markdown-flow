@@ -332,12 +332,14 @@ export const logPausedBindings: ReadonlyArray<Binding> = Object.freeze([
 ]);
 
 // --- APPROVAL ---------------------------------------------------------------
-// Wide:   `[APPROVAL]  ⏎ Decide  e Edit inputs  s Suspend-for-later    Esc Cancel  ?`
-// Medium: `[APPROVAL] ⏎ e s   Esc ?`
-// Narrow: `⏎ e s   Esc`
+// P7-T1: `e Edit inputs` removed per plan.md acceptance. Mockups §5 line 216
+// is the source of truth; §15's stale row retains the old copy. The shape
+// is now ⏎ Decide / s Suspend-for-later / Esc Cancel / ? Help.
+// Wide:   `[APPROVAL]  ⏎ Decide  s Suspend-for-later    Esc Cancel  ?`
+// Medium: `[APPROVAL] ⏎ s   Esc ?`
+// Narrow: `⏎ s   Esc`
 export const approvalBindings: ReadonlyArray<Binding> = Object.freeze([
   { keys: ["Enter"], label: "Decide", when: alwaysTrue, action: noop },
-  { keys: ["e"], label: "Edit inputs", when: alwaysTrue, action: noop },
   {
     keys: ["s"],
     label: "Suspend-for-later",

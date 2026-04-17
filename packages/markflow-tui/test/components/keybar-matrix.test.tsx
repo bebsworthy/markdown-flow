@@ -117,9 +117,9 @@ const ROWS: ReadonlyArray<Row> = [
     bindings: approvalBindings,
     ctx: approvalCtx,
     modePill: "APPROVAL",
-    wide: "[APPROVAL]  \u23CE Decide  e Edit inputs  s Suspend-for-later    Esc Cancel  ?",
-    medium: "[APPROVAL] \u23CE e s   Esc ?",
-    narrow: "\u23CE e s   Esc",
+    wide: "[APPROVAL]  \u23CE Decide  s Suspend-for-later    Esc Cancel  ?",
+    medium: "[APPROVAL] \u23CE s   Esc ?",
+    narrow: "\u23CE s   Esc",
   },
   {
     mode: "RESUME",

@@ -30,6 +30,14 @@ import { WorkflowBrowser } from "./components/workflow-browser.js";
 import { AddWorkflowModal } from "./components/add-workflow-modal.js";
 import { Keybar } from "./components/keybar.js";
 import { WORKFLOWS_EMPTY_KEYBAR } from "./components/keybar-fixtures/workflows-empty.js";
+import { APPROVAL_KEYBAR } from "./components/keybar-fixtures/approval.js";
+import { ApprovalModal } from "./components/approval-modal.js";
+import {
+  countPendingApprovalsByRun,
+  findPendingApproval,
+} from "./approval/index.js";
+import type { ApprovalSubmitResult } from "./approval/types.js";
+import { decideApproval as defaultDecideApproval } from "./engine/decide.js";
 import { RunsTable } from "./components/runs-table.js";
 import { RunDetailPlaceholder } from "./components/run-detail-placeholder.js";
 import { StepTableView } from "./components/step-table-view.js";
@@ -86,6 +94,18 @@ export interface AppProps {
    * disables sidecar reads (the ring-buffer tail still populates lines).
    */
   readonly runsDir?: string | null;
+  /**
+   * Test seam — overrides the `decideApproval` call used by the
+   * approval modal. Production defaults to the real engine bridge
+   * (`src/engine/decide.ts`).
+   */
+  readonly decideApproval?: (args: {
+    readonly runsDir: string;
+    readonly runId: string;
+    readonly nodeId: string;
+    readonly choice: string;
+    readonly decidedBy?: string;
+  }) => Promise<ApprovalSubmitResult>;
 }
 
 export function App({
@@ -96,10 +116,39 @@ export function App({
   initialRunRows,
   engineState,
   runsDir,
+  decideApproval,
 }: AppProps): React.ReactElement {
   const effectiveEngineState: EngineState = engineState ?? initialEngineState;
   const [state, dispatch] = useReducer(reducer, initialAppState);
   const { stdout } = useStdout();
+
+  // ---- Pending approvals derivation (P7-T1) -----------------------------
+  // Recompute on every render — the activeRun.events ring is capped and
+  // re-allocated per append, so useMemo would re-fire anyway (plan §6 D8).
+  const pendingCountsByRun = countPendingApprovalsByRun(
+    effectiveEngineState.runs,
+    effectiveEngineState.activeRun,
+  );
+  const activePending = findPendingApproval(
+    effectiveEngineState.activeRun?.events ?? [],
+  );
+  // `derivePendingApprovals` fills runId from info.id; when info is null the
+  // string is empty. Rehydrate from the active snapshot so callers get the
+  // authoritative runId.
+  const pendingForActiveRun =
+    state.mode.kind === "viewing" &&
+    effectiveEngineState.activeRun &&
+    effectiveEngineState.activeRun.runId === state.mode.runId &&
+    activePending
+      ? { ...activePending, runId: effectiveEngineState.activeRun.runId }
+      : null;
+  // `pendingApprovalsCount` threaded to keybar AppContext.
+  const pendingApprovalsCount: number =
+    state.mode.kind === "viewing"
+      ? (pendingCountsByRun.get(state.mode.runId) ?? 0)
+      : Array.from(pendingCountsByRun.values()).reduce((a, b) => a + b, 0);
+
+  const decide = decideApproval ?? defaultDecideApproval;
 
   const [registryState, setRegistryState] = useState<RegistryState>({
     entries: [],
@@ -219,6 +268,40 @@ export function App({
   // context. Rebinding `q` to "Back" inside RUN mode is a Phase-6 follow-up
   // (see plan §6.2).
 
+  // ---- Auto-open approval overlay (P7-T1) ------------------------------
+  // When viewing the active run and a gate opens, pop the modal. Does not
+  // auto-open in browsing.*: there `a` is the explicit trigger.
+  //
+  // Suppression: when the user presses `s` (Suspend-for-later) the overlay
+  // closes but the underlying gate stays pending. We must NOT auto-reopen on
+  // that same tokenId — the user explicitly chose to leave. `a` re-opens
+  // explicitly. A new or resolved gate clears suppression.
+  const suppressedTokensRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (state.overlay !== null) return;
+    if (state.mode.kind !== "viewing") return;
+    const active = effectiveEngineState.activeRun;
+    if (!active || active.runId !== state.mode.runId) return;
+    const next = findPendingApproval(active.events);
+    if (!next) return;
+    if (suppressedTokensRef.current.has(next.tokenId)) return;
+    dispatch({
+      type: "OVERLAY_OPEN",
+      overlay: {
+        kind: "approval",
+        runId: active.runId,
+        nodeId: next.nodeId,
+        state: "idle",
+      },
+    });
+    // Include the last seq in deps so a newly-arrived gate after a previous
+    // close re-auto-opens on its own event.
+  }, [
+    state.overlay,
+    state.mode,
+    effectiveEngineState.activeRun,
+  ]);
+
   useInput((input, key) => {
     if (state.overlay !== null) return;
     if (state.runsFilter.open) {
@@ -252,6 +335,26 @@ export function App({
       if (input === "4") {
         dispatch({ type: "FOCUS_VIEWING_PANE", focus: "events" });
         return;
+      }
+    }
+    // `a` Approve — explicit trigger from RUN keybar (P7-T1). Only fires
+    // when at least one pending gate exists in the current viewing context.
+    if (input === "a" && state.mode.kind === "viewing") {
+      const active = effectiveEngineState.activeRun;
+      if (active && active.runId === state.mode.runId) {
+        const next = findPendingApproval(active.events);
+        if (next) {
+          dispatch({
+            type: "OVERLAY_OPEN",
+            overlay: {
+              kind: "approval",
+              runId: active.runId,
+              nodeId: next.nodeId,
+              state: "idle",
+            },
+          });
+          return;
+        }
       }
     }
     if (input === "q") {
@@ -380,16 +483,33 @@ export function App({
     state.mode.kind === "browsing" &&
     state.mode.pane === "workflows";
 
-  const keybarSlot = showEmptyKeybar ? (
+  const approvalOverlayOpen = state.overlay?.kind === "approval";
+  const keybarSlot = approvalOverlayOpen ? (
+    <Keybar
+      bindings={APPROVAL_KEYBAR}
+      ctx={{
+        mode: state.mode,
+        overlay: state.overlay,
+        approvalsPending: true,
+        isFollowing: false,
+        isWrapped: false,
+        toggleState: { pendingApprovalsCount: pendingApprovalsCount },
+        pendingApprovalsCount,
+      }}
+      width={stdout?.columns ?? 80}
+      modePill="APPROVAL"
+    />
+  ) : showEmptyKeybar ? (
     <Keybar
       bindings={WORKFLOWS_EMPTY_KEYBAR}
       ctx={{
         mode: state.mode,
         overlay: state.overlay,
-        approvalsPending: false,
+        approvalsPending: pendingApprovalsCount > 0,
         isFollowing: false,
         isWrapped: false,
-        toggleState: {},
+        toggleState: { pendingApprovalsCount },
+        pendingApprovalsCount,
       }}
       width={stdout?.columns ?? 80}
       modePill="WORKFLOWS"
@@ -423,6 +543,49 @@ export function App({
         bottom={bottomSlot}
         keybar={keybarSlot}
       />
+      {state.overlay?.kind === "approval" && pendingForActiveRun ? (
+        <Box
+          marginTop={-(stdout?.rows ?? 30)}
+          flexDirection="column"
+          alignItems="center"
+        >
+          <ApprovalModal
+            approval={pendingForActiveRun}
+            onDecide={async (choice) => {
+              if (!runsDir) {
+                return {
+                  kind: "error",
+                  message: "runsDir is not configured",
+                };
+              }
+              if (state.overlay?.kind === "approval") {
+                dispatch({ type: "APPROVAL_SUBMIT" });
+              }
+              return decide({
+                runsDir,
+                runId: pendingForActiveRun.runId,
+                nodeId: pendingForActiveRun.nodeId,
+                choice,
+                decidedBy: process.env.USER,
+              });
+            }}
+            onSuspend={() => {
+              if (pendingForActiveRun) {
+                suppressedTokensRef.current.add(pendingForActiveRun.tokenId);
+              }
+              dispatch({ type: "OVERLAY_CLOSE" });
+            }}
+            onCancel={() => {
+              if (pendingForActiveRun) {
+                suppressedTokensRef.current.add(pendingForActiveRun.tokenId);
+              }
+              dispatch({ type: "OVERLAY_CLOSE" });
+            }}
+            width={modalWidth}
+            height={modalHeight}
+          />
+        </Box>
+      ) : null}
       {state.overlay?.kind === "addWorkflow" ? (
         <Box
           marginTop={-(stdout?.rows ?? 30)}

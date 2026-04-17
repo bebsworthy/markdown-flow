@@ -27,9 +27,18 @@ export const GRAPH_KEYBAR: ReadonlyArray<Binding> = [
   {
     keys: ["a"],
     label: "Approve",
-    when: () => true,
+    toggleLabel: (state) => {
+      // Narrow: fixtures consuming `toggleState.pendingApprovalsCount`
+      // pass a plain number; be defensive for other shapes.
+      const n = typeof state === "number" ? state : 0;
+      return `Approve (${n})`;
+    },
+    // Hide-don't-grey (features.md §5.6 rule 5): the binding is suppressed
+    // entirely when no approvals are pending. Count is surfaced through
+    // `ctx.pendingApprovalsCount` (P7-T1).
+    when: (ctx) => (ctx.pendingApprovalsCount ?? 0) > 0,
     action: () => {
-      /* deferred. */
+      /* owned by app.tsx global `a` handler (P7-T1). */
     },
   },
   {

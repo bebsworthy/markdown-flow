@@ -107,6 +107,12 @@ const files = [
   // P6-T4 keybar fixtures — data-only.
   "../../src/components/keybar-fixtures/graph.ts",
   "../../src/components/keybar-fixtures/events.ts",
+  // P7-T1 approval pure modules + fixture.
+  "../../src/approval/types.ts",
+  "../../src/approval/derive.ts",
+  "../../src/approval/reducer.ts",
+  "../../src/approval/index.ts",
+  "../../src/components/keybar-fixtures/approval.ts",
 ];
 
 /**
@@ -513,6 +519,35 @@ describe("pure-module purity", () => {
     const mod = await import("../../src/components/keybar-fixtures/events.js");
     expect(Array.isArray(mod.EVENTS_FOLLOWING_KEYBAR)).toBe(true);
     expect(Array.isArray(mod.EVENTS_PAUSED_KEYBAR)).toBe(true);
+  });
+
+  // -------------------------------------------------------------------
+  // P7-T1 approval pure surface
+  // -------------------------------------------------------------------
+
+  it("approval types module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/approval/types.js");
+    expect(Object.keys(mod)).toEqual([]);
+  });
+
+  it("approval derive module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/approval/derive.js");
+    expect(typeof mod.derivePendingApprovals).toBe("function");
+    expect(typeof mod.countPendingApprovalsByRun).toBe("function");
+    expect(typeof mod.findPendingApproval).toBe("function");
+  });
+
+  it("approval reducer module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/approval/reducer.js");
+    expect(typeof mod.approvalFormReducer).toBe("function");
+    expect(typeof mod.initialApprovalFormState).toBe("function");
+  });
+
+  it("approval keybar fixture loads without Ink/React/fs", async () => {
+    const mod = await import(
+      "../../src/components/keybar-fixtures/approval.js"
+    );
+    expect(Array.isArray(mod.APPROVAL_KEYBAR)).toBe(true);
   });
 
   it("steps detail module loads without Ink/React/fs", async () => {

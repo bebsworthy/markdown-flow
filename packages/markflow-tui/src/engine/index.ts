@@ -5,6 +5,8 @@
 // factory, which internally uses `node:path` but does not expose it).
 
 export { createEngineAdapter } from "./adapter.js";
+export { decideApproval } from "./decide.js";
+export type { DecideApprovalOptions } from "./decide.js";
 export {
   engineReducer,
   initialEngineState,
