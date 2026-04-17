@@ -236,7 +236,7 @@ each status.
 
 | ID | Test | Refs | Status |
 |---|---|---|---|
-| T1000 | `r` on a workflow with zero declared inputs starts a run immediately; the TUI transitions to `viewing` mode within 300 ms of the engine's `run:start`; the run appears in `runs/<id>/events.jsonl`. | features.md §3.1, §5.7 | [ ] |
+| T1000 | `r` on a workflow with zero declared inputs starts a run immediately; the TUI transitions to `viewing` mode within 300 ms of the engine's `run:start`; the run appears in `runs/<id>/events.jsonl`. | features.md §3.1, §5.7 | [x] |
 | T1001 | `r` on a workflow with ≥1 required input opens the input-prompt modal (mockup §4.3 of P9-T1 plan). Title reads `RUN · <workflow>`. | features.md §5.7 | [ ] |
 | T1002 | The `⏎ Run` button is dimmed (hidden label) until every required input is populated. | P9-T1 plan §6 D4 | [ ] |
 | T1003 | `Tab` / `Shift-Tab` cycles focus between input rows; `Enter` on a non-final row advances when submit is still blocked. | P9-T1 plan §6 D4 | [ ] |
@@ -401,7 +401,7 @@ Update this table after each test lands.
 | 8 Resume wizard | 11 | 0 |
 | 9 Palette & help | 13 | 0 |
 | 10 Keybar tiers | 9 | 0 |
-| 11 Run entry (P9-T1) | 16 | 0 |
+| 11 Run entry (P9-T1) | 16 | 1 |
 | 12 Cancel (P9-T2) | 6 | 0 |
 | 13 Pending (P9-T3) | 5 | 0 |
 | 14 Retry budget (P9-T4) | 4 | 0 |
