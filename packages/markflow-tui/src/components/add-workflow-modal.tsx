@@ -12,7 +12,9 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
+import { globSync } from "node:fs";
 import { stat } from "node:fs/promises";
+import { isAbsolute, resolve as resolvePath } from "node:path";
 import { useTheme } from "../theme/context.js";
 import { AddModalFuzzyTab } from "./add-modal-fuzzy-tab.js";
 import { AddModalUrlTab } from "./add-modal-url-tab.js";
@@ -329,25 +331,46 @@ function AddWorkflowModalImpl(
       return;
     }
 
-    // URL tab
+    // URL / Path tab
     if (key.return) {
       if (ingestingRef.current) return;
-      const url = urlInputRef.current.trim();
-      if (!/^https?:\/\//i.test(url)) {
-        setIngestError("expected http:// or https://");
+      const raw = urlInputRef.current.trim();
+      if (raw.length === 0) return;
+
+      // URL flow
+      if (/^https?:\/\//i.test(raw)) {
+        setIngestError(null);
+        setIngesting(true);
+        (async () => {
+          const res = await ingestor(raw, baseDir);
+          setIngesting(false);
+          if (!res.ok) {
+            setIngestError(res.reason);
+            return;
+          }
+          void onSubmit(res.workspaceDir);
+        })();
         return;
       }
-      setIngestError(null);
-      setIngesting(true);
-      (async () => {
-        const res = await ingestor(url, baseDir);
-        setIngesting(false);
-        if (!res.ok) {
-          setIngestError(res.reason);
+
+      // Path / glob flow
+      const hasGlob = /[*?{]/.test(raw);
+      if (hasGlob) {
+        const pattern = isAbsolute(raw) ? raw : resolvePath(baseDir, raw);
+        const matches = globSync(pattern);
+        if (matches.length === 0) {
+          setIngestError("no files matched");
           return;
         }
-        void onSubmit(res.workspaceDir);
-      })();
+        (async () => {
+          for (const m of matches) {
+            await onSubmit(m);
+          }
+        })();
+      } else {
+        const resolved = isAbsolute(raw) ? raw : resolvePath(baseDir, raw);
+        void onSubmit(resolved);
+      }
       return;
     }
     if (key.backspace || key.delete) {
