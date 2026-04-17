@@ -222,3 +222,35 @@ describe.each(ROWS)("keybar matrix — $mode", (row) => {
     },
   );
 });
+
+// ---------------------------------------------------------------------------
+// P8-T1 §4.2 — width=90 short-tier verbatim check for the five modes the
+// plan calls out: WORKFLOWS, RUNS, RUN-graph, LOG-follow, LOG-paused.
+// ---------------------------------------------------------------------------
+
+const NINETY_COL_ROWS: ReadonlyArray<Row> = ROWS.filter((r) =>
+  ["WORKFLOWS", "RUNS", "RUN (graph)", "LOG (follow)", "LOG (paused)"].includes(
+    r.mode,
+  ),
+);
+
+describe.each(NINETY_COL_ROWS)(
+  "P8-T1 keybar at width=90 — $mode",
+  (row) => {
+    it("short-tier render matches mockups §15 verbatim (ANSI-stripped, right-trimmed)", () => {
+      const out = renderKeybar({
+        bindings: row.bindings,
+        ctx: row.ctx,
+        width: 90,
+        modePill: row.modePill,
+        modePillTiers: row.modePillTiers,
+        modePillGap: row.modePillGap,
+        prefix: row.prefix,
+        prefixGap: row.prefixGap,
+      });
+      const actual = stripAnsi(out.lastFrame() ?? "").replace(/\s+$/g, "");
+      expect(actual).toBe(row.medium);
+      expect(actual.length).toBeLessThanOrEqual(90);
+    });
+  },
+);

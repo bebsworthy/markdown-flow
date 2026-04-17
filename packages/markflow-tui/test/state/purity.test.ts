@@ -46,6 +46,8 @@ const files = [
   // App-shell pure surface (P3-T5). NOTE: app-shell.tsx, mode-tabs.tsx are
   // NOT in this list — they import React/Ink by design.
   "../../src/components/app-shell-layout.ts",
+  // P8-T1 viewing-pane tab layout — pure tier/label/compose helpers.
+  "../../src/components/viewing-pane-tabs-layout.ts",
   // Registry pure surface (P4-T1). NOTE: store.ts, atomic-write.ts, index.ts
   // are NOT in this list — they import node:fs/path/crypto by design.
   "../../src/registry/types.ts",
@@ -234,6 +236,18 @@ describe("pure-module purity", () => {
     expect(typeof mod.composeTopRow).toBe("function");
     expect(typeof mod.pickFrameSlots).toBe("function");
     expect(typeof mod.pickActiveTabStyle).toBe("function");
+  });
+
+  it("viewing-pane-tabs-layout module loads without Ink/React", async () => {
+    const mod = await import(
+      "../../src/components/viewing-pane-tabs-layout.js"
+    );
+    expect(typeof mod.pickViewingTabTier).toBe("function");
+    expect(typeof mod.formatViewingTabLabel).toBe("function");
+    expect(typeof mod.composeViewingTabRow).toBe("function");
+    expect(Array.isArray(mod.VIEWING_TAB_KEYS)).toBe(true);
+    expect(typeof mod.VIEWING_TAB_WIDE_MIN).toBe("number");
+    expect(typeof mod.VIEWING_TAB_MEDIUM_MIN).toBe("number");
   });
 
   it("registry types module loads without Ink/React/fs", async () => {

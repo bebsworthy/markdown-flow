@@ -475,7 +475,12 @@ export function App({
 
   const shellWidth = stdout?.columns ?? 80;
   const shellHeight = stdout?.rows ?? 30;
-  const innerWidth = Math.max(0, shellWidth - 2);
+  // `innerWidth` is the content budget handed to panes. Use `shellWidth`
+  // directly so tier pickers (docs/tui/plans/P8-T1.md §3.2 — "At width=90
+  // → runs=medium") see the full terminal width. The AppShell box chrome
+  // is drawn around the content; Ink's flexbox clips any excess in the
+  // grow column.
+  const innerWidth = shellWidth;
   const { topRows: topSlotRows, bottomRows: bottomSlotRows } =
     pickFrameSlots(shellHeight);
   const nowMs = Date.now();
