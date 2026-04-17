@@ -75,6 +75,16 @@ const files = [
   "../../src/runs/window.ts",
   // P5-T3 pure module — cursor math for the runs table.
   "../../src/runs/cursor.ts",
+  // P6-T1 pure modules — step-table surface. NOTE: steps/index.ts is a
+  // barrel and is NOT scanned (just re-exports); step-table*.tsx and
+  // step-table-view.tsx are Ink by design.
+  "../../src/steps/types.ts",
+  "../../src/steps/tree.ts",
+  "../../src/steps/aggregate.ts",
+  "../../src/steps/columns.ts",
+  "../../src/steps/derive.ts",
+  "../../src/steps/retry.ts",
+  "../../src/steps/upstream.ts",
 ];
 
 /**
@@ -301,5 +311,71 @@ describe("pure-module purity", () => {
     expect(typeof mod.jumpCursorTo).toBe("function");
     expect(typeof mod.rowIdAtCursor).toBe("function");
     expect(typeof mod.reconcileCursorAfterRowsChange).toBe("function");
+  });
+
+  // ---------------------------------------------------------------------
+  // P6-T1 step-table pure surface
+  // ---------------------------------------------------------------------
+
+  it("steps types module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/steps/types.js");
+    // Type-only module — runtime exports empty.
+    expect(Object.keys(mod)).toEqual([]);
+  });
+
+  it("steps tree module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/steps/tree.js");
+    expect(typeof mod.buildStepRows).toBe("function");
+    expect(typeof mod.indexByParent).toBe("function");
+    expect(typeof mod.orderRoots).toBe("function");
+    expect(typeof mod.projectStepsSnapshot).toBe("function");
+  });
+
+  it("steps aggregate module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/steps/aggregate.js");
+    expect(typeof mod.shouldAggregateBatch).toBe("function");
+    expect(typeof mod.formatProgressBar).toBe("function");
+    expect(typeof mod.aggregateBatchRow).toBe("function");
+    expect(typeof mod.deriveAggregateStatus).toBe("function");
+    expect(typeof mod.toBatchAggregate).toBe("function");
+    expect(typeof mod.formatAggregateNote).toBe("function");
+    expect(typeof mod.BATCH_COLLAPSE_THRESHOLD).toBe("number");
+  });
+
+  it("steps columns module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/steps/columns.js");
+    expect(Array.isArray(mod.STEP_COLUMNS_WIDE)).toBe(true);
+    expect(Array.isArray(mod.STEP_COLUMNS_MEDIUM)).toBe(true);
+    expect(Array.isArray(mod.STEP_COLUMNS_NARROW)).toBe(true);
+    expect(typeof mod.pickStepColumnSet).toBe("function");
+    expect(typeof mod.computeStepColumnWidths).toBe("function");
+    expect(typeof mod.fitStepCell).toBe("function");
+  });
+
+  it("steps derive module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/steps/derive.js");
+    expect(typeof mod.tokenToStatus).toBe("function");
+    expect(typeof mod.stepStatusToRole).toBe("function");
+    expect(typeof mod.stepStatusToGlyphKey).toBe("function");
+    expect(typeof mod.stepStatusToLabel).toBe("function");
+    expect(typeof mod.toStepStatusCell).toBe("function");
+    expect(typeof mod.formatAttempt).toBe("function");
+    expect(typeof mod.deriveStepElapsedMs).toBe("function");
+    expect(typeof mod.formatStepElapsed).toBe("function");
+    expect(typeof mod.formatEdgeNote).toBe("function");
+    expect(typeof mod.formatWaitingNote).toBe("function");
+  });
+
+  it("steps retry module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/steps/retry.js");
+    expect(typeof mod.applyRetryEvent).toBe("function");
+    expect(typeof mod.buildRetryHints).toBe("function");
+    expect(typeof mod.formatRetryCountdown).toBe("function");
+  });
+
+  it("steps upstream module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/steps/upstream.js");
+    expect(typeof mod.isUpstreamFailed).toBe("function");
+    expect(typeof mod.upstreamNoteLabel).toBe("function");
   });
 });

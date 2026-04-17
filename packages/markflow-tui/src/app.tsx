@@ -32,8 +32,11 @@ import { Keybar } from "./components/keybar.js";
 import { WORKFLOWS_EMPTY_KEYBAR } from "./components/keybar-fixtures/workflows-empty.js";
 import { RunsTable } from "./components/runs-table.js";
 import { RunDetailPlaceholder } from "./components/run-detail-placeholder.js";
+import { StepTableView } from "./components/step-table-view.js";
 import { pickFrameSlots } from "./components/app-shell-layout.js";
 import { reducer, initialAppState } from "./state/reducer.js";
+import { initialEngineState } from "./engine/reducer.js";
+import type { EngineState } from "./engine/types.js";
 import {
   addEntry,
   loadRegistry,
@@ -68,6 +71,13 @@ export interface AppProps {
    * through verbatim — no sort/filter pre-processing.
    */
   readonly initialRunRows?: ReadonlyArray<RunsTableRow>;
+  /**
+   * Test seam — seeds the engine slice that production will wire to the
+   * adapter+reducer in P6-T0. When undefined, the slice is empty (the
+   * current production behaviour — the step table renders an empty state
+   * until the live feed lands). See docs/tui/plans/P6-T1.md §8.1.
+   */
+  readonly engineState?: EngineState;
 }
 
 export function App({
@@ -76,7 +86,9 @@ export function App({
   initialLaunchArgs,
   urlIngestor,
   initialRunRows,
+  engineState,
 }: AppProps): React.ReactElement {
+  const effectiveEngineState: EngineState = engineState ?? initialEngineState;
   const [state, dispatch] = useReducer(reducer, initialAppState);
   const { stdout } = useStdout();
 
@@ -285,16 +297,27 @@ export function App({
       />
     );
   } else if (state.mode.kind === "viewing") {
-    // Zoom: hide the runs table entirely (top slot becomes blank chrome)
-    // and fill the full body with the placeholder.
-    topSlot = null;
+    // Zoom: top slot renders the per-run step table; bottom slot keeps the
+    // detail-pane placeholder until P6-T2 swaps it for the tabbed pane.
+    topSlot = (
+      <StepTableView
+        runId={state.mode.runId}
+        engineState={effectiveEngineState}
+        width={innerWidth}
+        height={topSlotRows}
+        nowMs={nowMs}
+      />
+    );
     bottomSlot = (
       <RunDetailPlaceholder
         mode="zoom"
         selectedRunId={state.mode.runId}
-        runExists={rowsById.has(state.mode.runId)}
+        runExists={
+          rowsById.has(state.mode.runId) ||
+          effectiveEngineState.runs.has(state.mode.runId)
+        }
         width={innerWidth}
-        height={topSlotRows + bottomSlotRows}
+        height={bottomSlotRows}
       />
     );
   } else {

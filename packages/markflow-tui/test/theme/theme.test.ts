@@ -110,10 +110,10 @@ describe("MONOCHROME_COLOR_TABLE", () => {
 });
 
 describe("UNICODE_GLYPHS spec compliance (features.md §5.10 + plan.md line 294)", () => {
-  it("contains exactly the 10 glyphs ⊙ ▶ ✓ ✗ ○ ⏸ ↻ ⏱ ⟳ →", () => {
+  it("contains the 10 status glyphs ⊙ ▶ ✓ ✗ ○ ⏸ ↻ ⏱ ⟳ → plus progress glyphs █ ░ (P6-T1)", () => {
     const values = Object.values(UNICODE_GLYPHS).sort();
     expect(values).toEqual(
-      ["⊙", "▶", "✓", "✗", "○", "⏸", "↻", "⏱", "⟳", "→"].sort(),
+      ["⊙", "▶", "✓", "✗", "○", "⏸", "↻", "⏱", "⟳", "→", "█", "░"].sort(),
     );
   });
 
@@ -128,6 +128,8 @@ describe("UNICODE_GLYPHS spec compliance (features.md §5.10 + plan.md line 294)
     ["timeout", "⏱"],
     ["batch", "⟳"],
     ["arrow", "→"],
+    ["progressFilled", "█"],
+    ["progressEmpty", "░"],
   ])("UNICODE_GLYPHS.%s === %s", (key, glyph) => {
     expect(UNICODE_GLYPHS[key as keyof typeof UNICODE_GLYPHS]).toBe(glyph);
   });
@@ -140,6 +142,8 @@ describe("UNICODE_GLYPHS spec compliance (features.md §5.10 + plan.md line 294)
         "fail": "✗",
         "ok": "✓",
         "pending": "⊙",
+        "progressEmpty": "░",
+        "progressFilled": "█",
         "retry": "↻",
         "running": "▶",
         "skipped": "○",
@@ -162,6 +166,8 @@ describe("ASCII_GLYPHS tier", () => {
     ["timeout", "[time]"],
     ["batch", "[batch]"],
     ["arrow", "->"],
+    ["progressFilled", "#"],
+    ["progressEmpty", "."],
   ])("ASCII_GLYPHS.%s === %s", (key, glyph) => {
     expect(ASCII_GLYPHS[key as keyof typeof ASCII_GLYPHS]).toBe(glyph);
   });
@@ -174,6 +180,8 @@ describe("ASCII_GLYPHS tier", () => {
         "fail": "[fail]",
         "ok": "[ok]",
         "pending": "[pend]",
+        "progressEmpty": ".",
+        "progressFilled": "#",
         "retry": "[retry]",
         "running": "[run]",
         "skipped": "[skip]",

@@ -44,4 +44,9 @@ export {
   RunDetailPlaceholder,
   type RunDetailPlaceholderProps,
 } from "./run-detail-placeholder.js";
+export { StepTable, type StepTableProps } from "./step-table.js";
+export {
+  StepTableView,
+  type StepTableViewProps,
+} from "./step-table-view.js";
 export type { Binding, AppContext, KeySpec, Category } from "./types.js";

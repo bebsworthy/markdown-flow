@@ -58,26 +58,36 @@ export const ASCII_FRAME: FrameGlyphs = Object.freeze({
 });
 
 /**
- * The 10 glyphs from docs/tui/features.md §5.10 (line 529–540), keyed by
- * state name. The task brief (plan.md line 294) enumerates the same 10
- * characters: ⊙ ▶ ✓ ✗ ○ ⏸ ↻ ⏱ ⟳ →.
+ * The 10 status glyphs from docs/tui/features.md §5.10 (line 529–540),
+ * keyed by state name. The task brief (plan.md line 294) enumerates the
+ * same 10 characters: ⊙ ▶ ✓ ✗ ○ ⏸ ↻ ⏱ ⟳ →.
+ *
+ * Plus two progress-bar block glyphs added in P6-T1 (docs/tui/plans/P6-T1.md
+ * §4.4 + §12.6) for the forEach batch aggregate row: `progressFilled` (█)
+ * and `progressEmpty` (░). They degrade to `#` / `.` in the ASCII tier.
+ * The progress bar is the first non-status glyph we added — it belongs
+ * with the rest of the theme glyphs so capability-driven ASCII fallback
+ * flows through `buildTheme(capabilities).glyphs`.
  */
 export type GlyphKey =
-  | "pending"   // ⊙
-  | "running"   // ▶
-  | "ok"        // ✓           ("complete" state)
-  | "fail"      // ✗           ("failed"   state)
-  | "skipped"   // ○
-  | "waiting"   // ⏸           (approval / suspended)
-  | "retry"     // ↻
-  | "timeout"   // ⏱
-  | "batch"     // ⟳
-  | "arrow";    // →           (route / edge glyph)
+  | "pending"         // ⊙
+  | "running"         // ▶
+  | "ok"              // ✓           ("complete" state)
+  | "fail"            // ✗           ("failed"   state)
+  | "skipped"         // ○
+  | "waiting"         // ⏸           (approval / suspended)
+  | "retry"           // ↻
+  | "timeout"         // ⏱
+  | "batch"           // ⟳
+  | "arrow"           // →           (route / edge glyph)
+  | "progressFilled"  // █           (P6-T1 forEach aggregate progress bar)
+  | "progressEmpty";  // ░           (P6-T1 forEach aggregate progress bar)
 
 export type GlyphTable = Readonly<Record<GlyphKey, string>>;
 
 /**
- * Unicode glyph table — the default full-fat renderings from §5.10.
+ * Unicode glyph table — the default full-fat renderings from §5.10 plus
+ * the two progress-bar block glyphs (P6-T1).
  */
 export const UNICODE_GLYPHS: GlyphTable = Object.freeze({
   pending: "⊙",
@@ -90,6 +100,8 @@ export const UNICODE_GLYPHS: GlyphTable = Object.freeze({
   timeout: "⏱",
   batch: "⟳",
   arrow: "→",
+  progressFilled: "█",
+  progressEmpty: "░",
 });
 
 /**
@@ -98,6 +110,7 @@ export const UNICODE_GLYPHS: GlyphTable = Object.freeze({
  * - `pending` uses `[pend]` rather than `[wait]` to avoid colliding with
  *   the approval/suspended `waiting` state. See docs/tui/plans/P3-T3.md §3.3.
  * - `arrow` uses `->` per plan.md line 294.
+ * - `progressFilled` / `progressEmpty` fall back to `#` / `.` (P6-T1).
  */
 export const ASCII_GLYPHS: GlyphTable = Object.freeze({
   pending: "[pend]",
@@ -110,6 +123,8 @@ export const ASCII_GLYPHS: GlyphTable = Object.freeze({
   timeout: "[time]",
   batch: "[batch]",
   arrow: "->",
+  progressFilled: "#",
+  progressEmpty: ".",
 });
 
 /** Maps a semantic `ColorRole` to its corresponding `GlyphKey`. */
