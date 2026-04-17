@@ -297,20 +297,6 @@ function RunsTableImpl({
   const columns = pickColumnSet(width);
   const widths = computeColumnWidths(columns, width);
 
-  // Empty state branches — distinguish "no runs yet" from "filter matched none".
-  if (rows.length === 0) {
-    return (
-      <Box flexDirection="column" width={width} height={paneHeight}>
-        <Text
-          color={theme.colors.dim.color}
-          dimColor={theme.colors.dim.dim === true}
-        >
-          no runs yet
-        </Text>
-      </Box>
-    );
-  }
-
   const filterHasTerms = runsFilter.applied.terms.some(
     (t) => t.kind !== "malformed",
   );

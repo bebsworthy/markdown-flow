@@ -111,7 +111,7 @@ scripts — deterministic and fast.
 
 | ID | Test | Refs | Status |
 |---|---|---|---|
-| T0300 | `F2` (or `2`) switches to RUNS mode; the runs-table renders the expected columns (`ID · WORKFLOW · STATUS · STEP · ELAPSED · STARTED · NOTE`). | mockups.md §1, §12; features.md §3.2 | [ ] |
+| T0300 | `F2` (or `2`) switches to RUNS mode; the runs-table renders the expected columns (`ID · WORKFLOW · STATUS · STEP · ELAPSED · STARTED · NOTE`). | mockups.md §1, §12; features.md §3.2 | [x] |
 | T0301 | Default sort is "attention" — active (`▶`/`⏸`) first by `started` desc, then terminal (`✗`/`✓`) by `ended` desc. | features.md §3.2; mockups.md §1 | [ ] |
 | T0302 | `s` cycles sort columns (`started`, `ended`, `duration`, `workflow`, `status`); the header indicator moves and rows reorder. | features.md §3.2 | [ ] |
 | T0303 | Archive default hides terminal runs older than 24 h (ok) / 7 d (failed); footer reads `N shown · M archived`. | features.md §3.2 | [ ] |
@@ -394,7 +394,7 @@ Update this table after each test lands.
 | 1 Launch & lifecycle | 13 | 13 |
 | 2 Workflow browser | 11 | 11 |
 | 3 Add modal | 11 | 11 |
-| 4 Runs table | 15 | 0 |
+| 4 Runs table | 15 | 1 |
 | 5 Step table | 10 | 0 |
 | 6 Tabbed pane | 17 | 0 |
 | 7 Approval | 10 | 0 |

@@ -330,7 +330,7 @@ describe("<RunsTable> — key handling", () => {
 // ---------------------------------------------------------------------------
 
 describe("<RunsTable> — empty state", () => {
-  it("renders 'no runs yet' with no header chrome", () => {
+  it("renders 'no runs yet' with column headers", () => {
     const { frame, cleanup } = renderTable({
       rows: [],
       width: 140,
@@ -338,8 +338,8 @@ describe("<RunsTable> — empty state", () => {
     });
     const f = frame();
     expect(f).toContain("no runs yet");
-    expect(f).not.toContain("WORKFLOW");
-    expect(f).not.toContain("STATUS");
+    expect(f).toContain("WORKFLOW");
+    expect(f).toContain("STATUS");
     cleanup();
   });
 
