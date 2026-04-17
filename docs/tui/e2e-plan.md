@@ -98,7 +98,7 @@
 | T0204 | `Tab` switches between the Fuzzy find and Path or URL tabs; focus moves to the other input. | mockups.md §2 add-modal | [x] |
 | T0205 | Path tab accepts absolute paths, relative paths, and glob patterns; each resolved match becomes one registry entry. | features.md §3.1 | [x] |
 | T0206 | Path tab shows "no files matched" when a glob resolves to zero results; modal stays open with inline error. | features.md §3.1 | [x] |
-| T0207 | URL tab on a valid URL materialises a workspace on the local scratch env and registers it as `[workspace]` (network mocked via a local static file server fixture). | features.md §3.1 URL flow | [ ] |
+| T0207 | URL tab on a valid URL materialises a workspace on the local scratch env and registers it as `[workspace]` (network mocked via a local static file server fixture). | features.md §3.1 URL flow | [x] |
 | T0208 | `Esc` closes the modal without adding anything; registry file is unchanged. | mockups.md §2 add-modal | [ ] |
 | T0209 | `Enter` on the selected fuzzy result persists the entry and closes the modal; the new entry is selected in the browser. | features.md §3.1 | [ ] |
 | T0210 | Adding a path that is already in the registry is a no-op; no duplicate entry is written. | features.md §3.1 | [ ] |
@@ -393,7 +393,7 @@ Update this table after each test lands.
 |---|---|---|
 | 1 Launch & lifecycle | 13 | 13 |
 | 2 Workflow browser | 11 | 11 |
-| 3 Add modal | 11 | 7 |
+| 3 Add modal | 11 | 8 |
 | 4 Runs table | 15 | 0 |
 | 5 Step table | 10 | 0 |
 | 6 Tabbed pane | 17 | 0 |
@@ -412,7 +412,7 @@ Update this table after each test lands.
 | 19 Engine integration | 6 | 0 |
 | 20 Registry | 4 | 0 |
 | 21 Exit discipline | 3 | 0 |
-| **Total** | **180** | **31** |
+| **Total** | **180** | **32** |
 
 ---
 
