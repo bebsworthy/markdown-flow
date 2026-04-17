@@ -159,6 +159,16 @@ function WorkflowBrowserImpl({
       dispatch({ type: "SELECT_WORKFLOW", workflowId: id });
       return;
     }
+    if (input === "g") {
+      const id = resolved[0]?.id ?? null;
+      dispatch({ type: "SELECT_WORKFLOW", workflowId: id });
+      return;
+    }
+    if (input === "G") {
+      const id = resolved[resolved.length - 1]?.id ?? null;
+      dispatch({ type: "SELECT_WORKFLOW", workflowId: id });
+      return;
+    }
     if (key.return) {
       const id = resolved[curr]?.id ?? null;
       dispatch({ type: "SELECT_WORKFLOW", workflowId: id });
