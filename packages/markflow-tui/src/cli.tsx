@@ -10,9 +10,14 @@ try {
   process.exit(1);
 }
 
+let quitViaQ = false;
+
 const { unmount, waitUntilExit } = render(
   <App
-    onQuit={() => unmount()}
+    onQuit={() => {
+      quitViaQ = true;
+      unmount();
+    }}
     registryConfig={parsed.config}
     initialLaunchArgs={parsed.rest}
     runsDir={parsed.runsDir}
@@ -20,7 +25,7 @@ const { unmount, waitUntilExit } = render(
 );
 
 waitUntilExit().then(
-  () => process.exit(0),
+  () => process.exit(quitViaQ ? 0 : 130),
   (err) => {
     console.error(err);
     process.exit(1);
