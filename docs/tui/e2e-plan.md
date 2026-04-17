@@ -238,11 +238,11 @@ each status.
 |---|---|---|---|
 | T1000 | `r` on a workflow with zero declared inputs starts a run immediately; the TUI transitions to `viewing` mode within 300 ms of the engine's `run:start`; the run appears in `runs/<id>/events.jsonl`. | features.md §3.1, §5.7 | [x] |
 | T1001 | `r` on a workflow with ≥1 required input opens the input-prompt modal (mockup §4.3 of P9-T1 plan). Title reads `RUN · <workflow>`. | features.md §5.7 | [x] |
-| T1002 | The `⏎ Run` button is dimmed (hidden label) until every required input is populated. | P9-T1 plan §6 D4 | [ ] |
+| T1002 | The `⏎ Run` button is dimmed (hidden label) until every required input is populated. | P9-T1 plan §6 D4 | [x] |
 | T1003 | `Tab` / `Shift-Tab` cycles focus between input rows; `Enter` on a non-final row advances when submit is still blocked. | P9-T1 plan §6 D4 | [ ] |
 | T1004 | Typing into a row updates the draft live; backspace deletes. Rapid keystrokes do not clobber each other (ref-tracked drafts). | P9-T1 plan §6 D5 | [ ] |
 | T1005 | `Esc` cancels the modal; the bridge is NOT called; registry / runs dir unchanged. | P9-T1 plan | [x] |
-| T1006 | Submitting valid inputs calls the engine bridge; `run:start` fires with the inputs; the modal closes exactly once. | P9-T1 plan | [ ] |
+| T1006 | Submitting valid inputs calls the engine bridge; `run:start` fires with the inputs; the modal closes exactly once. | P9-T1 plan | [x] |
 | T1007 | Bridge returning `{kind:"locked", …}` keeps the modal open with "Run is locked — retry" surfaced in-modal. | features.md §7; P9-T1 plan | [ ] |
 | T1008 | Bridge returning `{kind:"invalidInputs", missing}` surfaces the missing keys in-modal and returns focus to the first missing row. | P9-T1 plan | [ ] |
 | T1009 | Bridge returning `{kind:"parseError", message}` surfaces the engine's message verbatim; modal stays mounted. | P9-T1 plan | [ ] |
@@ -401,7 +401,7 @@ Update this table after each test lands.
 | 8 Resume wizard | 11 | 0 |
 | 9 Palette & help | 13 | 0 |
 | 10 Keybar tiers | 9 | 0 |
-| 11 Run entry (P9-T1) | 16 | 3 |
+| 11 Run entry (P9-T1) | 16 | 5 |
 | 12 Cancel (P9-T2) | 6 | 0 |
 | 13 Pending (P9-T3) | 5 | 0 |
 | 14 Retry budget (P9-T4) | 4 | 0 |
