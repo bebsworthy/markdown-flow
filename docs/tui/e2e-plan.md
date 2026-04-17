@@ -75,8 +75,8 @@
 
 | ID | Test | Refs | Status |
 |---|---|---|---|
-| T0100 | With ≥1 entry, the browser renders title, source badge (`[file]`/`[workspace]`), last-run status, and diagnostics flag for each row (§2 mockup). | mockups.md §2 | [ ] |
-| T0101 | `↑`/`↓` + `j`/`k` moves the cursor; the preview pane updates to the selected workflow on each move. | mockups.md §2 | [ ] |
+| T0100 | With ≥1 entry, the browser renders title, source badge (`[file]`/`[workspace]`), last-run status, and diagnostics flag for each row (§2 mockup). | mockups.md §2 | [x] |
+| T0101 | `↑`/`↓` + `j`/`k` moves the cursor; the preview pane updates to the selected workflow on each move. | mockups.md §2 | [x] |
 | T0102 | `g` jumps to top, `G` to bottom. | features.md §5.5 | [ ] |
 | T0103 | A parse-failing entry renders in the list with `✗ parse` and stays visible (hide-don't-delete). Cursor can still land on it. | features.md §3.1; mockups.md §2 | [ ] |
 | T0104 | Preview pane for a valid workflow shows `# Title`, `## Inputs`, `## Flow` ascii digest, and `N steps · K approvals · B forEach` summary. | mockups.md §2 | [ ] |
@@ -392,7 +392,7 @@ Update this table after each test lands.
 | Group | Total | Done |
 |---|---|---|
 | 1 Launch & lifecycle | 13 | 13 |
-| 2 Workflow browser | 11 | 0 |
+| 2 Workflow browser | 11 | 2 |
 | 3 Add modal | 11 | 0 |
 | 4 Runs table | 15 | 0 |
 | 5 Step table | 10 | 0 |
