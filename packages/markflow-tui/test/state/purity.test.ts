@@ -139,6 +139,11 @@ const files = [
   "../../src/components/keybar-fixtures/command.ts",
   "../../src/components/keybar-fixtures/help.ts",
   "../../src/components/keybar-fixtures/registry.ts",
+  // P9-T1 run-entry pure modules (input-prompt modal form + row derive).
+  "../../src/runStart/types.ts",
+  "../../src/runStart/derive.ts",
+  "../../src/runStart/reducer.ts",
+  "../../src/runStart/index.ts",
 ];
 
 /**
@@ -628,6 +633,35 @@ describe("pure-module purity", () => {
   it("resume keybar fixture loads without Ink/React/fs", async () => {
     const mod = await import("../../src/components/keybar-fixtures/resume.js");
     expect(Array.isArray(mod.RESUME_KEYBAR)).toBe(true);
+  });
+
+  // -------------------------------------------------------------------
+  // P9-T1 run-entry pure surface
+  // -------------------------------------------------------------------
+
+  it("runStart types module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/runStart/types.js");
+    expect(Object.keys(mod)).toEqual([]);
+  });
+
+  it("runStart derive module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/runStart/derive.js");
+    expect(typeof mod.deriveRunInputRows).toBe("function");
+    expect(typeof mod.composeRunInputs).toBe("function");
+    expect(typeof mod.missingRequiredInputs).toBe("function");
+    expect(typeof mod.canSubmitRunInputs).toBe("function");
+  });
+
+  it("runStart reducer module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/runStart/reducer.js");
+    expect(typeof mod.runInputFormReducer).toBe("function");
+    expect(typeof mod.initialRunInputFormState).toBe("function");
+  });
+
+  it("runStart index module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/runStart/index.js");
+    expect(typeof mod.deriveRunInputRows).toBe("function");
+    expect(typeof mod.runInputFormReducer).toBe("function");
   });
 
   it("steps detail module loads without Ink/React/fs", async () => {

@@ -52,6 +52,7 @@ import { RunsTableRow } from "./runs-table-row.js";
 import { RunsFilterBar } from "./runs-filter-bar.js";
 import { RunsFooter } from "./runs-footer.js";
 import type { Action } from "../state/types.js";
+import type { RunInfo } from "markflow";
 
 export interface RunsTableProps {
   readonly rows: ReadonlyArray<RowData>;
@@ -81,6 +82,12 @@ export interface RunsTableProps {
    * observe call counts. Production callers omit this.
    */
   readonly applyFilterImpl?: typeof applyFilter;
+  /**
+   * Callback fired when the user presses `r` on a terminal-state row
+   * (complete / error / cancelled). App wires it to the run-entry flow
+   * (plan §4.2). Silently ignored on active rows — hide-don't-grey.
+   */
+  readonly onStartRun?: (info: RunInfo) => void;
 }
 
 const DEFAULT_HEIGHT = 10;
@@ -101,6 +108,7 @@ function RunsTableImpl({
   dispatch,
   inputDisabled,
   applyFilterImpl,
+  onStartRun,
 }: RunsTableProps): React.ReactElement {
   const theme = useTheme();
   const paneHeight = height ?? DEFAULT_HEIGHT;
@@ -211,6 +219,18 @@ function RunsTableImpl({
       }
       if (input === "a") {
         dispatch({ type: "RUNS_ARCHIVE_TOGGLE" });
+        return;
+      }
+
+      // `r` Run — start a fresh run of the same workflow (P9-T1). Scoped
+      // to terminal rows (hide-don't-grey on active runs).
+      if (input === "r") {
+        const row = sortedRows[windowState.cursor];
+        if (!row) return;
+        const terminal =
+          row.info.status === "complete" || row.info.status === "error";
+        if (!terminal) return;
+        if (onStartRun) onStartRun(row.info);
         return;
       }
 

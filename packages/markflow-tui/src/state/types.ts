@@ -22,6 +22,7 @@ import type {
   RunsFilterState,
   RunsSortState,
 } from "../runs/types.js";
+import type { RunInputRow } from "../runStart/types.js";
 
 /** Which top-level area of the app is active. §5.1 "app mode" tree. */
 export type Mode =
@@ -73,7 +74,22 @@ export type Overlay =
   // threaded through the reducer — all other ephemeral state (query text,
   // walker results, URL input, ingest in-flight flag, root picker) lives
   // as component-local `useState` inside <AddWorkflowModal>.
-  | { readonly kind: "addWorkflow"; readonly tab: AddModalTab };
+  | { readonly kind: "addWorkflow"; readonly tab: AddModalTab }
+  // Input-prompt modal (P9-T1). Opened from browser `r`, runs-table `r`
+  // on a terminal row, or `:run <workflow>` in the palette when the
+  // resolved workflow declares required inputs. Row drafts live inside
+  // the modal's component-local reducer — see docs/tui/plans/P9-T1.md
+  // §6 D2. This overlay variant carries only the seed snapshot + submit
+  // FSM so the reducer stays thin.
+  | {
+      readonly kind: "runInput";
+      readonly workflowId: string;
+      readonly sourceFile: string;
+      readonly workspaceDir: string;
+      readonly workflowName: string;
+      readonly seedRows: readonly RunInputRow[];
+      readonly state: "idle" | "submitting";
+    };
 
 /**
  * Top-level app state. §6.2 "single source of truth".
@@ -210,4 +226,10 @@ export type Action =
   // no-op placeholder kept for catalogue symmetry with RUNS_CURSOR_MOVE;
   // row-aware cursor logic lands with a later Phase-6 task.
   | { readonly type: "SELECT_STEP"; readonly stepId: string | null }
-  | { readonly type: "STEP_CURSOR_MOVE"; readonly delta: number };
+  | { readonly type: "STEP_CURSOR_MOVE"; readonly delta: number }
+  // Run-input modal submit FSM (P9-T1). `SUBMIT_START` flips
+  // `overlay.state` to `"submitting"`; `SUBMIT_DONE` closes the overlay
+  // unconditionally. Per-row draft edits live in the modal's local
+  // reducer (§6 D2), so there is no `SET_DRAFT` at the app level.
+  | { readonly type: "RUN_INPUT_SUBMIT_START" }
+  | { readonly type: "RUN_INPUT_SUBMIT_DONE" };

@@ -9,6 +9,9 @@ export { decideApproval } from "./decide.js";
 export type { DecideApprovalOptions } from "./decide.js";
 export { resumeRun } from "./resume.js";
 export type { ResumeRunOptions } from "./resume.js";
+export { runWorkflow } from "./run.js";
+export type { RunWorkflowOptions } from "./run.js";
+export type { RunWorkflowResult } from "../runStart/types.js";
 export {
   engineReducer,
   initialEngineState,

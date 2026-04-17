@@ -22,6 +22,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { dirname } from "node:path";
 import { Box, Text, useInput, useStdout } from "ink";
 import { ThemeProvider } from "./theme/context.js";
 import { AppShell } from "./components/app-shell.js";
@@ -46,6 +47,15 @@ import {
 import type { ApprovalSubmitResult } from "./approval/types.js";
 import { decideApproval as defaultDecideApproval } from "./engine/decide.js";
 import { resumeRun as defaultResumeRun } from "./engine/resume.js";
+import { runWorkflow as defaultRunWorkflow } from "./engine/run.js";
+import { InputPromptModal } from "./components/input-prompt-modal.js";
+import { deriveRunInputRows } from "./runStart/derive.js";
+import type {
+  RunInputRow,
+  RunWorkflowResult,
+} from "./runStart/types.js";
+import type { ResolvedEntry } from "./browser/types.js";
+import type { RunInfo, WorkflowDefinition } from "markflow";
 import {
   deriveInputRows,
   deriveRerunNodes,
@@ -159,6 +169,25 @@ export interface AppProps {
    * sourced via `deriveInputRows(workflow, events)`.
    */
   readonly resumeWorkflow?: import("markflow").WorkflowDefinition | null;
+  /**
+   * Test seam — overrides the `runWorkflow` call used by the run-entry
+   * flow (P9-T1). Production defaults to the real engine bridge
+   * (`src/engine/run.ts`).
+   */
+  readonly runWorkflow?: (args: {
+    readonly runsDir: string;
+    readonly workspaceDir: string;
+    readonly sourceFile: string;
+    readonly inputs: Readonly<Record<string, string>>;
+    readonly onRunStart?: (runId: string) => void;
+  }) => Promise<RunWorkflowResult>;
+  /**
+   * Test seam — snapshot of currently-resolved workflows used by the
+   * run-entry flow to look up a workflow by name or id when the runs
+   * table emits `r`. Production threads this from the workflow browser
+   * once resolvers have completed; tests seed it.
+   */
+  readonly runRegistryLookup?: ReadonlyArray<ResolvedEntry>;
 }
 
 export function App({
@@ -172,6 +201,8 @@ export function App({
   decideApproval,
   resumeRun,
   resumeWorkflow,
+  runWorkflow: runWorkflowProp,
+  runRegistryLookup,
 }: AppProps): React.ReactElement {
   const effectiveEngineState: EngineState = engineState ?? initialEngineState;
   const [state, dispatch] = useReducer(reducer, initialAppState);
@@ -205,6 +236,7 @@ export function App({
 
   const decide = decideApproval ?? defaultDecideApproval;
   const resume = resumeRun ?? defaultResumeRun;
+  const startRun = runWorkflowProp ?? defaultRunWorkflow;
 
   // ---- Resume wizard derivations (P7-T2) -------------------------------
   const activeRun = effectiveEngineState.activeRun;
@@ -331,6 +363,163 @@ export function App({
       }
     })();
   }, [registryLoaded, initialLaunchArgs, urlIngestor, onAddEntry]);
+
+  // ---- Run-entry helpers (P9-T1) ----------------------------------------
+  //
+  // Two shapes of caller:
+  //   1. `startRunFromEntry(entry)` — given a ResolvedEntry from the
+  //      workflow browser or runs-table resolver, open the input modal
+  //      when required inputs are declared; otherwise invoke the bridge
+  //      directly and transition to viewing mode on success.
+  //   2. `startRunFromWorkflow(workflow, sourceFile)` — same logic but
+  //      sourced from a parsed WorkflowDefinition (palette path).
+  // Both funnel into the same bridge call + overlay open.
+  const launchRun = useCallback(
+    async (args: {
+      readonly sourceFile: string;
+      readonly workspaceDir: string;
+      readonly inputs: Readonly<Record<string, string>>;
+    }): Promise<RunWorkflowResult> => {
+      if (!runsDir) {
+        return { kind: "error", message: "runsDir is not configured" };
+      }
+      return startRun({
+        runsDir,
+        workspaceDir: args.workspaceDir,
+        sourceFile: args.sourceFile,
+        inputs: args.inputs,
+        onRunStart: (runId) => {
+          dispatch({ type: "OVERLAY_CLOSE" });
+          dispatch({ type: "MODE_OPEN_RUN", runId });
+        },
+      });
+    },
+    [runsDir, startRun],
+  );
+
+  const startRunForWorkflow = useCallback(
+    (args: {
+      readonly workflowId: string;
+      readonly workflow: WorkflowDefinition;
+      readonly sourceFile: string;
+    }): void => {
+      const rows = deriveRunInputRows(args.workflow);
+      if (rows.length === 0) {
+        // Direct launch — no modal.
+        void launchRun({
+          sourceFile: args.sourceFile,
+          workspaceDir: dirname(args.sourceFile),
+          inputs: {},
+        });
+        return;
+      }
+      dispatch({
+        type: "OVERLAY_OPEN",
+        overlay: {
+          kind: "runInput",
+          workflowId: args.workflowId,
+          sourceFile: args.sourceFile,
+          workspaceDir: dirname(args.sourceFile),
+          workflowName: args.workflow.name,
+          seedRows: rows as readonly RunInputRow[],
+          state: "idle",
+        },
+      });
+    },
+    [launchRun],
+  );
+
+  const startRunFromEntry = useCallback(
+    (entry: ResolvedEntry): void => {
+      if (entry.status !== "valid") return;
+      if (!entry.workflow || !entry.absolutePath) return;
+      startRunForWorkflow({
+        workflowId: entry.id,
+        workflow: entry.workflow,
+        sourceFile: entry.absolutePath,
+      });
+    },
+    [startRunForWorkflow],
+  );
+
+  const runsTableStartRun = useCallback(
+    (info: RunInfo): void => {
+      const entries = runRegistryLookup ?? [];
+      const match = entries.find(
+        (e) =>
+          e.workflow !== null &&
+          (e.workflow.name === info.workflowName ||
+            (e.absolutePath !== null && e.absolutePath === info.sourceFile)),
+      );
+      if (match) startRunFromEntry(match);
+    },
+    [runRegistryLookup, startRunFromEntry],
+  );
+
+  const paletteRunWorkflow = useCallback(
+    async (arg: string): Promise<CommandResult> => {
+      const entries = runRegistryLookup ?? [];
+      if (entries.length === 0) {
+        return {
+          kind: "unavailable",
+          message: "no workflows registered",
+        };
+      }
+      const needle = arg.trim();
+      if (needle === "") {
+        return { kind: "usage", message: "usage: :run <workflow>" };
+      }
+      // Exact match on name or id.
+      let match: ResolvedEntry | null =
+        entries.find(
+          (e) =>
+            (e.workflow && e.workflow.name === needle) || e.id === needle,
+        ) ?? null;
+      if (!match) {
+        // Unique prefix match on name.
+        const prefixMatches = entries.filter(
+          (e) => e.workflow && e.workflow.name.startsWith(needle),
+        );
+        if (prefixMatches.length === 1) {
+          match = prefixMatches[0]!;
+        } else if (prefixMatches.length > 1) {
+          return {
+            kind: "usage",
+            message: `ambiguous: matches ${prefixMatches
+              .map((e) => (e.workflow ? e.workflow.name : e.id))
+              .join(", ")}`,
+          };
+        }
+      }
+      if (!match) {
+        return {
+          kind: "unavailable",
+          message: `no workflow matching '${needle}'`,
+        };
+      }
+      if (match.status !== "valid" || !match.workflow || !match.absolutePath) {
+        return {
+          kind: "unavailable",
+          message: "workflow is not resolvable",
+        };
+      }
+      // Schedule the run-entry dispatch for the NEXT macrotask so the
+      // palette's `{kind:"ok"}` branch can run its own `OVERLAY_CLOSE`
+      // first without clobbering the new `runInput` overlay. Palette
+      // sees `ok`, closes itself; then we open the input modal on the
+      // next tick.
+      const resolvedMatch = match;
+      setImmediate(() => {
+        startRunForWorkflow({
+          workflowId: resolvedMatch.id,
+          workflow: resolvedMatch.workflow!,
+          sourceFile: resolvedMatch.absolutePath!,
+        });
+      });
+      return { kind: "ok" };
+    },
+    [runRegistryLookup, startRunForWorkflow],
+  );
 
   // ---- Global key bindings ----------------------------------------------
   //
@@ -551,6 +740,7 @@ export function App({
         onRemoveEntry={(source) => {
           void onRemoveEntry(source);
         }}
+        onStartRun={startRunFromEntry}
       />
     );
     bottomSlot = <Text> </Text>;
@@ -567,6 +757,7 @@ export function App({
         height={topSlotRows}
         nowMs={nowMs}
         dispatch={dispatch}
+        onStartRun={runsTableStartRun}
       />
     );
     bottomSlot = (
@@ -772,6 +963,7 @@ export function App({
           height={slotRows}
           nowMs={nowMs}
           dispatch={dispatch}
+          onStartRun={runsTableStartRun}
         />
       );
       narrowBreadcrumb = composeBreadcrumb(
@@ -1004,10 +1196,7 @@ export function App({
               runActive: false,
               runResumable,
               pendingApprovalsCount,
-              runWorkflow: async (): Promise<CommandResult> => ({
-                kind: "unavailable",
-                message: "run command not yet wired",
-              }),
+              runWorkflow: paletteRunWorkflow,
               resumeRun: async (args): Promise<CommandResult> => {
                 if (!runsDir) {
                   return { kind: "error", message: "runsDir not configured" };
@@ -1086,6 +1275,37 @@ export function App({
             modeLabel={prevFixtureRef.current?.modeLabel ?? ""}
             focusLabel={prevFixtureRef.current?.focusLabel ?? ""}
             onClose={() => dispatch({ type: "OVERLAY_CLOSE" })}
+            width={modalWidth}
+            height={modalHeight}
+          />
+        </Box>
+      ) : null}
+      {state.overlay?.kind === "runInput" ? (
+        <Box
+          flexDirection="column"
+          alignItems="center"
+        >
+          <InputPromptModal
+            workflowName={state.overlay.workflowName}
+            sourceFile={state.overlay.sourceFile}
+            rows={state.overlay.seedRows}
+            onSubmit={async (inputs) => {
+              const ov = state.overlay;
+              if (ov?.kind !== "runInput") {
+                return { kind: "error", message: "overlay closed" };
+              }
+              dispatch({ type: "RUN_INPUT_SUBMIT_START" });
+              const result = await launchRun({
+                sourceFile: ov.sourceFile,
+                workspaceDir: ov.workspaceDir,
+                inputs,
+              });
+              if (result.kind === "ok") {
+                dispatch({ type: "RUN_INPUT_SUBMIT_DONE" });
+              }
+              return result;
+            }}
+            onCancel={() => dispatch({ type: "OVERLAY_CLOSE" })}
             width={modalWidth}
             height={modalHeight}
           />

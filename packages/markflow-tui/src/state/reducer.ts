@@ -204,7 +204,24 @@ export function reducer(state: AppState, action: Action): AppState {
       // context the reducer does not have. The action variant stays in
       // the union for future wiring.
       return state;
+    case "RUN_INPUT_SUBMIT_START":
+      return startRunInputSubmit(state);
+    case "RUN_INPUT_SUBMIT_DONE":
+      return finishRunInputSubmit(state);
   }
+}
+
+function startRunInputSubmit(state: AppState): AppState {
+  const ov = state.overlay;
+  if (!ov || ov.kind !== "runInput") return state;
+  if (ov.state === "submitting") return state;
+  return { ...state, overlay: { ...ov, state: "submitting" } };
+}
+
+function finishRunInputSubmit(state: AppState): AppState {
+  const ov = state.overlay;
+  if (!ov || ov.kind !== "runInput") return state;
+  return { ...state, overlay: null };
 }
 
 // ---------------------------------------------------------------------------

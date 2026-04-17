@@ -49,6 +49,13 @@ export interface WorkflowBrowserProps {
    * if not provided so older call sites (mid-migration) keep working.
    */
   readonly onRemoveEntry?: (source: string) => void;
+  /**
+   * Callback fired when the user presses `r` on a selected resolvable row.
+   * App wires it to the run-entry flow (opens the input-prompt modal when
+   * required inputs are declared, otherwise starts the run directly).
+   * Silently ignored on rows with `status !== "valid"` — hide-don't-grey.
+   */
+  readonly onStartRun?: (entry: ResolvedEntry) => void;
 }
 
 const DEFAULT_WIDTH = 140;
@@ -65,6 +72,7 @@ function WorkflowBrowserImpl({
   resolver,
   resolverBaseDir,
   onRemoveEntry,
+  onStartRun,
 }: WorkflowBrowserProps): React.ReactElement {
   const theme = useTheme();
   const paneWidth = width ?? DEFAULT_WIDTH;
@@ -152,8 +160,19 @@ function WorkflowBrowserImpl({
       if (row && onRemoveEntry) onRemoveEntry(row.entry.source);
       return;
     }
-    // 🟡 TODO P5 — run workflow
-    if (input === "r") return;
+    if (input === "r") {
+      const row = resolved[curr];
+      if (
+        row &&
+        row.status === "valid" &&
+        row.workflow &&
+        row.absolutePath !== null &&
+        onStartRun
+      ) {
+        onStartRun(row);
+      }
+      return;
+    }
     // 🟡 TODO future — edit in $EDITOR
     if (input === "e") return;
   });
