@@ -211,7 +211,7 @@ each status.
 | T0806 | `:goto <seq>` jumps the log pane to that `seq` if present; otherwise shows an inline error. | features.md §3.10 | [ ] |
 | T0807 | `:theme <name>` switches theme at runtime (if the feature is in MVP scope) or reports `unknown theme`. | features.md §3.10 | [ ] |
 | T0808 | Unknown command → inline `unknown command` message, palette stays open. | features.md §3.10 | [x] |
-| T0809 | `?` opens the help overlay with categories `RUN`, `VIEW`, `GLOBAL` and only the active bindings for the current (mode, focus). | features.md §3.10; mockups.md §11 | [ ] |
+| T0809 | `?` opens the help overlay with categories `RUN`, `VIEW`, `GLOBAL` and only the active bindings for the current (mode, focus). | features.md §3.10; mockups.md §11 | [x] |
 | T0810 | `/` inside help filters rows to matches; keys bold-highlighted. | mockups.md §11 | [ ] |
 | T0811 | Disabled bindings (e.g. `a Approve` when no approvals pending) are **omitted** from the help overlay, not greyed. | features.md §5.6 rule 5; mockups.md §11 | [ ] |
 | T0812 | `Esc` closes the help overlay; focus returns to the pane/modal that was active before `?`. | mockups.md §11 | [ ] |
@@ -308,9 +308,9 @@ to every mounted `useInput` consumer.
 |---|---|---|---|
 | T1600 | With the command palette open, typing `run deploy` into the palette does NOT also trigger the browser/runs-table `r` handler. | P9-T1 post-mortem | [ ] |
 | T1601 | With the approval modal open, the runs-table `r` / `X` handlers are inert. | features.md §5.6 rule 5 | [ ] |
-| T1602 | With the help overlay open, no underlying pane handler fires on any keystroke except `Esc` or `q`. | features.md §3.10 | [ ] |
+| T1602 | With the help overlay open, no underlying pane handler fires on any keystroke except `Esc` or `q`. | features.md §3.10 | [x] |
 | T1603 | With the resume wizard open, typing numeric characters in the inputs does NOT switch tabs. | features.md §3.8 | [ ] |
-| T1604 | With the input-prompt modal open, the browser `r` handler is inert. | P9-T1 post-mortem | [ ] |
+| T1604 | With the input-prompt modal open, the browser `r` handler is inert. | P9-T1 post-mortem | [x] |
 | T1605 | Every `useInput` site in `packages/markflow-tui/src/` receives an `inputDisabled` or equivalent gate; enforced by an AST check. | §7 B3 | [ ] |
 
 ## 18. Theming, monochrome, ASCII fallback  (P8-T2)
@@ -399,7 +399,7 @@ Update this table after each test lands.
 | 6 Tabbed pane | 17 | 0 |
 | 7 Approval | 10 | 0 |
 | 8 Resume wizard | 11 | 0 |
-| 9 Palette & help | 13 | 4 |
+| 9 Palette & help | 13 | 5 |
 | 10 Keybar tiers | 9 | 0 |
 | 11 Run entry (P9-T1) | 16 | 6 |
 | 12 Cancel (P9-T2) | 6 | 0 |
@@ -407,7 +407,7 @@ Update this table after each test lands.
 | 14 Retry budget (P9-T4) | 4 | 0 |
 | 15 Static rendering (P9-T5) | 2 | 0 |
 | 16 Nav ergonomics (P9-T6) | 4 | 0 |
-| 17 Input dispatch | 6 | 0 |
+| 17 Input dispatch | 6 | 2 |
 | 18 Theming | 4 | 0 |
 | 19 Engine integration | 6 | 0 |
 | 20 Registry | 4 | 0 |
