@@ -85,6 +85,9 @@ const files = [
   "../../src/steps/derive.ts",
   "../../src/steps/retry.ts",
   "../../src/steps/upstream.ts",
+  // P6-T2 pure modules — step detail projection surface.
+  "../../src/steps/detail.ts",
+  "../../src/steps/detail-types.ts",
 ];
 
 /**
@@ -377,5 +380,27 @@ describe("pure-module purity", () => {
     const mod = await import("../../src/steps/upstream.js");
     expect(typeof mod.isUpstreamFailed).toBe("function");
     expect(typeof mod.upstreamNoteLabel).toBe("function");
+  });
+
+  // -------------------------------------------------------------------
+  // P6-T2 step-detail pure surface
+  // -------------------------------------------------------------------
+
+  it("steps detail-types module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/steps/detail-types.js");
+    // Type-only module — runtime exports empty.
+    expect(Object.keys(mod)).toEqual([]);
+  });
+
+  it("steps detail module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/steps/detail.js");
+    expect(typeof mod.selectStepDetail).toBe("function");
+    expect(typeof mod.formatJsonOneLine).toBe("function");
+    expect(typeof mod.pickLastLog).toBe("function");
+    expect(typeof mod.pickStderrTail).toBe("function");
+    expect(typeof mod.pickRouteTarget).toBe("function");
+    expect(typeof mod.computeStepTypeLabel).toBe("function");
+    expect(typeof mod.computeAttemptLabel).toBe("function");
+    expect(typeof mod.computeTimeoutLabel).toBe("function");
   });
 });

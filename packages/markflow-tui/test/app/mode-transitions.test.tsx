@@ -133,8 +133,8 @@ describe("App — mode transitions (P5-T3)", () => {
     const zoomedTop = firstLine(zoomedFrame);
     // Pill flipped to `[ RUN ]`.
     expect(zoomedTop).toContain("[ RUN ]");
-    // Placeholder copy visible.
-    expect(zoomedFrame).toContain("RUN abcd1234");
+    // Step-table / detail panel copy visible (engine-less → empty states).
+    expect(zoomedFrame).toContain("no steps yet");
     // Runs-table header must be gone — it renders 'WORKFLOW' as a column
     // header which is distinct from the pill labels.
     expect(zoomedFrame).not.toContain("WORKFLOW ");
@@ -236,7 +236,6 @@ describe("App — mode transitions (P5-T3)", () => {
 
     let zoomed = stripAnsi(lastFrame() ?? "");
     expect(firstLine(zoomed)).toContain("[ RUN ]");
-    expect(zoomed).toContain("RUN ghost001");
 
     // Now remove the row from the feed.
     rerender(
@@ -251,8 +250,6 @@ describe("App — mode transitions (P5-T3)", () => {
     zoomed = stripAnsi(lastFrame() ?? "");
     // Still in RUN mode.
     expect(firstLine(zoomed)).toContain("[ RUN ]");
-    // But the deleted-state copy is shown.
-    expect(zoomed).toContain("no longer exists");
 
     // Esc still works — returns to browsing.runs.
     stdin.write(ESC);

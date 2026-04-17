@@ -103,6 +103,7 @@ export const initialAppState: AppState = {
   },
   runsArchive: RUNS_ARCHIVE_DEFAULTS,
   runsCursor: 0,
+  selectedStepId: null,
 };
 
 export function reducer(state: AppState, action: Action): AppState {
@@ -123,9 +124,13 @@ export function reducer(state: AppState, action: Action): AppState {
         },
         selectedRunId: action.runId,
         filter: "",
+        selectedStepId: null,
       };
     case "MODE_CLOSE_RUN":
-      return withMode(state, { kind: "browsing", pane: "runs" });
+      return {
+        ...withMode(state, { kind: "browsing", pane: "runs" }),
+        selectedStepId: null,
+      };
 
     // --- Focus transitions -------------------------------------------------
     case "FOCUS_BROWSING_PANE":
@@ -188,6 +193,13 @@ export function reducer(state: AppState, action: Action): AppState {
       return pageRunsCursor(state, action);
     case "RUNS_SELECT":
       return selectRun(state, action.runId);
+    case "SELECT_STEP":
+      return selectStep(state, action.stepId);
+    case "STEP_CURSOR_MOVE":
+      // No-op placeholder (plan §4.2 D9) — row resolution requires row
+      // context the reducer does not have. The action variant stays in
+      // the union for future wiring.
+      return state;
   }
 }
 
@@ -372,6 +384,12 @@ function pageRunsCursor(
   const signed = a.direction === "up" ? -size : size;
   const next = Math.max(0, Math.min(rc - 1, state.runsCursor + signed));
   return next === state.runsCursor ? state : { ...state, runsCursor: next };
+}
+
+function selectStep(state: AppState, stepId: string | null): AppState {
+  if (state.mode.kind !== "viewing") return state;
+  if (state.selectedStepId === stepId) return state;
+  return { ...state, selectedStepId: stepId };
 }
 
 function selectRun(state: AppState, runId: string | null): AppState {

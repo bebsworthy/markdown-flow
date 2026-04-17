@@ -33,6 +33,7 @@ import { WORKFLOWS_EMPTY_KEYBAR } from "./components/keybar-fixtures/workflows-e
 import { RunsTable } from "./components/runs-table.js";
 import { RunDetailPlaceholder } from "./components/run-detail-placeholder.js";
 import { StepTableView } from "./components/step-table-view.js";
+import { StepDetailPanelView } from "./components/step-detail-panel-view.js";
 import { pickFrameSlots } from "./components/app-shell-layout.js";
 import { reducer, initialAppState } from "./state/reducer.js";
 import { initialEngineState } from "./engine/reducer.js";
@@ -297,27 +298,26 @@ export function App({
       />
     );
   } else if (state.mode.kind === "viewing") {
-    // Zoom: top slot renders the per-run step table; bottom slot keeps the
-    // detail-pane placeholder until P6-T2 swaps it for the tabbed pane.
+    // Zoom: top slot renders the per-run step table; bottom slot renders
+    // the step detail panel (P6-T2).
     topSlot = (
       <StepTableView
         runId={state.mode.runId}
         engineState={effectiveEngineState}
+        selectedStepId={state.selectedStepId}
         width={innerWidth}
         height={topSlotRows}
         nowMs={nowMs}
       />
     );
     bottomSlot = (
-      <RunDetailPlaceholder
-        mode="zoom"
-        selectedRunId={state.mode.runId}
-        runExists={
-          rowsById.has(state.mode.runId) ||
-          effectiveEngineState.runs.has(state.mode.runId)
-        }
+      <StepDetailPanelView
+        runId={state.mode.runId}
+        selectedStepId={state.selectedStepId}
+        engineState={effectiveEngineState}
         width={innerWidth}
         height={bottomSlotRows}
+        nowMs={nowMs}
       />
     );
   } else {

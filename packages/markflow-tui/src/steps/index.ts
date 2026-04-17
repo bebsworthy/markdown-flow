@@ -74,3 +74,26 @@ export {
   isUpstreamFailed,
   upstreamNoteLabel,
 } from "./upstream.js";
+
+export type {
+  StepDetailSelection,
+  StepDetailField,
+  StderrTailLine,
+  LastLogLine,
+  StepDetailEmpty,
+  StepDetailNotFound,
+  StepDetailTokenData,
+  StepDetailAggregateData,
+  StepDetailModel,
+} from "./detail-types.js";
+
+export {
+  selectStepDetail,
+  formatJsonOneLine,
+  pickLastLog,
+  pickStderrTail,
+  pickRouteTarget,
+  computeStepTypeLabel,
+  computeAttemptLabel,
+  computeTimeoutLabel,
+} from "./detail.js";

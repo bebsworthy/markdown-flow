@@ -49,4 +49,12 @@ export {
   StepTableView,
   type StepTableViewProps,
 } from "./step-table-view.js";
+export {
+  StepDetailPanel,
+  type StepDetailPanelProps,
+} from "./step-detail-panel.js";
+export {
+  StepDetailPanelView,
+  type StepDetailPanelViewProps,
+} from "./step-detail-panel-view.js";
 export type { Binding, AppContext, KeySpec, Category } from "./types.js";

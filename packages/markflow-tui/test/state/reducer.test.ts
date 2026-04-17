@@ -769,6 +769,51 @@ describe("MODE_OPEN_RUN / MODE_CLOSE_RUN — no orphan state", () => {
   });
 });
 
+// -------- P6-T2: step selection ------------------------------------------
+
+describe("SELECT_STEP", () => {
+  it("sets selectedStepId in viewing mode", () => {
+    const base = viewingState("r1");
+    const s = reducer(base, { type: "SELECT_STEP", stepId: "t1" });
+    expect(s.selectedStepId).toBe("t1");
+  });
+  it("is a no-op in browsing modes", () => {
+    const s = reducer(initialAppState, { type: "SELECT_STEP", stepId: "t1" });
+    expect(s).toBe(initialAppState);
+  });
+  it("clearing with null also works in viewing", () => {
+    const base: AppState = { ...viewingState("r1"), selectedStepId: "t1" };
+    const s = reducer(base, { type: "SELECT_STEP", stepId: null });
+    expect(s.selectedStepId).toBeNull();
+  });
+  it("is referentially stable when stepId unchanged", () => {
+    const base: AppState = { ...viewingState("r1"), selectedStepId: "t1" };
+    const s = reducer(base, { type: "SELECT_STEP", stepId: "t1" });
+    expect(s).toBe(base);
+  });
+});
+
+describe("MODE_OPEN_RUN / MODE_CLOSE_RUN — selectedStepId lifecycle", () => {
+  it("MODE_OPEN_RUN resets selectedStepId to null", () => {
+    const base: AppState = { ...initialAppState, selectedStepId: "leftover" };
+    const s = reducer(base, { type: "MODE_OPEN_RUN", runId: "r1" });
+    expect(s.selectedStepId).toBeNull();
+  });
+  it("MODE_CLOSE_RUN clears selectedStepId", () => {
+    const base: AppState = { ...viewingState("r1"), selectedStepId: "t1" };
+    const s = reducer(base, { type: "MODE_CLOSE_RUN" });
+    expect(s.selectedStepId).toBeNull();
+  });
+});
+
+describe("STEP_CURSOR_MOVE", () => {
+  it("is a no-op placeholder (symmetry with RUNS_CURSOR_MOVE)", () => {
+    const base = viewingState("r1");
+    const s = reducer(base, { type: "STEP_CURSOR_MOVE", delta: 1 });
+    expect(s).toBe(base);
+  });
+});
+
 // -------- Purity: calling reducer twice with the same args yields deep-equal
 // output and never mutates the input. -------------------------------------
 describe("reducer purity", () => {

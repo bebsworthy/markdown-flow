@@ -137,7 +137,7 @@ describe("App — step table in RUN mode (P6-T1)", () => {
     unmount();
   });
 
-  it("Bottom slot retains RunDetailPlaceholder content in RUN mode", async () => {
+  it("Bottom slot renders the step detail panel in RUN mode (P6-T2)", async () => {
     const { stdin, lastFrame, unmount } = renderApp({
       engineState: buildEngineState("abcd1234"),
     });
@@ -149,7 +149,10 @@ describe("App — step table in RUN mode (P6-T1)", () => {
     await flush();
 
     const frame = stripAnsi(lastFrame() ?? "");
-    expect(frame).toContain("RUN abcd1234");
+    // Detail panel defaults to the first row (view-layer fallback) so the
+    // selected node's headline renders in the bottom slot.
+    expect(frame).toContain("build");
+    expect(frame).toContain("script (bash)");
     unmount();
   });
 

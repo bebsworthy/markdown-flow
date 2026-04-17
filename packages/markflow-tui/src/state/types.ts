@@ -119,6 +119,17 @@ export interface AppState {
    * See docs/tui/plans/P5-T3.md §2.
    */
   readonly runsCursor: number;
+  /**
+   * Currently-selected step-row id in `viewing.*` mode (P6-T2). Either a
+   * token id (for a leaf row) or `"batch:<batchId>"` (for a forEach
+   * aggregate). `null` when nothing is explicitly selected — the detail
+   * panel view layer falls back to the first step row so the mockup
+   * §1 / §4 default renders.
+   *
+   * Cleared on `MODE_CLOSE_RUN`; reset to `null` on `MODE_OPEN_RUN` (no
+   * carry-over across runs). See docs/tui/plans/P6-T2.md §4.
+   */
+  readonly selectedStepId: string | null;
 }
 
 /**
@@ -186,4 +197,10 @@ export type Action =
       readonly pageSize: number;
       readonly rowCount: number;
     }
-  | { readonly type: "RUNS_SELECT"; readonly runId: string | null };
+  | { readonly type: "RUNS_SELECT"; readonly runId: string | null }
+  // Step-row selection for the detail panel (P6-T2). See docs/tui/plans/
+  // P6-T2.md §4 for reducer behaviour. `STEP_CURSOR_MOVE` is wired as a
+  // no-op placeholder kept for catalogue symmetry with RUNS_CURSOR_MOVE;
+  // row-aware cursor logic lands with a later Phase-6 task.
+  | { readonly type: "SELECT_STEP"; readonly stepId: string | null }
+  | { readonly type: "STEP_CURSOR_MOVE"; readonly delta: number };
