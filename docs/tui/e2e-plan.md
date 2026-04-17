@@ -94,7 +94,7 @@
 | T0200 | `a` opens the add modal with `[ Fuzzy find ]  Path or URL` tabs and an empty input (§2 mockup). | features.md §3.1 adding; mockups.md §2 add-modal | [x] |
 | T0201 | Fuzzy-find tab lists `.md` files under the current root, filtered to workflows that parse (plus `✗ parse` rows, but no random `.md`). | features.md §3.1 fuzzy | [x] |
 | T0202 | Fuzzy-find ranks matches by fuzzysort score; typing incrementally narrows the list within 100 ms of keystroke. | features.md §6.1 | [x] |
-| T0203 | `Ctrl+Up` moves the fuzzy-find root and re-indexes — any absolute path is accepted, no disk restriction. | features.md §3.1 fuzzy | [ ] |
+| T0203 | `Ctrl+Up` moves the fuzzy-find root and re-indexes — any absolute path is accepted, no disk restriction. | features.md §3.1 fuzzy | [x] |
 | T0204 | `Tab` switches between the Fuzzy find and Path or URL tabs; focus moves to the other input. | mockups.md §2 add-modal | [ ] |
 | T0205 | Path tab accepts absolute paths, relative paths, and glob patterns; each resolved match becomes one registry entry. | features.md §3.1 | [ ] |
 | T0206 | URL tab rejects non-`http(s)://` input with an inline error; `Enter` is disabled (hide-don't-grey: button omitted). | features.md §3.1 | [ ] |
@@ -393,7 +393,7 @@ Update this table after each test lands.
 |---|---|---|
 | 1 Launch & lifecycle | 13 | 13 |
 | 2 Workflow browser | 11 | 11 |
-| 3 Add modal | 11 | 3 |
+| 3 Add modal | 11 | 4 |
 | 4 Runs table | 15 | 0 |
 | 5 Step table | 10 | 0 |
 | 6 Tabbed pane | 17 | 0 |
@@ -412,7 +412,7 @@ Update this table after each test lands.
 | 19 Engine integration | 6 | 0 |
 | 20 Registry | 4 | 0 |
 | 21 Exit discipline | 3 | 0 |
-| **Total** | **180** | **27** |
+| **Total** | **180** | **28** |
 
 ---
 
