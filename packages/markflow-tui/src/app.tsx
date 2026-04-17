@@ -1051,8 +1051,11 @@ export function App({
     }
   }
 
+  const frameWidth = stdout?.columns ?? 80;
+
   return (
     <ThemeProvider>
+      <Box width={frameWidth}>
       {narrowLevel !== null ? (
         <AppShell
           width={stdout?.columns}
@@ -1087,9 +1090,10 @@ export function App({
       )}
       {state.overlay?.kind === "approval" && pendingForActiveRun ? (
         <Box
-          marginTop={-(stdout?.rows ?? 30)}
+          position="absolute"
           flexDirection="column"
           alignItems="center"
+          width={frameWidth}
         >
           <ApprovalModal
             approval={pendingForActiveRun}
@@ -1130,9 +1134,10 @@ export function App({
       ) : null}
       {state.overlay?.kind === "resumeWizard" && resumableRun ? (
         <Box
-          marginTop={-(stdout?.rows ?? 30)}
+          position="absolute"
           flexDirection="column"
           alignItems="center"
+          width={frameWidth}
         >
           <ResumeWizardModal
             run={resumableRun}
@@ -1177,7 +1182,7 @@ export function App({
         </Box>
       ) : null}
       {state.overlay?.kind === "commandPalette" ? (
-        <Box flexDirection="column" alignItems="center">
+        <Box position="absolute" flexDirection="column" alignItems="center" width={frameWidth}>
           <CommandPaletteModal
             query={state.overlay.query}
             ctx={{
@@ -1262,7 +1267,7 @@ export function App({
         </Box>
       ) : null}
       {state.overlay?.kind === "help" ? (
-        <Box flexDirection="column" alignItems="center">
+        <Box position="absolute" flexDirection="column" alignItems="center" width={frameWidth}>
           <HelpOverlay
             ctx={{
               mode: state.mode,
@@ -1285,9 +1290,10 @@ export function App({
       ) : null}
       {state.overlay?.kind === "runInput" ? (
         <Box
-          marginTop={-(stdout?.rows ?? 30)}
+          position="absolute"
           flexDirection="column"
           alignItems="center"
+          width={frameWidth}
         >
           <InputPromptModal
             workflowName={state.overlay.workflowName}
@@ -1317,9 +1323,10 @@ export function App({
       ) : null}
       {state.overlay?.kind === "addWorkflow" ? (
         <Box
-          marginTop={-(stdout?.rows ?? 30)}
+          position="absolute"
           flexDirection="column"
           alignItems="center"
+          width={frameWidth}
         >
           <AddWorkflowModal
             tab={state.overlay.tab}
@@ -1338,6 +1345,7 @@ export function App({
           />
         </Box>
       ) : null}
+      </Box>
     </ThemeProvider>
   );
 }
