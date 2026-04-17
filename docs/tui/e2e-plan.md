@@ -81,7 +81,7 @@
 | T0103 | A parse-failing entry renders in the list with `✗ parse` and stays visible (hide-don't-delete). Cursor can still land on it. | features.md §3.1; mockups.md §2 | [x] |
 | T0104 | Preview pane for a valid workflow shows `# Title`, `## Inputs`, `## Flow` ascii digest, and `N steps · K approvals · B forEach` summary. | mockups.md §2 | [x] |
 | T0105 | Preview pane for an invalid entry shows diagnostic lines verbatim and hides the Run keybar binding. | features.md §5.6 rule 5 | [x] |
-| T0106 | `Enter` on a valid entry drills into the run list filtered to that workflow (or opens the preview pane — spec-exact behaviour per mockups.md §2). | mockups.md §2 | [ ] |
+| T0106 | `Enter` on a valid entry drills into the run list filtered to that workflow (or opens the preview pane — spec-exact behaviour per mockups.md §2). | mockups.md §2 | [x] |
 | T0107 | `d` on a valid entry removes the entry from the registry file but does NOT touch the underlying `.md` or workspace directory on disk. | features.md §3.1 | [ ] |
 | T0108 | `e` on a valid entry is accepted (may be a no-op today) without corrupting state; cursor stays on the same entry. | mockups.md §2 keybar | [ ] |
 | T0109 | Registry file is atomically replaced on every mutation — a `kill -9` during write never leaves a truncated JSON file. | features.md §3.1 persistence | [ ] |
@@ -392,7 +392,7 @@ Update this table after each test lands.
 | Group | Total | Done |
 |---|---|---|
 | 1 Launch & lifecycle | 13 | 13 |
-| 2 Workflow browser | 11 | 6 |
+| 2 Workflow browser | 11 | 7 |
 | 3 Add modal | 11 | 0 |
 | 4 Runs table | 15 | 0 |
 | 5 Step table | 10 | 0 |
@@ -412,7 +412,7 @@ Update this table after each test lands.
 | 19 Engine integration | 6 | 0 |
 | 20 Registry | 4 | 0 |
 | 21 Exit discipline | 3 | 0 |
-| **Total** | **180** | **19** |
+| **Total** | **180** | **20** |
 
 ---
 
