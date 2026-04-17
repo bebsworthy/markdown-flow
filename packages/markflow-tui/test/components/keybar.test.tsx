@@ -326,14 +326,16 @@ describe("Keybar — rule coverage (features.md §5.6)", () => {
     expect(frame).not.toContain("q");
   });
 
-  it("R7: <60 tier appends 'press ? for labels' right-aligned by default", () => {
+  it("R7: <60 tier appends '? for labels' right-aligned by default (P8-T2)", () => {
     const out = renderWithTheme({
       bindings: workflowsBindings,
       ctx: browsingCtx,
-      width: 40,
+      width: 52,
     });
     const frame = stripAnsi(out.lastFrame() ?? "");
-    expect(frame).toContain("press ? for labels");
+    expect(frame).toContain("? for labels");
+    // Should NOT include the legacy "press ? for labels" copy.
+    expect(frame).not.toContain("press ? for labels");
   });
 
   // R8 — mode pill (reverse video).

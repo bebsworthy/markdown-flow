@@ -48,6 +48,9 @@ const files = [
   "../../src/components/app-shell-layout.ts",
   // P8-T1 viewing-pane tab layout — pure tier/label/compose helpers.
   "../../src/components/viewing-pane-tabs-layout.ts",
+  // P8-T2 narrow-layout + keybar trailing-hint pure helpers.
+  "../../src/components/narrow-layout.ts",
+  "../../src/components/keybar-narrow-hint.ts",
   // Registry pure surface (P4-T1). NOTE: store.ts, atomic-write.ts, index.ts
   // are NOT in this list — they import node:fs/path/crypto by design.
   "../../src/registry/types.ts",
@@ -236,6 +239,19 @@ describe("pure-module purity", () => {
     expect(typeof mod.composeTopRow).toBe("function");
     expect(typeof mod.pickFrameSlots).toBe("function");
     expect(typeof mod.pickActiveTabStyle).toBe("function");
+  });
+
+  it("narrow-layout module loads without Ink/React", async () => {
+    const mod = await import("../../src/components/narrow-layout.js");
+    expect(typeof mod.pickNarrowLevel).toBe("function");
+    expect(typeof mod.composeBreadcrumb).toBe("function");
+    expect(typeof mod.NARROW_TIER_MAX).toBe("number");
+  });
+
+  it("keybar-narrow-hint module loads without Ink/React", async () => {
+    const mod = await import("../../src/components/keybar-narrow-hint.js");
+    expect(typeof mod.composeKeybarTrailingHint).toBe("function");
+    expect(typeof mod.KEYS_TIER_HINT).toBe("string");
   });
 
   it("viewing-pane-tabs-layout module loads without Ink/React", async () => {

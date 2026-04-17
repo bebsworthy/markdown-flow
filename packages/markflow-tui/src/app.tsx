@@ -65,6 +65,21 @@ import { StepTableView } from "./components/step-table-view.js";
 import { GraphPanelView } from "./components/graph-panel-view.js";
 import { ViewingBottomSlot } from "./components/viewing-panes.js";
 import { pickFrameSlots } from "./components/app-shell-layout.js";
+import {
+  NARROW_TIER_MAX,
+  composeBreadcrumb,
+  pickNarrowLevel,
+  type NarrowLevel,
+} from "./components/narrow-layout.js";
+import { StepDetailPanelView } from "./components/step-detail-panel-view.js";
+import { detectCapabilities } from "./theme/capabilities.js";
+import { buildTheme } from "./theme/theme.js";
+import {
+  buildStepRows,
+  projectStepsSnapshot,
+} from "./steps/tree.js";
+import { buildRetryHints } from "./steps/retry.js";
+import { composeViewingTabRow, type ViewingTabKey } from "./components/viewing-pane-tabs-layout.js";
 import { reducer, initialAppState } from "./state/reducer.js";
 import { initialEngineState } from "./engine/reducer.js";
 import type { EngineState } from "./engine/types.js";
@@ -363,12 +378,47 @@ export function App({
     effectiveEngineState.activeRun,
   ]);
 
+  // ---- Narrow-tier layout detection (P8-T2) -----------------------------
+  const colsForNarrow = stdout?.columns ?? 80;
+  const isNarrow = colsForNarrow < NARROW_TIER_MAX;
+  const narrowLevel: NarrowLevel | null = isNarrow
+    ? pickNarrowLevel({
+        mode: state.mode,
+        selectedStepId: state.selectedStepId,
+      })
+    : null;
+
   useInput((input, key) => {
     if (state.overlay !== null) return;
     if (state.runsFilter.open) {
       // Filter bar handler runs first via LIFO; this is a belt-and-suspenders
       // guard so a stray Esc never closes RUN mode when the bar is open.
       return;
+    }
+    // --- P8-T2 narrow drill gestures -------------------------------------
+    // These only fire when the single-pane layout is active. At wide /
+    // medium widths the existing two-pane semantics are preserved.
+    if (isNarrow && state.mode.kind === "viewing") {
+      // Esc at stepdetail → pop back to step list (deselect the step).
+      if (key.escape && state.selectedStepId !== null) {
+        dispatch({ type: "SELECT_STEP", stepId: null });
+        return;
+      }
+      // Enter at steplist → drill into the first step row (SELECT_STEP).
+      if (key.return && state.selectedStepId === null) {
+        const active = effectiveEngineState.activeRun;
+        const info = active && active.runId === state.mode.runId
+          ? active.info ?? effectiveEngineState.runs.get(state.mode.runId) ?? null
+          : effectiveEngineState.runs.get(state.mode.runId) ?? null;
+        const events = active && active.runId === state.mode.runId ? active.events : [];
+        const snapshot = projectStepsSnapshot(events, info);
+        const retryHints = buildRetryHints(events);
+        const rows = buildStepRows(snapshot, info, Date.now(), retryHints);
+        if (rows.length > 0) {
+          dispatch({ type: "SELECT_STEP", stepId: rows[0]!.id });
+          return;
+        }
+      }
     }
     if (key.escape && state.mode.kind === "viewing") {
       if (state.mode.focus !== "graph") {
@@ -696,8 +746,133 @@ export function App({
     18,
   );
 
+  // ---- Narrow single-pane branch (P8-T2) --------------------------------
+  // Uses local env+stdout detection to pick the arrow glyph for the
+  // breadcrumb separator, mirroring what ThemeProvider would resolve.
+  // Capability detection is pure (docs/tui/plans/P3-T3.md §3.3).
+  const narrowCaps = detectCapabilities(process.env, {
+    stdoutIsTTY: Boolean(process.stdout.isTTY),
+  });
+  const narrowTheme = buildTheme(narrowCaps);
+  let narrowSingleSlot: React.ReactNode = null;
+  let narrowBreadcrumb: string = "";
+  if (narrowLevel !== null) {
+    const narrowRows = stdout?.rows ?? 30;
+    const slotRows = Math.max(1, narrowRows - 2);
+    if (narrowLevel === "runs") {
+      narrowSingleSlot = (
+        <RunsTable
+          rows={runRows}
+          sort={state.runsSort}
+          runsFilter={state.runsFilter}
+          runsArchive={state.runsArchive}
+          selectedRunId={state.selectedRunId}
+          cursor={state.runsCursor}
+          width={innerWidth}
+          height={slotRows}
+          nowMs={nowMs}
+          dispatch={dispatch}
+        />
+      );
+      narrowBreadcrumb = composeBreadcrumb(
+        "runs",
+        null,
+        null,
+        narrowTheme.glyphs.arrow,
+      );
+    } else if (narrowLevel === "steplist" && state.mode.kind === "viewing") {
+      narrowSingleSlot = (
+        <StepTableView
+          runId={state.mode.runId}
+          engineState={effectiveEngineState}
+          selectedStepId={state.selectedStepId}
+          width={innerWidth}
+          height={slotRows}
+          nowMs={nowMs}
+        />
+      );
+      narrowBreadcrumb = composeBreadcrumb(
+        "steplist",
+        state.mode.runId.slice(0, 6),
+        null,
+        narrowTheme.glyphs.arrow,
+      );
+    } else if (narrowLevel === "stepdetail" && state.mode.kind === "viewing") {
+      const tabRow = composeViewingTabRow(
+        state.mode.focus as ViewingTabKey,
+        innerWidth,
+      );
+      // Map selectedStepId (= token.id for leaves, or "batch:..." for aggregates)
+      // to a breadcrumb label. Prefer the row's nodeId when the selection
+      // resolves to a row; fall back to the raw selectedStepId otherwise.
+      let breadcrumbStepLabel = state.selectedStepId ?? "";
+      {
+        const active = effectiveEngineState.activeRun;
+        const runId = state.mode.runId;
+        const info = active && active.runId === runId
+          ? active.info ?? effectiveEngineState.runs.get(runId) ?? null
+          : effectiveEngineState.runs.get(runId) ?? null;
+        const events = active && active.runId === runId ? active.events : [];
+        const snapshot = projectStepsSnapshot(events, info);
+        const retryHints = buildRetryHints(events);
+        const rows = buildStepRows(snapshot, info, nowMs, retryHints);
+        const sel = state.selectedStepId;
+        const row = sel ? rows.find((r) => r.id === sel) : rows[0];
+        if (row) breadcrumbStepLabel = row.nodeId;
+      }
+      narrowSingleSlot = (
+        <Box flexDirection="column">
+          <Box flexDirection="row">
+            {tabRow.tokens.map((tok, i) => {
+              const sep = i > 0 ? "  " : "";
+              return (
+                <React.Fragment key={`nt-${i}`}>
+                  {sep ? <Text>{sep}</Text> : null}
+                  {tok.active ? (
+                    <Text inverse bold>{tok.text}</Text>
+                  ) : (
+                    <Text>{tok.text}</Text>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </Box>
+          <StepDetailPanelView
+            runId={state.mode.runId}
+            selectedStepId={state.selectedStepId}
+            engineState={effectiveEngineState}
+            width={innerWidth}
+            height={Math.max(0, slotRows - 1)}
+            nowMs={nowMs}
+          />
+        </Box>
+      );
+      narrowBreadcrumb = composeBreadcrumb(
+        "stepdetail",
+        state.mode.runId.slice(0, 6),
+        breadcrumbStepLabel,
+        narrowTheme.glyphs.arrow,
+      );
+    }
+  }
+
   return (
     <ThemeProvider>
+      {narrowLevel !== null ? (
+        <AppShell
+          width={stdout?.columns}
+          height={stdout?.rows}
+          mode={state.mode}
+          selectedRunId={state.selectedRunId}
+          modeTabs={null}
+          top={null}
+          bottom={null}
+          narrow={true}
+          breadcrumb={narrowBreadcrumb}
+          singleSlot={narrowSingleSlot}
+          keybar={keybarSlot}
+        />
+      ) : (
       <AppShell
         width={stdout?.columns}
         height={stdout?.rows}
@@ -714,6 +889,7 @@ export function App({
         bottom={bottomSlot}
         keybar={keybarSlot}
       />
+      )}
       {state.overlay?.kind === "approval" && pendingForActiveRun ? (
         <Box
           marginTop={-(stdout?.rows ?? 30)}

@@ -65,8 +65,28 @@ export interface AppShellProps {
   /**
    * Mode-tabs overlay subtree (typically `<ModeTabs>`). Rendered inline
    * inside the top frame edge using a `marginTop={-1}` overlay.
+   *
+   * Under `narrow={true}` the overlay is NOT rendered — the top edge
+   * hosts the breadcrumb instead.
    */
   readonly modeTabs: React.ReactNode;
+  /**
+   * When true, renders the <60-col single-pane layout (P8-T2):
+   *   - no splitter row; one slot consumes the full frame body
+   *   - `breadcrumb` replaces the mode-tabs overlay in the top edge
+   *   - `top` / `bottom` / `modeTabs` are ignored; `singleSlot` is used
+   *
+   * Default false preserves the existing wide/medium two-pane render.
+   */
+  readonly narrow?: boolean;
+  /**
+   * Plain-text breadcrumb string for the top edge when `narrow === true`.
+   * Composed by the caller via `composeBreadcrumb(...)`. Clamped here to
+   * the available title budget.
+   */
+  readonly breadcrumb?: string;
+  /** Single-slot body content when `narrow === true`. */
+  readonly singleSlot?: React.ReactNode;
   /**
    * Drives the plain-text title in the top edge: the active tab is
    * wrapped in `[ ... ]` so the column positions align with the
@@ -104,6 +124,9 @@ function AppShellImpl({
   selectedRunId,
   width,
   height,
+  narrow,
+  breadcrumb,
+  singleSlot,
 }: AppShellProps): React.ReactElement {
   const theme = useTheme();
   const cols = width ?? DEFAULT_WIDTH;
@@ -112,6 +135,44 @@ function AppShellImpl({
   const { topRows, bottomRows } = pickFrameSlots(rows);
   const frame = theme.frame;
   const innerWidth = Math.max(0, cols - 2);
+
+  // ------------------------------------------------------------------------
+  // P8-T2 narrow branch — single-pane layout with breadcrumb title.
+  // ------------------------------------------------------------------------
+  if (narrow === true) {
+    // Total interior rows = `rows - 2` (top + bottom edges only, no
+    // splitter). Guard against extreme low heights.
+    const fullRows = Math.max(1, rows - 2);
+    const titleBudget = Math.max(0, cols - 4);
+    let title = breadcrumb ?? "";
+    if (title.length > titleBudget) {
+      // Defensive clamp — collapse from the left with an ellipsis.
+      title = titleBudget <= 1 ? "\u2026" : "\u2026" + title.slice(title.length - (titleBudget - 1));
+    }
+    const narrowTopEdge = composeTopRow(cols, title, frame);
+    const narrowBottomEdge = `${frame.bl}${frame.h.repeat(innerWidth)}${frame.br}`;
+    const fullSlotShell = slotLines(fullRows).map(
+      () => `${frame.v}${" ".repeat(innerWidth)}${frame.v}`,
+    );
+
+    return (
+      <Box flexDirection="column">
+        <Text>{narrowTopEdge}</Text>
+        <Box flexDirection="column">
+          {fullSlotShell.map((line, idx) => (
+            <Text key={`full-shell-${idx}`}>{line}</Text>
+          ))}
+        </Box>
+        {fullRows > 0 ? (
+          <Box marginTop={-fullRows} marginLeft={1} flexDirection="column">
+            {singleSlot}
+          </Box>
+        ) : null}
+        <Text>{narrowBottomEdge}</Text>
+        {keybar ? <Box>{keybar}</Box> : null}
+      </Box>
+    );
+  }
 
   // Top-edge title:
   //   - If `mode` is provided, the active tab is derived from it.

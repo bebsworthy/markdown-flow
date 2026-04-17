@@ -42,6 +42,10 @@ import {
   type Tier,
 } from "./keybar-layout.js";
 import {
+  composeKeybarTrailingHint,
+  KEYS_TIER_HINT,
+} from "./keybar-narrow-hint.js";
+import {
   LOG_FOLLOWING_KEYBAR,
   LOG_PAUSED_KEYBAR,
 } from "./keybar-fixtures/log.js";
@@ -116,7 +120,12 @@ export interface KeybarProps {
   };
   /**
    * Optional right-side hint for the keys tier. Defaults to
-   * "press ? for labels" per features.md line 447 / line 486.
+   * `KEYS_TIER_HINT` ("? for labels") per mockups.md §13 line 505 / P8-T2.
+   * Pass an explicit empty string to suppress the hint in tests.
+   *
+   * At the keys tier the hint is right-aligned and only rendered when the
+   * composed bindings row leaves at least 4 cols of slack after it — see
+   * `composeKeybarTrailingHint` (P8-T2).
    */
   readonly keysTierHint?: string;
 }
@@ -190,7 +199,7 @@ function KeybarImpl({
   prefix,
   modePillGap,
   prefixGap,
-  keysTierHint = "press ? for labels",
+  keysTierHint = KEYS_TIER_HINT,
 }: KeybarProps): React.ReactElement {
   const theme = useTheme();
 
@@ -290,10 +299,34 @@ function KeybarImpl({
     width,
     countCategories(filterBindings(effectiveBindings, ctx)),
   );
-  const showKeysHint = currentTier === "keys" && keysTierHint.length > 0;
+  // Measured row length (post ANSI-stripped, but our segments carry only
+  // plain text — the ANSI wrappers Ink applies at render time aren't in
+  // this sum, which is what we want for pure text accounting).
+  const rowLen = segments.reduce((n, s) => n + s.text.length, 0);
+  // P8-T2: gate the right-side hint on slack availability. For the default
+  // `? for labels` hint we delegate to the pure helper; for a caller-
+  // supplied custom string we apply the same slack rule symmetrically so
+  // bespoke hints don't overrun narrow widths.
+  const defaultHint = keysTierHint === KEYS_TIER_HINT;
+  let showKeysHint: boolean;
+  if (currentTier !== "keys" || keysTierHint.length === 0) {
+    showKeysHint = false;
+  } else if (defaultHint) {
+    showKeysHint =
+      composeKeybarTrailingHint(currentTier, width, rowLen) !== null;
+  } else {
+    // Custom hint — 4-col slack rule applied against caller's string length.
+    showKeysHint = width - rowLen - 4 >= keysTierHint.length;
+  }
+
+  // When the keys-tier hint is active, right-align via flex
+  // `justifyContent="space-between"` at the terminal width (P8-T2 §2.4).
+  const rowJustify =
+    showKeysHint && currentTier === "keys" ? "space-between" : undefined;
+  const rowWidth = rowJustify ? width : undefined;
 
   return (
-    <Box flexDirection="row">
+    <Box flexDirection="row" justifyContent={rowJustify} width={rowWidth}>
       <Box>
         {segments.map((s, idx) => {
           if (s.kind === "category") {
