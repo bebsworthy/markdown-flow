@@ -61,12 +61,13 @@ function parseMissingInputs(message: string): readonly string[] {
 }
 
 /**
- * Extract a runId from an arbitrary event object. Engine events do not
- * officially carry `runId`, but tests inject synthetic `run:start` events
- * with a `runId` field so the caller-facing contract can be exercised
- * deterministically. In production we fall back to `RunInfo.id`.
+ * Extract a runId from a `run:start` event. The engine stamps `runId`
+ * onto the first event so the TUI can transition into `viewing` mode
+ * as soon as the run directory is minted — long before
+ * `executeWorkflow()` resolves at end-of-run.
  */
 function pickRunIdFromEvent(event: EngineEvent): string | null {
+  if (event.type !== "run:start") return null;
   const maybe = (event as unknown as { runId?: unknown }).runId;
   if (typeof maybe === "string" && maybe.length > 0) return maybe;
   return null;

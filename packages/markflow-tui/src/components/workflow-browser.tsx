@@ -56,6 +56,13 @@ export interface WorkflowBrowserProps {
    * Silently ignored on rows with `status !== "valid"` — hide-don't-grey.
    */
   readonly onStartRun?: (entry: ResolvedEntry) => void;
+  /**
+   * Suppress the browser's internal keystroke handling while an overlay
+   * (palette, modal, etc.) is mounted. Ink dispatches keystrokes to every
+   * mounted `useInput` consumer, so without this guard keys like `r` fire
+   * here in addition to the overlay-owned handler.
+   */
+  readonly inputDisabled?: boolean;
 }
 
 const DEFAULT_WIDTH = 140;
@@ -73,6 +80,7 @@ function WorkflowBrowserImpl({
   resolverBaseDir,
   onRemoveEntry,
   onStartRun,
+  inputDisabled,
 }: WorkflowBrowserProps): React.ReactElement {
   const theme = useTheme();
   const paneWidth = width ?? DEFAULT_WIDTH;
@@ -127,6 +135,7 @@ function WorkflowBrowserImpl({
   }, [resolved, selectedWorkflowId]);
 
   useInput((input, key) => {
+    if (inputDisabled) return;
     // `a` opens the add modal even when the registry is empty — that's the
     // whole point of the empty-state onboarding flow.
     if (input === "a") {

@@ -29,6 +29,7 @@ function stamp(events: EngineEventPayload[]): EngineEvent[] {
 const runStart = {
   type: "run:start" as const,
   v: 1 as const,
+  runId: "r1",
   workflowName: "T",
   sourceFile: "t.md",
   inputs: {},

@@ -152,6 +152,8 @@ describe("App — run-entry flow (P9-T1)", () => {
     const runWorkflow = vi.fn(
       async (): Promise<RunWorkflowResult> => ({ kind: "ok", runId: "x" }),
     );
+    // Seed runs rows + switch to runs mode so the AppShell is tall enough
+    // for the overlay's negative-margin positioning to land on-screen.
     const out = render(
       <App
         onQuit={() => {}}
@@ -159,8 +161,11 @@ describe("App — run-entry flow (P9-T1)", () => {
         runsDir="/tmp/runs"
         runRegistryLookup={resolved}
         runWorkflow={runWorkflow}
+        initialRunRows={[makeRunRow({ id: "r-prev" })]}
       />,
     );
+    await flush();
+    out.stdin.write("2"); // switch to runs pane
     await flush();
     out.stdin.write(":");
     await flush();
@@ -262,8 +267,11 @@ describe("App — run-entry flow (P9-T1)", () => {
         runsDir="/tmp/runs"
         runRegistryLookup={resolved}
         runWorkflow={runWorkflow}
+        initialRunRows={[makeRunRow({ id: "r-prev" })]}
       />,
     );
+    await flush();
+    out.stdin.write("2"); // switch to runs pane for a taller shell
     await flush();
     out.stdin.write(":");
     await flush();

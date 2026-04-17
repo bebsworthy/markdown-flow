@@ -200,6 +200,7 @@ export class WorkflowEngine {
       await this.emit({
         type: "run:start",
         v: 1,
+        runId: this.runDir.id,
         workflowName: this.def.name,
         sourceFile: this.def.sourceFile,
         inputs: this.resolvedInputs,

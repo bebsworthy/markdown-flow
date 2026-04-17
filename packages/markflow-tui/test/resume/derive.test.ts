@@ -183,6 +183,7 @@ describe("deriveInputRows", () => {
       ev(1, {
         type: "run:start",
         v: 1,
+        runId: "r1",
         workflowName: "wf",
         sourceFile: "./wf.md",
         inputs: { env: "prod", undeclared: "yes" },
@@ -202,6 +203,7 @@ describe("deriveInputRows", () => {
       ev(1, {
         type: "run:start",
         v: 1,
+        runId: "r1",
         workflowName: "wf",
         sourceFile: "./wf.md",
         inputs: { env: "prod" },
@@ -225,6 +227,7 @@ describe("deriveInputRows", () => {
       ev(1, {
         type: "run:start",
         v: 1,
+        runId: "r1",
         workflowName: "wf",
         sourceFile: "./wf.md",
         inputs: {},

@@ -23,6 +23,7 @@ function runStart(seq: number): EngineEvent {
   return {
     type: "run:start",
     v: 1,
+    runId: "r1",
     workflowName: "wf",
     sourceFile: "/fake.md",
     inputs: {},

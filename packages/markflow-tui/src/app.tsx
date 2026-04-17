@@ -741,6 +741,7 @@ export function App({
           void onRemoveEntry(source);
         }}
         onStartRun={startRunFromEntry}
+        inputDisabled={state.overlay !== null}
       />
     );
     bottomSlot = <Text> </Text>;
@@ -758,6 +759,7 @@ export function App({
         nowMs={nowMs}
         dispatch={dispatch}
         onStartRun={runsTableStartRun}
+        inputDisabled={state.overlay !== null}
       />
     );
     bottomSlot = (
@@ -964,6 +966,7 @@ export function App({
           nowMs={nowMs}
           dispatch={dispatch}
           onStartRun={runsTableStartRun}
+          inputDisabled={state.overlay !== null}
         />
       );
       narrowBreadcrumb = composeBreadcrumb(
@@ -1282,6 +1285,7 @@ export function App({
       ) : null}
       {state.overlay?.kind === "runInput" ? (
         <Box
+          marginTop={-(stdout?.rows ?? 30)}
           flexDirection="column"
           alignItems="center"
         >

@@ -16,6 +16,7 @@ describe("readEventLog truncation handling", () => {
   const goodA = line({
     type: "run:start",
     v: 1,
+    runId: "r1",
     workflowName: "x",
     sourceFile: "x.md",
     inputs: {},

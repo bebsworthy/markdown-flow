@@ -207,6 +207,7 @@ export type EngineEventPayload =
   | {
       type: "run:start";
       v: 1;
+      runId: string;
       workflowName: string;
       sourceFile: string;
       inputs: Record<string, string>;

@@ -43,14 +43,13 @@ describe("runWorkflow", () => {
       opts.onEvent?.({
         type: "run:start",
         v: 1,
+        runId: "rX",
         workflowName: "wf",
         sourceFile: "/fake.md",
         inputs: {},
         configResolved: {} as never,
         seq: 1,
         ts: "2026-01-01T00:00:00Z",
-        // Test-only field — bridge reads via type-cast.
-        runId: "rX",
       } as unknown as EngineEvent);
       return info({ id: "rX" });
     });
