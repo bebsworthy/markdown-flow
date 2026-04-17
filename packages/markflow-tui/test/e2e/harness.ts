@@ -59,6 +59,7 @@ export interface TuiSession {
     minSeq: number,
     timeoutMs?: number,
   ): Promise<ReadonlyArray<Record<string, unknown>>>;
+  waitForExit(timeoutMs?: number): Promise<{ exitCode: number | null }>;
   resize(cols: number, rows: number): void;
   kill(): Promise<void>;
   readonly scratch: ScratchEnv;
@@ -244,6 +245,22 @@ export async function spawnTui(opts: SpawnOpts = {}): Promise<TuiSession> {
     );
   };
 
+  const waitForExit = async (
+    timeoutMs: number = DEFAULT_WAIT_MS,
+  ): Promise<{ exitCode: number | null }> => {
+    const deadline = Date.now() + timeoutMs;
+    while (!exited && Date.now() < deadline) {
+      await sleep(POLL_INTERVAL_MS);
+    }
+    if (!exited) {
+      throw new HarnessTimeoutError(
+        `TUI did not exit within ${timeoutMs}ms`,
+        snapshot(),
+      );
+    }
+    return { exitCode };
+  };
+
   let killed = false;
   const kill = async (): Promise<void> => {
     if (killed) return;
@@ -288,6 +305,7 @@ export async function spawnTui(opts: SpawnOpts = {}): Promise<TuiSession> {
     snapshotContains,
     waitForRegex,
     waitForEventLog,
+    waitForExit,
     resize: (c: number, r: number) => {
       child.resize(c, r);
       term.resize(c, r);
