@@ -407,7 +407,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 ## Phase 6 — Run mode (step table + tabbed pane)
 
-### [ ] P6-T1 — Step table for a single run
+### [x] P6-T1 — Step table for a single run
 
 **Reference.** features.md §3.3 (Live run viewer); mockups.md §4, §6.
 
@@ -578,6 +578,7 @@ Every time the orchestrator finishes a task it appends one line here (most recen
 ```
 
 ```
+2026-04-16  P6-T1  ee48e40  step table for a single run (1110 TUI tests, tree + forEach aggregate + retry countdown)
 2026-04-16  P5-T3  3d087c8  mode wiring + cursor follow-selection (926 TUI tests, zoom/unzoom + filter-clamp)
 2026-04-16  P5-T2  67c3a51  filter + archive + virtualised runs table (838 TUI tests, perf budgets on 10k fixture)
 2026-04-16  P5-T1  f46414b  runs table component (709 TUI tests, attention-first sort + theme glyphs + column-drop tiers)
