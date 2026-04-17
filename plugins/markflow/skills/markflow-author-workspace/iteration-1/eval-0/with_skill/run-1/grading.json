@@ -1,0 +1,50 @@
+{
+  "expectations": [
+    {
+      "text": "workflow.md validates cleanly via `markflow init` (exit 0, no parse/validation errors)",
+      "passed": true,
+      "evidence": "markflow init exited 0; workspace created without errors"
+    },
+    {
+      "text": "File contains an `# Inputs` section declaring a `city` parameter",
+      "passed": true,
+      "evidence": "Line 17-19: `# Inputs\\n- city (required): Name of the city...`"
+    },
+    {
+      "text": "`# Flow` section present with exactly one fenced mermaid block",
+      "passed": true,
+      "evidence": "Lines 21-27: flowchart TD with fetch_weather --> recommend --> render"
+    },
+    {
+      "text": "`# Steps` section present; every node referenced in the flow has a matching `## <id>` heading and every `## <id>` heading appears in the flow",
+      "passed": true,
+      "evidence": "Nodes {fetch_weather, recommend, render} all have ## headings; no orphan headings"
+    },
+    {
+      "text": "Includes at least one script step (```bash / ```sh / ```python / ```js) that performs the weather fetch",
+      "passed": true,
+      "evidence": "## fetch_weather uses ```bash to call geocoding-api.open-meteo.com and api.open-meteo.com"
+    },
+    {
+      "text": "Includes at least one agent step (plain prose under a `##` heading, no fenced code block body) for the dog-walk recommendation",
+      "passed": true,
+      "evidence": "## recommend (lines 98-114) is plain prose, no code fence"
+    },
+    {
+      "text": "The agent step references the city via Liquid templating (e.g., `{{ city }}` or `{{ GLOBAL.* }}` populated from the fetch step) \u2014 not hard-coded",
+      "passed": true,
+      "evidence": "Line 101: `{{ GLOBAL.weather.city }}` and weather fields via `{{ GLOBAL.weather.* }}`"
+    },
+    {
+      "text": "No use of banned patterns: `local`/`global` keys nested inside `RESULT`, unpaired `max:N`/`:max` edges, or unknown code-block language",
+      "passed": true,
+      "evidence": "No RESULT nesting, no retry edges, only bash code blocks"
+    }
+  ],
+  "summary": {
+    "total": 8,
+    "passed": 8,
+    "failed": 0,
+    "pass_rate": 1.0
+  }
+}

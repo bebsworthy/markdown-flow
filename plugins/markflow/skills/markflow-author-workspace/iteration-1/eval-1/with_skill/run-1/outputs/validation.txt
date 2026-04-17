@@ -1,0 +1,5 @@
+$ node /Users/boyd/wip/markdown-flow/packages/markflow/dist/cli/index.js init outputs/workflow.md -w /tmp/markflow-validate-$$
+EXIT: 0
+Workspace created: /tmp/markflow-validate-67004
+  Workflow: ../../Users/boyd/wip/markdown-flow/plugins/markflow/skills/markflow-author-workspace/iteration-1/eval-1/with_skill/outputs/workflow.md
+  Edit /tmp/markflow-validate-67004/.env to configure inputs.

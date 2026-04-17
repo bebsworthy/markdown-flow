@@ -1,0 +1,413 @@
+{
+  "metadata": {
+    "skill_name": "markflow-author",
+    "skill_path": "<path/to/skill>",
+    "executor_model": "<model-name>",
+    "analyzer_model": "<model-name>",
+    "timestamp": "2026-04-17T06:46:48Z",
+    "evals_run": [
+      0,
+      1,
+      2
+    ],
+    "runs_per_configuration": 3
+  },
+  "runs": [
+    {
+      "eval_id": 0,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 8,
+        "failed": 0,
+        "total": 8,
+        "time_seconds": 78.0,
+        "tokens": 31479,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "workflow.md validates cleanly via `markflow init` (exit 0, no parse/validation errors)",
+          "passed": true,
+          "evidence": "markflow init exited 0; workspace created without errors"
+        },
+        {
+          "text": "File contains an `# Inputs` section declaring a `city` parameter",
+          "passed": true,
+          "evidence": "Line 17-19: `# Inputs\\n- city (required): Name of the city...`"
+        },
+        {
+          "text": "`# Flow` section present with exactly one fenced mermaid block",
+          "passed": true,
+          "evidence": "Lines 21-27: flowchart TD with fetch_weather --> recommend --> render"
+        },
+        {
+          "text": "`# Steps` section present; every node referenced in the flow has a matching `## <id>` heading and every `## <id>` heading appears in the flow",
+          "passed": true,
+          "evidence": "Nodes {fetch_weather, recommend, render} all have ## headings; no orphan headings"
+        },
+        {
+          "text": "Includes at least one script step (```bash / ```sh / ```python / ```js) that performs the weather fetch",
+          "passed": true,
+          "evidence": "## fetch_weather uses ```bash to call geocoding-api.open-meteo.com and api.open-meteo.com"
+        },
+        {
+          "text": "Includes at least one agent step (plain prose under a `##` heading, no fenced code block body) for the dog-walk recommendation",
+          "passed": true,
+          "evidence": "## recommend (lines 98-114) is plain prose, no code fence"
+        },
+        {
+          "text": "The agent step references the city via Liquid templating (e.g., `{{ city }}` or `{{ GLOBAL.* }}` populated from the fetch step) \u2014 not hard-coded",
+          "passed": true,
+          "evidence": "Line 101: `{{ GLOBAL.weather.city }}` and weather fields via `{{ GLOBAL.weather.* }}`"
+        },
+        {
+          "text": "No use of banned patterns: `local`/`global` keys nested inside `RESULT`, unpaired `max:N`/`:max` edges, or unknown code-block language",
+          "passed": true,
+          "evidence": "No RESULT nesting, no retry edges, only bash code blocks"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 8,
+        "failed": 0,
+        "total": 8,
+        "time_seconds": 58.1,
+        "tokens": 28384,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "workflow.md validates cleanly via `markflow init` (exit 0)",
+          "passed": true,
+          "evidence": "markflow init exited 0"
+        },
+        {
+          "text": "Uses the emitter pattern: a node has a back-edge (downstream step routes back to the emitter), creating a cycle in the Mermaid graph",
+          "passed": true,
+          "evidence": "Line 25: `print --> emit` back-edge"
+        },
+        {
+          "text": "Cyclic entry node is marked with stadium shape (e.g., `emit([...])`) because auto-detection fails on cycles",
+          "passed": true,
+          "evidence": "Line 22: `emit([Emit next PR])`"
+        },
+        {
+          "text": "Emitter step maintains a cursor in `LOCAL` across re-entries (reads `$LOCAL` / writes `LOCAL: {...}`)",
+          "passed": true,
+          "evidence": "Line 43 reads `$LOCAL`; line 55 emits `LOCAL: $(jo cursor=$NEXT)`"
+        },
+        {
+          "text": "Emitter publishes the current PR item to `GLOBAL` so downstream steps read it generically (e.g., `{{ GLOBAL.item.* }}`)",
+          "passed": true,
+          "evidence": "Line 56: `GLOBAL: $(jo item=\"$ITEM\")`"
+        },
+        {
+          "text": "An agent step (plain prose) performs the review summary and references `GLOBAL.*` via Liquid",
+          "passed": true,
+          "evidence": "## review (lines 60-74) is plain prose and uses `{{ GLOBAL.item.* }}`"
+        },
+        {
+          "text": "Has a `done` / terminal branch out of the emitter so the loop can exit (e.g., `emit -->|done| ...`)",
+          "passed": true,
+          "evidence": "Line 23: `emit -->|done| summary`; emit emits `RESULT: $(jo edge=done)` when cursor exhausted"
+        },
+        {
+          "text": "Every node in the mermaid flow has a matching `## <id>` heading and vice versa",
+          "passed": true,
+          "evidence": "emit, review, print, summary all present in both flow and steps"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "with_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 8,
+        "failed": 0,
+        "total": 8,
+        "time_seconds": 71.3,
+        "tokens": 30812,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "workflow.md validates cleanly via `markflow init` (exit 0)",
+          "passed": true,
+          "evidence": "markflow init exited 0"
+        },
+        {
+          "text": "The fetch step has a per-step ```config block with a `retry:` policy: `max: 5` and `backoff: exponential`",
+          "passed": true,
+          "evidence": "Lines 37-44: `retry: {max: 5, delay: 2s, backoff: exponential, jitter: 0.3}`"
+        },
+        {
+          "text": "Includes a python script step (```python code block) for the JSON transform",
+          "passed": true,
+          "evidence": "## transform uses ```python block (lines 73-98)"
+        },
+        {
+          "text": "Has a failure branch that routes to a `mail`-based notify step \u2014 either via a `fail` edge or a `fail:max` exhaustion handler",
+          "passed": true,
+          "evidence": "Lines 22-27 include `fetch -->|fail| notify`, `transform -->|fail| notify`, `upload -->|fail| notify`; notify step invokes `mail -s`"
+        },
+        {
+          "text": "If `label max:N` appears on any edge, it's paired with a matching `label:max` handler edge (or retries are expressed via step-level config only)",
+          "passed": true,
+          "evidence": "No edge-level `max:N` used; retries are step-level only"
+        },
+        {
+          "text": "Every node in the mermaid flow has a matching `## <id>` heading and vice versa",
+          "passed": true,
+          "evidence": "fetch, transform, upload, notify, done all present in both"
+        },
+        {
+          "text": "`flags:` lists (if any) don't duplicate the agent's non-interactive switch (`-p`, `exec -`)",
+          "passed": true,
+          "evidence": "No `flags:` lists in this workflow (no agent steps)"
+        },
+        {
+          "text": "No `local` or `global` keys nested inside a `RESULT` JSON",
+          "passed": true,
+          "evidence": "All RESULT objects contain only `edge` and `summary`"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 0,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 1.0,
+        "passed": 8,
+        "failed": 0,
+        "total": 8,
+        "time_seconds": 67.5,
+        "tokens": 26914,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "workflow.md validates cleanly via `markflow init` (exit 0, no parse/validation errors)",
+          "passed": true,
+          "evidence": "markflow init exited 0"
+        },
+        {
+          "text": "File contains an `# Inputs` section declaring a `city` parameter",
+          "passed": true,
+          "evidence": "Lines 9-11: `# Inputs\\n- city (required)...`"
+        },
+        {
+          "text": "`# Flow` section present with exactly one fenced mermaid block",
+          "passed": true,
+          "evidence": "Lines 15-20: flowchart TD with fetch-weather, recommend, done, error"
+        },
+        {
+          "text": "`# Steps` section present; every node referenced in the flow has a matching `## <id>` heading and every `## <id>` heading appears in the flow",
+          "passed": true,
+          "evidence": "All four nodes (fetch-weather, recommend, done, error) have ## headings; all ## headings referenced"
+        },
+        {
+          "text": "Includes at least one script step (```bash / ```sh / ```python / ```js) that performs the weather fetch",
+          "passed": true,
+          "evidence": "## fetch-weather uses ```bash with curl to wttr.in"
+        },
+        {
+          "text": "Includes at least one agent step (plain prose under a `##` heading, no fenced code block body) for the dog-walk recommendation",
+          "passed": true,
+          "evidence": "## recommend is plain prose with a config block; no body code fence"
+        },
+        {
+          "text": "The agent step references the city via Liquid templating (e.g., `{{ city }}` or `{{ GLOBAL.* }}` populated from the fetch step) \u2014 not hard-coded",
+          "passed": true,
+          "evidence": "Lines 81-89 use `{{ GLOBAL.city }}`, `{{ GLOBAL.desc }}`, etc."
+        },
+        {
+          "text": "No use of banned patterns: `local`/`global` keys nested inside `RESULT`, unpaired `max:N`/`:max` edges, or unknown code-block language",
+          "passed": true,
+          "evidence": "No RESULT nesting, no retry edges, only bash code blocks"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 1,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.875,
+        "passed": 7,
+        "failed": 1,
+        "total": 8,
+        "time_seconds": 64.2,
+        "tokens": 24730,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "workflow.md validates cleanly via `markflow init` (exit 0)",
+          "passed": true,
+          "evidence": "markflow init exited 0"
+        },
+        {
+          "text": "Uses the emitter pattern: a node has a back-edge (downstream step routes back to the emitter), creating a cycle in the Mermaid graph",
+          "passed": true,
+          "evidence": "Line 30: `print --> emit` back-edge"
+        },
+        {
+          "text": "Cyclic entry node is marked with stadium shape (e.g., `emit([...])`) because auto-detection fails on cycles",
+          "passed": false,
+          "evidence": "Only `fetch([Fetch open PRs])` has stadium shape; `emit` itself (the cyclic loop node receiving the back-edge) does NOT. Works because fetch is declared as start, but this is off-pattern vs the skill's guidance: 'Once any node carries stadium shape, those nodes are the start set.' The emitter node is the one typically marked."
+        },
+        {
+          "text": "Emitter step maintains a cursor in `LOCAL` across re-entries (reads `$LOCAL` / writes `LOCAL: {...}`)",
+          "passed": true,
+          "evidence": "Line 60 reads `$LOCAL`; line 75 emits `LOCAL: $(jo cursor=$NEXT)`"
+        },
+        {
+          "text": "Emitter publishes the current PR item to `GLOBAL` so downstream steps read it generically (e.g., `{{ GLOBAL.item.* }}`)",
+          "passed": true,
+          "evidence": "Line 76: `GLOBAL: $(jo pr=\"$PR\")` (uses `pr` instead of `item`, but publishes)"
+        },
+        {
+          "text": "An agent step (plain prose) performs the review summary and references `GLOBAL.*` via Liquid",
+          "passed": true,
+          "evidence": "## summarize uses `{{ GLOBAL.pr.* }}` extensively"
+        },
+        {
+          "text": "Has a `done` / terminal branch out of the emitter so the loop can exit (e.g., `emit -->|done| ...`)",
+          "passed": true,
+          "evidence": "Line 28: `emit -->|done| done`; emit emits `RESULT: $(jo edge=done)` when exhausted"
+        },
+        {
+          "text": "Every node in the mermaid flow has a matching `## <id>` heading and vice versa",
+          "passed": true,
+          "evidence": "fetch, emit, summarize, print, done all present in both flow and steps"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "eval_id": 2,
+      "configuration": "without_skill",
+      "run_number": 1,
+      "result": {
+        "pass_rate": 0.875,
+        "passed": 7,
+        "failed": 1,
+        "total": 8,
+        "time_seconds": 65.2,
+        "tokens": 25076,
+        "tool_calls": 0,
+        "errors": 0
+      },
+      "expectations": [
+        {
+          "text": "workflow.md validates cleanly via `markflow init` (exit 0)",
+          "passed": true,
+          "evidence": "markflow init exited 0"
+        },
+        {
+          "text": "The fetch step has a per-step ```config block with a `retry:` policy: `max: 5` and `backoff: exponential`",
+          "passed": true,
+          "evidence": "Lines 46-53: `retry: {max: 5, delay: 1s, backoff: exponential, jitter: true}` \u2014 note: `jitter: true` is likely wrong type (spec expects 0..1 numeric) but max/backoff are correct"
+        },
+        {
+          "text": "Includes a python script step (```python code block) for the JSON transform",
+          "passed": false,
+          "evidence": "## transform uses a ```bash block that invokes `python3 -` via heredoc inline. There is no ```python step block, so the transform is actually a bash step, not a python step. The user asked for 'run a python script to transform'."
+        },
+        {
+          "text": "Has a failure branch that routes to a `mail`-based notify step \u2014 either via a `fail` edge or a `fail:max` exhaustion handler",
+          "passed": true,
+          "evidence": "Lines 30, 33, 35: `fetch_sales -->|fail| notify_ops`, `transform -->|fail| notify_ops`, `upload -->|fail| notify_ops`; notify_ops uses `mail -s`"
+        },
+        {
+          "text": "If `label max:N` appears on any edge, it's paired with a matching `label:max` handler edge (or retries are expressed via step-level config only)",
+          "passed": true,
+          "evidence": "No edge-level max:N; step-level retry only"
+        },
+        {
+          "text": "Every node in the mermaid flow has a matching `## <id>` heading and vice versa",
+          "passed": true,
+          "evidence": "fetch_sales, transform, upload, done, notify_ops all present in both"
+        },
+        {
+          "text": "`flags:` lists (if any) don't duplicate the agent's non-interactive switch (`-p`, `exec -`)",
+          "passed": true,
+          "evidence": "No `flags:` lists (no agent steps)"
+        },
+        {
+          "text": "No `local` or `global` keys nested inside a `RESULT` JSON",
+          "passed": true,
+          "evidence": "No RESULT sentinels emitted; steps rely on exit-code routing"
+        }
+      ],
+      "notes": []
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0,
+        "min": 1.0,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 69.1333,
+        "stddev": 10.1254,
+        "min": 58.1,
+        "max": 78.0
+      },
+      "tokens": {
+        "mean": 30225.0,
+        "stddev": 1628.8594,
+        "min": 28384,
+        "max": 31479
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.9167,
+        "stddev": 0.0722,
+        "min": 0.875,
+        "max": 1.0
+      },
+      "time_seconds": {
+        "mean": 65.6333,
+        "stddev": 1.6921,
+        "min": 64.2,
+        "max": 67.5
+      },
+      "tokens": {
+        "mean": 25573.3333,
+        "stddev": 1173.8694,
+        "min": 24730,
+        "max": 26914
+      }
+    },
+    "delta": {
+      "pass_rate": "+0.08",
+      "time_seconds": "+3.5",
+      "tokens": "+4652"
+    }
+  },
+  "notes": []
+}

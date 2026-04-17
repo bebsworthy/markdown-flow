@@ -1,0 +1,15 @@
+{
+  "eval_id": 0,
+  "eval_name": "linear-weather-dog",
+  "prompt": "I want a markflow workflow that takes a `city` input, fetches the weather for it, then uses claude to write a one-sentence recommendation of whether it's good weather to walk a dog. Include the ability to pass the city at run time.",
+  "assertions": [
+    {"text": "workflow.md validates cleanly via `markflow init` (exit 0, no parse/validation errors)"},
+    {"text": "File contains an `# Inputs` section declaring a `city` parameter"},
+    {"text": "`# Flow` section present with exactly one fenced mermaid block"},
+    {"text": "`# Steps` section present; every node referenced in the flow has a matching `## <id>` heading and every `## <id>` heading appears in the flow"},
+    {"text": "Includes at least one script step (```bash / ```sh / ```python / ```js) that performs the weather fetch"},
+    {"text": "Includes at least one agent step (plain prose under a `##` heading, no fenced code block body) for the dog-walk recommendation"},
+    {"text": "The agent step references the city via Liquid templating (e.g., `{{ city }}` or `{{ GLOBAL.* }}` populated from the fetch step) — not hard-coded"},
+    {"text": "No use of banned patterns: `local`/`global` keys nested inside `RESULT`, unpaired `max:N`/`:max` edges, or unknown code-block language"}
+  ]
+}

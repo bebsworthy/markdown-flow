@@ -1,0 +1,15 @@
+{
+  "eval_id": 1,
+  "eval_name": "loop-pr-review",
+  "prompt": "Make me a markflow workflow that iterates over all my open GitHub PRs and has an agent write a one-paragraph review summary for each one. I want each summary printed as it's generated.",
+  "assertions": [
+    {"text": "workflow.md validates cleanly via `markflow init` (exit 0)"},
+    {"text": "Uses the emitter pattern: a node has a back-edge (downstream step routes back to the emitter), creating a cycle in the Mermaid graph"},
+    {"text": "Cyclic entry node is marked with stadium shape (e.g., `emit([...])`) because auto-detection fails on cycles"},
+    {"text": "Emitter step maintains a cursor in `LOCAL` across re-entries (reads `$LOCAL` / writes `LOCAL: {...}`)"},
+    {"text": "Emitter publishes the current PR item to `GLOBAL` so downstream steps read it generically (e.g., `{{ GLOBAL.item.* }}`)"},
+    {"text": "An agent step (plain prose) performs the review summary and references `GLOBAL.*` via Liquid"},
+    {"text": "Has a `done` / terminal branch out of the emitter so the loop can exit (e.g., `emit -->|done| ...`)"},
+    {"text": "Every node in the mermaid flow has a matching `## <id>` heading and vice versa"}
+  ]
+}

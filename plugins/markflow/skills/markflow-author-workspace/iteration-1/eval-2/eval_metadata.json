@@ -1,0 +1,15 @@
+{
+  "eval_id": 2,
+  "eval_name": "retry-branch-failure-handler",
+  "prompt": "Convert this daily script into a markflow workflow: curl the API at `https://api.example.com/sales.json` (retry up to 5x with exponential backoff on failure), run a python script to transform the JSON, and upload the result to s3. If it still fails after retries, notify via `mail` to ops@example.com.",
+  "assertions": [
+    {"text": "workflow.md validates cleanly via `markflow init` (exit 0)"},
+    {"text": "The fetch step has a per-step ```config block with a `retry:` policy: `max: 5` and `backoff: exponential`"},
+    {"text": "Includes a python script step (```python code block) for the JSON transform"},
+    {"text": "Has a failure branch that routes to a `mail`-based notify step — either via a `fail` edge or a `fail:max` exhaustion handler"},
+    {"text": "If `label max:N` appears on any edge, it's paired with a matching `label:max` handler edge (or retries are expressed via step-level config only)"},
+    {"text": "Every node in the mermaid flow has a matching `## <id>` heading and vice versa"},
+    {"text": "`flags:` lists (if any) don't duplicate the agent's non-interactive switch (`-p`, `exec -`)"},
+    {"text": "No `local` or `global` keys nested inside a `RESULT` JSON"}
+  ]
+}

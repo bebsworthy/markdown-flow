@@ -1,0 +1,26 @@
+{
+  "skill_name": "markflow-author",
+  "evals": [
+    {
+      "id": 0,
+      "name": "linear-weather-dog",
+      "prompt": "I want a markflow workflow that takes a `city` input, fetches the weather for it, then uses claude to write a one-sentence recommendation of whether it's good weather to walk a dog. Include the ability to pass the city at run time.",
+      "expected_output": "A single workflow .md file with: H1 title, # Inputs declaring `city`, # Flow with a simple linear Mermaid chart, # Steps containing a bash fetch step and an agent step. Should validate with `markflow init`.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "loop-pr-review",
+      "prompt": "Make me a markflow workflow that iterates over all my open GitHub PRs and has an agent write a one-paragraph review summary for each one. I want each summary printed as it's generated.",
+      "expected_output": "A workflow using the emitter pattern: one step maintains a cursor in LOCAL, publishes the current PR to GLOBAL, back-edges after each iteration, routes to a done branch when finished. Entry node uses stadium shape. Agent step reads from GLOBAL.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "retry-branch-failure-handler",
+      "prompt": "Convert this daily script into a markflow workflow: curl the API at `https://api.example.com/sales.json` (retry up to 5x with exponential backoff on failure), run a python script to transform the JSON, and upload the result to s3. If it still fails after retries, notify via `mail` to ops@example.com.",
+      "expected_output": "A workflow where the fetch step uses step-level retry config (max: 5, backoff: exponential), the graph has a failure branch routing to a mail-notify step via a `fail:max` edge or a fail branch, and a python step transforms then a bash step uploads.",
+      "files": []
+    }
+  ]
+}

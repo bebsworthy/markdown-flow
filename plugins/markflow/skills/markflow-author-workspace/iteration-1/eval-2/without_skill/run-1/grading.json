@@ -1,0 +1,50 @@
+{
+  "expectations": [
+    {
+      "text": "workflow.md validates cleanly via `markflow init` (exit 0)",
+      "passed": true,
+      "evidence": "markflow init exited 0"
+    },
+    {
+      "text": "The fetch step has a per-step ```config block with a `retry:` policy: `max: 5` and `backoff: exponential`",
+      "passed": true,
+      "evidence": "Lines 46-53: `retry: {max: 5, delay: 1s, backoff: exponential, jitter: true}` \u2014 note: `jitter: true` is likely wrong type (spec expects 0..1 numeric) but max/backoff are correct"
+    },
+    {
+      "text": "Includes a python script step (```python code block) for the JSON transform",
+      "passed": false,
+      "evidence": "## transform uses a ```bash block that invokes `python3 -` via heredoc inline. There is no ```python step block, so the transform is actually a bash step, not a python step. The user asked for 'run a python script to transform'."
+    },
+    {
+      "text": "Has a failure branch that routes to a `mail`-based notify step \u2014 either via a `fail` edge or a `fail:max` exhaustion handler",
+      "passed": true,
+      "evidence": "Lines 30, 33, 35: `fetch_sales -->|fail| notify_ops`, `transform -->|fail| notify_ops`, `upload -->|fail| notify_ops`; notify_ops uses `mail -s`"
+    },
+    {
+      "text": "If `label max:N` appears on any edge, it's paired with a matching `label:max` handler edge (or retries are expressed via step-level config only)",
+      "passed": true,
+      "evidence": "No edge-level max:N; step-level retry only"
+    },
+    {
+      "text": "Every node in the mermaid flow has a matching `## <id>` heading and vice versa",
+      "passed": true,
+      "evidence": "fetch_sales, transform, upload, done, notify_ops all present in both"
+    },
+    {
+      "text": "`flags:` lists (if any) don't duplicate the agent's non-interactive switch (`-p`, `exec -`)",
+      "passed": true,
+      "evidence": "No `flags:` lists (no agent steps)"
+    },
+    {
+      "text": "No `local` or `global` keys nested inside a `RESULT` JSON",
+      "passed": true,
+      "evidence": "No RESULT sentinels emitted; steps rely on exit-code routing"
+    }
+  ],
+  "summary": {
+    "total": 8,
+    "passed": 7,
+    "failed": 1,
+    "pass_rate": 0.875
+  }
+}

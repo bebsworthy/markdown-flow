@@ -1,0 +1,50 @@
+{
+  "expectations": [
+    {
+      "text": "workflow.md validates cleanly via `markflow init` (exit 0)",
+      "passed": true,
+      "evidence": "markflow init exited 0"
+    },
+    {
+      "text": "Uses the emitter pattern: a node has a back-edge (downstream step routes back to the emitter), creating a cycle in the Mermaid graph",
+      "passed": true,
+      "evidence": "Line 30: `print --> emit` back-edge"
+    },
+    {
+      "text": "Cyclic entry node is marked with stadium shape (e.g., `emit([...])`) because auto-detection fails on cycles",
+      "passed": false,
+      "evidence": "Only `fetch([Fetch open PRs])` has stadium shape; `emit` itself (the cyclic loop node receiving the back-edge) does NOT. Works because fetch is declared as start, but this is off-pattern vs the skill's guidance: 'Once any node carries stadium shape, those nodes are the start set.' The emitter node is the one typically marked."
+    },
+    {
+      "text": "Emitter step maintains a cursor in `LOCAL` across re-entries (reads `$LOCAL` / writes `LOCAL: {...}`)",
+      "passed": true,
+      "evidence": "Line 60 reads `$LOCAL`; line 75 emits `LOCAL: $(jo cursor=$NEXT)`"
+    },
+    {
+      "text": "Emitter publishes the current PR item to `GLOBAL` so downstream steps read it generically (e.g., `{{ GLOBAL.item.* }}`)",
+      "passed": true,
+      "evidence": "Line 76: `GLOBAL: $(jo pr=\"$PR\")` (uses `pr` instead of `item`, but publishes)"
+    },
+    {
+      "text": "An agent step (plain prose) performs the review summary and references `GLOBAL.*` via Liquid",
+      "passed": true,
+      "evidence": "## summarize uses `{{ GLOBAL.pr.* }}` extensively"
+    },
+    {
+      "text": "Has a `done` / terminal branch out of the emitter so the loop can exit (e.g., `emit -->|done| ...`)",
+      "passed": true,
+      "evidence": "Line 28: `emit -->|done| done`; emit emits `RESULT: $(jo edge=done)` when exhausted"
+    },
+    {
+      "text": "Every node in the mermaid flow has a matching `## <id>` heading and vice versa",
+      "passed": true,
+      "evidence": "fetch, emit, summarize, print, done all present in both flow and steps"
+    }
+  ],
+  "summary": {
+    "total": 8,
+    "passed": 7,
+    "failed": 1,
+    "pass_rate": 0.875
+  }
+}
