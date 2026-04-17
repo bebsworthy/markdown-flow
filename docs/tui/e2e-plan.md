@@ -68,8 +68,8 @@
 | T0009 | `--list <path>` reads/writes the alternate list file. | features.md §3.1 launch | [x] |
 | T0010 | A SIGWINCH during startup does not corrupt the first render (regression for Ink alt-screen race). | features.md §6.2 | [ ] |
 | T0011 | Non-TTY stdout (`markflow-tui <<<""`) prints a guidance message and exits non-zero; does not attempt to mount Ink. | features.md §6.4 | [ ] |
-| T0012 | `NO_COLOR=1` disables colored output; monochrome theme applied to shell, keybar, and modals. | features.md §5.10; mockups.md §14 | [ ] |
-| T0013 | `MARKFLOW_ASCII=1` (or `--ascii`) swaps glyphs for bracketed text states and box-drawing for `+-|`. | features.md §5.10; mockups.md §14 | [ ] |
+| T0012 | `NO_COLOR=1` disables colored output; monochrome theme applied to shell, keybar, and modals. | features.md §5.10; mockups.md §14 | [x] |
+| T0013 | `MARKFLOW_ASCII=1` (or `--ascii`) swaps glyphs for bracketed text states and box-drawing for `+-|`. | features.md §5.10; mockups.md §14 | [x] |
 
 ## 2. Workflow browser  (P4-T1/T2)
 
@@ -391,7 +391,7 @@ Update this table after each test lands.
 
 | Group | Total | Done |
 |---|---|---|
-| 1 Launch & lifecycle | 13 | 8 |
+| 1 Launch & lifecycle | 13 | 10 |
 | 2 Workflow browser | 11 | 0 |
 | 3 Add modal | 11 | 0 |
 | 4 Runs table | 15 | 0 |
@@ -412,7 +412,7 @@ Update this table after each test lands.
 | 19 Engine integration | 6 | 0 |
 | 20 Registry | 4 | 0 |
 | 21 Exit discipline | 3 | 0 |
-| **Total** | **180** | **8** |
+| **Total** | **180** | **10** |
 
 ---
 
