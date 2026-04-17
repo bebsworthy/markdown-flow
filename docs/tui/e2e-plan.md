@@ -251,7 +251,7 @@ each status.
 | T1012 | `:run <name>` on a workflow with required inputs opens the same input-prompt modal. | P9-T1 plan | [ ] |
 | T1013 | `r` on a Runs-table row with a terminal (`complete` / `error`) status re-launches the same workflow with an empty input set (hide-don't-grey: `r` absent when the row is still active). | P9-T1 plan | [ ] |
 | T1014 | `r` is a silent no-op on an active row; no modal, no error. | features.md §5.6 rule 5 | [ ] |
-| T1015 | With the palette open, the browser's `r` binding does not also fire on the `r` character of `:run` — no double-dispatch. | B3 audit | [ ] |
+| T1015 | With the palette open, the browser's `r` binding does not also fire on the `r` character of `:run` — no double-dispatch. | B3 audit | [x] |
 
 ## 12. Cancel live run  (P9-T2)
 
@@ -401,7 +401,7 @@ Update this table after each test lands.
 | 8 Resume wizard | 11 | 0 |
 | 9 Palette & help | 13 | 0 |
 | 10 Keybar tiers | 9 | 0 |
-| 11 Run entry (P9-T1) | 16 | 5 |
+| 11 Run entry (P9-T1) | 16 | 6 |
 | 12 Cancel (P9-T2) | 6 | 0 |
 | 13 Pending (P9-T3) | 5 | 0 |
 | 14 Retry budget (P9-T4) | 4 | 0 |
