@@ -41,6 +41,36 @@ import {
   resolveGapAfter,
   type Tier,
 } from "./keybar-layout.js";
+import {
+  LOG_FOLLOWING_KEYBAR,
+  LOG_PAUSED_KEYBAR,
+} from "./keybar-fixtures/log.js";
+
+/**
+ * Per plan §6.4: when the app is in `viewing.*` with log-pane focus, the
+ * keybar auto-swaps its bindings + prefix to match mockups §8 / §9 / §15,
+ * regardless of what bindings the caller passed in. `ctx.isFollowing`
+ * decides between the LOG_FOLLOWING_KEYBAR / LOG_PAUSED_KEYBAR fixtures.
+ */
+function selectLogOverride(
+  ctx: AppContext,
+): {
+  readonly bindings: ReadonlyArray<Binding>;
+  readonly prefix: { readonly full: string; readonly short: string };
+} | null {
+  if (ctx.mode.kind !== "viewing") return null;
+  if (ctx.mode.focus !== "log") return null;
+  if (ctx.isFollowing) {
+    return {
+      bindings: LOG_FOLLOWING_KEYBAR,
+      prefix: { full: "LOG \u00b7 following", short: "LOG follow" },
+    };
+  }
+  return {
+    bindings: LOG_PAUSED_KEYBAR,
+    prefix: { full: "LOG \u00b7 paused", short: "LOG paused" },
+  };
+}
 
 export interface KeybarProps {
   readonly bindings: ReadonlyArray<Binding>;
@@ -164,8 +194,16 @@ function KeybarImpl({
 }: KeybarProps): React.ReactElement {
   const theme = useTheme();
 
+  // Plan §6.4: in viewing.* with focus === "log", override the caller's
+  // bindings + prefix with the LOG_FOLLOWING / LOG_PAUSED fixtures based
+  // on `ctx.isFollowing`. For all other modes/focuses the caller's props
+  // are used verbatim (including focus === "graph" / "detail").
+  const logOverride = selectLogOverride(ctx);
+  const effectiveBindings = logOverride ? logOverride.bindings : bindings;
+  const effectivePrefix = logOverride ? logOverride.prefix : prefix;
+
   const segments = useMemo<ColoredSegment[]>(() => {
-    const filtered = filterBindings(bindings, ctx);
+    const filtered = filterBindings(effectiveBindings, ctx);
     const sorted = sortByOrder(filtered);
     const catCount = countCategories(sorted);
     const tier = pickTier(width, catCount);
@@ -193,8 +231,8 @@ function KeybarImpl({
         const gap = tier === "full" ? pillGapFull : pillGapShort;
         out.push({ text: spaces(gap), kind: "plain" });
       }
-    } else if (prefix && tier !== "keys") {
-      const text = tier === "full" ? prefix.full : prefix.short;
+    } else if (effectivePrefix && tier !== "keys") {
+      const text = tier === "full" ? effectivePrefix.full : effectivePrefix.short;
       out.push({ text, kind: "plain" });
       if (visible.length > 0) {
         const gap = tier === "full" ? prefixGapFull : prefixGapShort;
@@ -246,11 +284,11 @@ function KeybarImpl({
     }
 
     return out;
-  }, [bindings, ctx, width, modePill, modePillTiers, prefix, modePillGap, prefixGap]);
+  }, [effectiveBindings, ctx, width, modePill, modePillTiers, effectivePrefix, modePillGap, prefixGap]);
 
   const currentTier = pickTier(
     width,
-    countCategories(filterBindings(bindings, ctx)),
+    countCategories(filterBindings(effectiveBindings, ctx)),
   );
   const showKeysHint = currentTier === "keys" && keysTierHint.length > 0;
 

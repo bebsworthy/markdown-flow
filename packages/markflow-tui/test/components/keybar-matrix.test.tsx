@@ -90,9 +90,14 @@ const ROWS: ReadonlyArray<Row> = [
     narrow: "\u2191\u2193 \u23CE R X  | f /  | ? q",
   },
   {
+    // Matrix row tests the §15 mockup strings assuming the caller passes
+    // the tuned `logFollowBindings` fixture. Uses a non-log ctx so the
+    // Keybar's plan §6.4 auto-switch (which would swap in the production
+    // LOG_FOLLOWING_KEYBAR fixture) does not fire for this pure layout
+    // test — see keybar.test.tsx for the ctx-driven auto-switch coverage.
     mode: "LOG (follow)",
     bindings: logFollowBindings,
-    ctx: logFollowCtx,
+    ctx: { ...logFollowCtx, mode: { kind: "browsing", pane: "workflows" } },
     prefix: { full: "LOG \u00b7 following", short: "LOG follow" },
     wide: "LOG \u00b7 following   w Wrap  t Timestamps  1/2/3 streams  / Search    Esc",
     medium: "LOG follow  w t 1/2/3 /   Esc",
@@ -101,7 +106,7 @@ const ROWS: ReadonlyArray<Row> = [
   {
     mode: "LOG (paused)",
     bindings: logPausedBindings,
-    ctx: logPausedCtx,
+    ctx: { ...logPausedCtx, mode: { kind: "browsing", pane: "workflows" } },
     prefix: { full: "LOG \u00b7 paused", short: "LOG paused" },
     wide: "LOG \u00b7 paused   F Resume  G Head  g Top  w Wrap  / Search    Esc",
     medium: "LOG paused  F G g w /   Esc",

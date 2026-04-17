@@ -88,6 +88,15 @@ const files = [
   // P6-T2 pure modules — step detail projection surface.
   "../../src/steps/detail.ts",
   "../../src/steps/detail-types.ts",
+  // P6-T3 pure modules — log panel surface.
+  "../../src/log/types.ts",
+  "../../src/log/ansi.ts",
+  "../../src/log/reducer.ts",
+  "../../src/log/derive.ts",
+  "../../src/log/ingest.ts",
+  "../../src/log/select.ts",
+  // P6-T3 keybar fixtures — data-only.
+  "../../src/components/keybar-fixtures/log.ts",
 ];
 
 /**
@@ -390,6 +399,55 @@ describe("pure-module purity", () => {
     const mod = await import("../../src/steps/detail-types.js");
     // Type-only module — runtime exports empty.
     expect(Object.keys(mod)).toEqual([]);
+  });
+
+  // -------------------------------------------------------------------
+  // P6-T3 log panel pure surface
+  // -------------------------------------------------------------------
+
+  it("log types module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/log/types.js");
+    expect(Object.keys(mod)).toEqual(["LOG_RING_CAP"]);
+    expect(mod.LOG_RING_CAP).toBe(2000);
+  });
+
+  it("log ansi module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/log/ansi.js");
+    expect(typeof mod.parseAnsi).toBe("function");
+    expect(typeof mod.stripAnsi).toBe("function");
+    expect(mod.ANSI_PATTERN).toBeInstanceOf(RegExp);
+  });
+
+  it("log reducer module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/log/reducer.js");
+    expect(typeof mod.logReducer).toBe("function");
+    expect(mod.initialLogPanelState).toBeDefined();
+    expect(typeof mod.linesSincePause).toBe("function");
+  });
+
+  it("log derive module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/log/derive.js");
+    expect(typeof mod.deriveLogModel).toBe("function");
+    expect(typeof mod.emptyReasonLabel).toBe("function");
+    expect(typeof mod.formatHeader).toBe("function");
+  });
+
+  it("log ingest module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/log/ingest.js");
+    expect(typeof mod.appendEventLines).toBe("function");
+    expect(typeof mod.mergeSidecarTail).toBe("function");
+    expect(typeof mod.parseSidecarText).toBe("function");
+  });
+
+  it("log select module loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/log/select.js");
+    expect(typeof mod.resolveLogTarget).toBe("function");
+  });
+
+  it("log keybar fixture loads without Ink/React/fs", async () => {
+    const mod = await import("../../src/components/keybar-fixtures/log.js");
+    expect(Array.isArray(mod.LOG_FOLLOWING_KEYBAR)).toBe(true);
+    expect(Array.isArray(mod.LOG_PAUSED_KEYBAR)).toBe(true);
   });
 
   it("steps detail module loads without Ink/React/fs", async () => {

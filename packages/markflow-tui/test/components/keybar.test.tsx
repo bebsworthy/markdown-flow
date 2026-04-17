@@ -69,6 +69,7 @@ import {
   runGraphBindings,
   runGraphCtx,
   logFollowCtx,
+  logPausedCtx,
   approvalBindings,
   approvalCtx,
   helpBindings,
@@ -238,9 +239,13 @@ describe("Keybar — rule coverage (features.md §5.6)", () => {
       when: alwaysTrue,
       action: noop,
     };
-    const onCtx: AppContext = { ...logFollowCtx, toggleState: { isFollowing: true } };
+    // Use a non-log ctx — plan §6.4 overrides caller bindings when ctx
+    // is viewing.*/focus=log, which would swallow the single-binding
+    // fixture this test exercises.
+    const baseCtx: AppContext = { ...browsingCtx, isFollowing: true };
+    const onCtx: AppContext = { ...baseCtx, toggleState: { isFollowing: true } };
     const offCtx: AppContext = {
-      ...logFollowCtx,
+      ...baseCtx,
       toggleState: { isFollowing: false },
     };
 
@@ -266,7 +271,12 @@ describe("Keybar — rule coverage (features.md §5.6)", () => {
       when: alwaysTrue,
       action: noop,
     };
-    const onCtx: AppContext = { ...logFollowCtx, toggleState: { isFollowing: true } };
+    // Non-log ctx — see sibling R6 test above for rationale.
+    const onCtx: AppContext = {
+      ...browsingCtx,
+      isFollowing: true,
+      toggleState: { isFollowing: true },
+    };
     const shortFrame = stripAnsi(
       renderWithTheme({ bindings: [follow], ctx: onCtx, width: 80 }).lastFrame() ?? "",
     );
@@ -406,5 +416,82 @@ describe("Keybar — rule coverage (features.md §5.6)", () => {
     const xCancel = findTextNodeContaining(element, "X Cancel");
     expect(xCancel).not.toBeNull();
     expect(xCancel?.props.color).toBe("red");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plan §6.4: LOG-fixture auto-switch based on ctx.
+// When ctx.mode === "viewing" + focus === "log", the Keybar overrides the
+// caller's bindings with LOG_FOLLOWING_KEYBAR / LOG_PAUSED_KEYBAR based on
+// ctx.isFollowing. Other focuses (detail / graph) render caller-supplied
+// bindings verbatim.
+// ---------------------------------------------------------------------------
+
+describe("Keybar — LOG fixture auto-switch (plan §6.4)", () => {
+  const runDetailCtx: AppContext = {
+    mode: { kind: "viewing", runId: "r1", focus: "detail" },
+    overlay: null,
+    approvalsPending: false,
+    isFollowing: false,
+    isWrapped: false,
+    toggleState: {},
+  };
+
+  it("focus === 'log' + isFollowing=true renders LOG_FOLLOWING_KEYBAR", () => {
+    const out = renderWithTheme({
+      // Pass a non-log fixture; the keybar should ignore it in favour of LOG_FOLLOWING.
+      bindings: runGraphBindings,
+      ctx: logFollowCtx,
+      width: 120,
+    });
+    const frame = stripAnsi(out.lastFrame() ?? "");
+    // Follow fixture contents (per src/components/keybar-fixtures/log.ts).
+    expect(frame).toContain("LOG \u00b7 following");
+    expect(frame).toContain("w Wrap");
+    expect(frame).toContain("t Timestamps");
+    expect(frame).toContain("Esc Back to graph");
+    // Paused-only keys must not appear.
+    expect(frame).not.toContain("F Resume follow");
+    expect(frame).not.toContain("Jump to top");
+  });
+
+  it("focus === 'log' + isFollowing=false renders LOG_PAUSED_KEYBAR", () => {
+    const out = renderWithTheme({
+      bindings: runGraphBindings,
+      ctx: logPausedCtx,
+      width: 120,
+    });
+    const frame = stripAnsi(out.lastFrame() ?? "");
+    expect(frame).toContain("LOG \u00b7 paused");
+    expect(frame).toContain("F Resume follow");
+    expect(frame).toContain("G Jump to head");
+    expect(frame).toContain("g Jump to top");
+    // Follow-only keys must not appear.
+    expect(frame).not.toContain("t Timestamps");
+  });
+
+  it("focus === 'detail' does NOT trigger LOG override — caller bindings win", () => {
+    const out = renderWithTheme({
+      bindings: runGraphBindings,
+      ctx: runDetailCtx,
+      width: 120,
+    });
+    const frame = stripAnsi(out.lastFrame() ?? "");
+    expect(frame).not.toContain("LOG \u00b7 following");
+    expect(frame).not.toContain("LOG \u00b7 paused");
+    // runGraphBindings includes "X Cancel".
+    expect(frame).toContain("X Cancel");
+  });
+
+  it("focus === 'graph' still renders the base viewing fixture (no override)", () => {
+    const out = renderWithTheme({
+      bindings: runGraphBindings,
+      ctx: runGraphCtx,
+      width: 120,
+    });
+    const frame = stripAnsi(out.lastFrame() ?? "");
+    expect(frame).not.toContain("LOG \u00b7 following");
+    expect(frame).not.toContain("LOG \u00b7 paused");
+    expect(frame).toContain("X Cancel");
   });
 });

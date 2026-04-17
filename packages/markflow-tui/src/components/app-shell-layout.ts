@@ -115,9 +115,14 @@ export function keyToMode(
     readonly selectedRunId: string | null;
   },
 ): Action | null {
-  const hitF1 = isF1(ev) || ev.input === "1";
-  const hitF2 = isF2(ev) || ev.input === "2";
-  const hitF3 = isF3(ev) || ev.input === "3";
+  // In viewing.* mode, raw `1`/`2`/`3` are consumed by the pane-focus /
+  // stream-filter handlers in `app.tsx` and `<LogPanelView>` (P6-T3). Only
+  // the actual F1/F2/F3 escape sequences still toggle the top-level mode
+  // while viewing a run.
+  const viewingRaw = ctx.mode.kind === "viewing";
+  const hitF1 = isF1(ev) || (ev.input === "1" && !viewingRaw);
+  const hitF2 = isF2(ev) || (ev.input === "2" && !viewingRaw);
+  const hitF3 = isF3(ev) || (ev.input === "3" && !viewingRaw);
 
   if (hitF1) return { type: "MODE_SHOW_WORKFLOWS" };
   if (hitF2) return { type: "MODE_SHOW_RUNS" };

@@ -34,6 +34,7 @@ import { RunsTable } from "./components/runs-table.js";
 import { RunDetailPlaceholder } from "./components/run-detail-placeholder.js";
 import { StepTableView } from "./components/step-table-view.js";
 import { StepDetailPanelView } from "./components/step-detail-panel-view.js";
+import { LogPanelView } from "./components/log-panel-view.js";
 import { pickFrameSlots } from "./components/app-shell-layout.js";
 import { reducer, initialAppState } from "./state/reducer.js";
 import { initialEngineState } from "./engine/reducer.js";
@@ -79,6 +80,12 @@ export interface AppProps {
    * until the live feed lands). See docs/tui/plans/P6-T1.md §8.1.
    */
   readonly engineState?: EngineState;
+  /**
+   * Optional override for the path to the `runs/` parent. Threaded to
+   * <LogPanelView> so the log pane can open per-step sidecar files. Null
+   * disables sidecar reads (the ring-buffer tail still populates lines).
+   */
+  readonly runsDir?: string | null;
 }
 
 export function App({
@@ -88,6 +95,7 @@ export function App({
   urlIngestor,
   initialRunRows,
   engineState,
+  runsDir,
 }: AppProps): React.ReactElement {
   const effectiveEngineState: EngineState = engineState ?? initialEngineState;
   const [state, dispatch] = useReducer(reducer, initialAppState);
@@ -219,8 +227,23 @@ export function App({
       return;
     }
     if (key.escape && state.mode.kind === "viewing") {
+      if (state.mode.focus === "log") {
+        dispatch({ type: "FOCUS_VIEWING_PANE", focus: "graph" });
+        return;
+      }
       dispatch({ type: "MODE_CLOSE_RUN" });
       return;
+    }
+    if (state.mode.kind === "viewing") {
+      // Tab-switching keystrokes in viewing mode (P6-T3).
+      if (input === "2") {
+        dispatch({ type: "FOCUS_VIEWING_PANE", focus: "log" });
+        return;
+      }
+      if (input === "d") {
+        dispatch({ type: "FOCUS_VIEWING_PANE", focus: "detail" });
+        return;
+      }
     }
     if (input === "q") {
       onQuit();
@@ -310,16 +333,30 @@ export function App({
         nowMs={nowMs}
       />
     );
-    bottomSlot = (
-      <StepDetailPanelView
-        runId={state.mode.runId}
-        selectedStepId={state.selectedStepId}
-        engineState={effectiveEngineState}
-        width={innerWidth}
-        height={bottomSlotRows}
-        nowMs={nowMs}
-      />
-    );
+    if (state.mode.focus === "log") {
+      bottomSlot = (
+        <LogPanelView
+          runsDir={runsDir ?? null}
+          runId={state.mode.runId}
+          selectedStepId={state.selectedStepId}
+          engineState={effectiveEngineState}
+          width={innerWidth}
+          height={bottomSlotRows}
+          nowMs={nowMs}
+        />
+      );
+    } else {
+      bottomSlot = (
+        <StepDetailPanelView
+          runId={state.mode.runId}
+          selectedStepId={state.selectedStepId}
+          engineState={effectiveEngineState}
+          width={innerWidth}
+          height={bottomSlotRows}
+          nowMs={nowMs}
+        />
+      );
+    }
   } else {
     topSlot = <Text>markflow-tui \u00b7 scaffold</Text>;
     bottomSlot = <Text> </Text>;

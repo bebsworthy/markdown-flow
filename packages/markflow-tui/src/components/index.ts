@@ -57,4 +57,12 @@ export {
   StepDetailPanelView,
   type StepDetailPanelViewProps,
 } from "./step-detail-panel-view.js";
+export { LogPanel, type LogPanelProps } from "./log-panel.js";
+export {
+  LogPanelView,
+  LogPaneStatusContext,
+  useLogPaneStatus,
+  type LogPanelViewProps,
+  type LogPaneStatus,
+} from "./log-panel-view.js";
 export type { Binding, AppContext, KeySpec, Category } from "./types.js";
