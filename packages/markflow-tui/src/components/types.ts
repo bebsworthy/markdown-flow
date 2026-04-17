@@ -78,6 +78,12 @@ export interface AppContext {
    * to `false` when omitted.
    */
   readonly runResumable?: boolean;
+  /** True while the currently-focused run is live (status === "running").
+   *  Used by `:cancel` command availability (P7-T3). */
+  readonly runActive?: boolean;
+  /** `runsDir` is ready (adapter bootstrapped). Used by `:resume` when no
+   *  arg (P7-T3). */
+  readonly runsDirReady?: boolean;
   /**
    * Generic payload threaded to `toggleLabel`. For the log `f` binding
    * this is `isFollowing`; for the `w` binding it is `isWrapped`. The

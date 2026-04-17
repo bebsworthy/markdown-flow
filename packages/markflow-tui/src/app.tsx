@@ -34,6 +34,11 @@ import { APPROVAL_KEYBAR } from "./components/keybar-fixtures/approval.js";
 import { RESUME_KEYBAR } from "./components/keybar-fixtures/resume.js";
 import { ApprovalModal } from "./components/approval-modal.js";
 import { ResumeWizardModal } from "./components/resume-wizard-modal.js";
+import { CommandPaletteModal } from "./components/command-palette-modal.js";
+import { HelpOverlay } from "./components/help-overlay.js";
+import { selectKeybarFixture } from "./components/keybar-fixtures/registry.js";
+import type { KeybarSelection } from "./components/keybar-fixtures/registry.js";
+import type { CommandExecContext, CommandResult } from "./palette/types.js";
 import {
   countPendingApprovalsByRun,
   findPendingApproval,
@@ -432,6 +437,19 @@ export function App({
         return;
       }
     }
+    // `:` opens command palette (P7-T3).
+    if (input === ":") {
+      dispatch({
+        type: "OVERLAY_OPEN",
+        overlay: { kind: "commandPalette", query: "" },
+      });
+      return;
+    }
+    // `?` opens help overlay (P7-T3).
+    if (input === "?") {
+      dispatch({ type: "OVERLAY_OPEN", overlay: { kind: "help" } });
+      return;
+    }
     if (input === "q") {
       onQuit();
     }
@@ -558,8 +576,26 @@ export function App({
     state.mode.kind === "browsing" &&
     state.mode.pane === "workflows";
 
+  // Pre-overlay keybar snapshot for help overlay (P7-T3). Captures the
+  // keybar fixture that was in use the moment before `?` opened the help
+  // overlay, so HelpOverlay can render rows derived from exactly that
+  // fixture (features.md §5.6 rule 8 — single source of truth).
+  const prevFixtureRef = useRef<KeybarSelection | null>(null);
+  const currentSelection = selectKeybarFixture({
+    mode: state.mode,
+    overlay: state.overlay,
+    logFollowing: false,
+    eventsFollowing: false,
+    registryEmpty: registryState.entries.length === 0,
+  });
+  if (state.overlay?.kind !== "help" && state.overlay?.kind !== "commandPalette") {
+    prevFixtureRef.current = currentSelection;
+  }
+
   const approvalOverlayOpen = state.overlay?.kind === "approval";
   const resumeOverlayOpen = state.overlay?.kind === "resumeWizard";
+  const commandOverlayOpen = state.overlay?.kind === "commandPalette";
+  const helpOverlayOpen = state.overlay?.kind === "help";
   const keybarSlot = approvalOverlayOpen ? (
     <Keybar
       bindings={APPROVAL_KEYBAR}
@@ -591,6 +627,42 @@ export function App({
       }}
       width={stdout?.columns ?? 80}
       modePill="RESUME"
+    />
+  ) : commandOverlayOpen ? (
+    <Keybar
+      bindings={currentSelection.bindings}
+      ctx={{
+        mode: state.mode,
+        overlay: state.overlay,
+        approvalsPending: pendingApprovalsCount > 0,
+        isFollowing: false,
+        isWrapped: false,
+        toggleState: { pendingApprovalsCount },
+        pendingApprovalsCount,
+        runResumable,
+      }}
+      width={stdout?.columns ?? 80}
+      modePill="COMMAND"
+      modePillTiers={["full"]}
+      modePillGap={{ full: 3 }}
+    />
+  ) : helpOverlayOpen ? (
+    <Keybar
+      bindings={currentSelection.bindings}
+      ctx={{
+        mode: state.mode,
+        overlay: state.overlay,
+        approvalsPending: pendingApprovalsCount > 0,
+        isFollowing: false,
+        isWrapped: false,
+        toggleState: { pendingApprovalsCount },
+        pendingApprovalsCount,
+        runResumable,
+      }}
+      width={stdout?.columns ?? 80}
+      modePill="HELP"
+      modePillTiers={["full"]}
+      modePillGap={{ full: 3 }}
     />
   ) : showEmptyKeybar ? (
     <Keybar
@@ -723,6 +795,116 @@ export function App({
               return result;
             }}
             onCancel={() => dispatch({ type: "OVERLAY_CLOSE" })}
+            width={modalWidth}
+            height={modalHeight}
+          />
+        </Box>
+      ) : null}
+      {state.overlay?.kind === "commandPalette" ? (
+        <Box flexDirection="column" alignItems="center">
+          <CommandPaletteModal
+            query={state.overlay.query}
+            ctx={{
+              mode: state.mode,
+              overlay: state.overlay,
+              approvalsPending: pendingApprovalsCount > 0,
+              isFollowing: false,
+              isWrapped: false,
+              toggleState: { pendingApprovalsCount },
+              pendingApprovalsCount,
+              runResumable,
+              runActive: false,
+              runsDirReady: runsDir != null,
+            }}
+            exec={{
+              state,
+              dispatch,
+              runsDir: runsDir ?? null,
+              runActive: false,
+              runResumable,
+              pendingApprovalsCount,
+              runWorkflow: async (): Promise<CommandResult> => ({
+                kind: "unavailable",
+                message: "run command not yet wired",
+              }),
+              resumeRun: async (args): Promise<CommandResult> => {
+                if (!runsDir) {
+                  return { kind: "error", message: "runsDir not configured" };
+                }
+                const r = await resume({
+                  runsDir,
+                  runId: args.runId,
+                  rerunNodes: Array.from(args.rerunNodes),
+                  inputOverrides: args.inputOverrides,
+                });
+                if (r.kind === "ok") return { kind: "ok" };
+                if (r.kind === "notResumable") {
+                  return { kind: "unavailable", message: "run is not resumable" };
+                }
+                if (r.kind === "locked") {
+                  return { kind: "error", message: "resume locked — retry" };
+                }
+                if (r.kind === "unknownNode") {
+                  return {
+                    kind: "unavailable",
+                    message: `unknown node: ${r.nodeId}`,
+                  };
+                }
+                return { kind: "error", message: r.message };
+              },
+              cancelRun: async (): Promise<CommandResult> => ({
+                kind: "unavailable",
+                message: "cancel not yet wired",
+              }),
+              openApproval: (runId): CommandResult => {
+                const pending = findPendingApproval(
+                  effectiveEngineState.activeRun?.events ?? [],
+                );
+                if (!pending) {
+                  return { kind: "unavailable", message: "no pending approval" };
+                }
+                dispatch({
+                  type: "OVERLAY_OPEN",
+                  overlay: {
+                    kind: "approval",
+                    runId,
+                    nodeId: pending.nodeId,
+                    state: "idle",
+                  },
+                });
+                return { kind: "ok" };
+              },
+              rotateTheme: () => {
+                /* theme rotation deferred */
+              },
+              quit: onQuit,
+            } satisfies CommandExecContext}
+            onQueryChange={(q) =>
+              dispatch({ type: "COMMAND_PALETTE_QUERY", query: q })
+            }
+            onClose={() => dispatch({ type: "OVERLAY_CLOSE" })}
+            width={modalWidth}
+            height={modalHeight}
+          />
+        </Box>
+      ) : null}
+      {state.overlay?.kind === "help" ? (
+        <Box flexDirection="column" alignItems="center">
+          <HelpOverlay
+            ctx={{
+              mode: state.mode,
+              overlay: state.overlay,
+              approvalsPending: pendingApprovalsCount > 0,
+              isFollowing: false,
+              isWrapped: false,
+              toggleState: { pendingApprovalsCount },
+              pendingApprovalsCount,
+              runResumable,
+            }}
+            bindings={prevFixtureRef.current?.bindings ?? []}
+            modeLabel={prevFixtureRef.current?.modeLabel ?? ""}
+            focusLabel={prevFixtureRef.current?.focusLabel ?? ""}
+            onClose={() => dispatch({ type: "OVERLAY_CLOSE" })}
             width={modalWidth}
             height={modalHeight}
           />

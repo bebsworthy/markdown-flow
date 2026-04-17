@@ -119,6 +119,21 @@ const files = [
   "../../src/resume/reducer.ts",
   "../../src/resume/index.ts",
   "../../src/components/keybar-fixtures/resume.ts",
+  // P7-T3 palette + help pure modules + fixtures + registry.
+  "../../src/palette/types.ts",
+  "../../src/palette/commands.ts",
+  "../../src/palette/fuzzy.ts",
+  "../../src/palette/parser.ts",
+  "../../src/palette/reducer.ts",
+  "../../src/palette/exec.ts",
+  "../../src/palette/index.ts",
+  "../../src/help/types.ts",
+  "../../src/help/derive.ts",
+  "../../src/help/reducer.ts",
+  "../../src/help/index.ts",
+  "../../src/components/keybar-fixtures/command.ts",
+  "../../src/components/keybar-fixtures/help.ts",
+  "../../src/components/keybar-fixtures/registry.ts",
 ];
 
 /**
