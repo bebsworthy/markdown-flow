@@ -202,15 +202,15 @@ each status.
 
 | ID | Test | Refs | Status |
 |---|---|---|---|
-| T0800 | `:` opens the command palette; `[COMMAND]` pill appears; background dimmed. | features.md §3.10; mockups.md §10 | [ ] |
+| T0800 | `:` opens the command palette; `[COMMAND]` pill appears; background dimmed. | features.md §3.10; mockups.md §10 | [x] |
 | T0801 | Typing `:re` filters the command list to `:resume`, `:rerun`, `:reload`, `:restart`; first match pre-selected. | mockups.md §10 | [ ] |
 | T0802 | `Tab` completes the common prefix of the filtered commands. | mockups.md §10 | [ ] |
 | T0803 | `Enter` executes the selected command with its argument. | features.md §3.10 | [ ] |
-| T0804 | `Esc` closes the palette without executing; any typed text is discarded. | mockups.md §10 | [ ] |
-| T0805 | `:quit` exits the TUI cleanly. | features.md §3.10 | [ ] |
+| T0804 | `Esc` closes the palette without executing; any typed text is discarded. | mockups.md §10 | [x] |
+| T0805 | `:quit` exits the TUI cleanly. | features.md §3.10 | [x] |
 | T0806 | `:goto <seq>` jumps the log pane to that `seq` if present; otherwise shows an inline error. | features.md §3.10 | [ ] |
 | T0807 | `:theme <name>` switches theme at runtime (if the feature is in MVP scope) or reports `unknown theme`. | features.md §3.10 | [ ] |
-| T0808 | Unknown command → inline `unknown command` message, palette stays open. | features.md §3.10 | [ ] |
+| T0808 | Unknown command → inline `unknown command` message, palette stays open. | features.md §3.10 | [x] |
 | T0809 | `?` opens the help overlay with categories `RUN`, `VIEW`, `GLOBAL` and only the active bindings for the current (mode, focus). | features.md §3.10; mockups.md §11 | [ ] |
 | T0810 | `/` inside help filters rows to matches; keys bold-highlighted. | mockups.md §11 | [ ] |
 | T0811 | Disabled bindings (e.g. `a Approve` when no approvals pending) are **omitted** from the help overlay, not greyed. | features.md §5.6 rule 5; mockups.md §11 | [ ] |
@@ -399,7 +399,7 @@ Update this table after each test lands.
 | 6 Tabbed pane | 17 | 0 |
 | 7 Approval | 10 | 0 |
 | 8 Resume wizard | 11 | 0 |
-| 9 Palette & help | 13 | 0 |
+| 9 Palette & help | 13 | 4 |
 | 10 Keybar tiers | 9 | 0 |
 | 11 Run entry (P9-T1) | 16 | 6 |
 | 12 Cancel (P9-T2) | 6 | 0 |
