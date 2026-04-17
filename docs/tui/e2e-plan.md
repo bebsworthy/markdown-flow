@@ -101,7 +101,7 @@
 | T0207 | URL tab on a valid URL materialises a workspace on the local scratch env and registers it as `[workspace]` (network mocked via a local static file server fixture). | features.md §3.1 URL flow | [x] |
 | T0208 | `Esc` closes the modal without adding anything; registry file is unchanged. | mockups.md §2 add-modal | [x] |
 | T0209 | `Enter` on the selected fuzzy result persists the entry and closes the modal; the new entry is selected in the browser. | features.md §3.1 | [x] |
-| T0210 | Adding a path that is already in the registry is a no-op; no duplicate entry is written. | features.md §3.1 | [ ] |
+| T0210 | Adding a path that is already in the registry is a no-op; no duplicate entry is written. | features.md §3.1 | [x] |
 
 ## 4. Runs table / Runs mode  (P5-T1/T2/T3)
 
@@ -393,7 +393,7 @@ Update this table after each test lands.
 |---|---|---|
 | 1 Launch & lifecycle | 13 | 13 |
 | 2 Workflow browser | 11 | 11 |
-| 3 Add modal | 11 | 10 |
+| 3 Add modal | 11 | 11 |
 | 4 Runs table | 15 | 0 |
 | 5 Step table | 10 | 0 |
 | 6 Tabbed pane | 17 | 0 |
@@ -412,7 +412,7 @@ Update this table after each test lands.
 | 19 Engine integration | 6 | 0 |
 | 20 Registry | 4 | 0 |
 | 21 Exit discipline | 3 | 0 |
-| **Total** | **180** | **34** |
+| **Total** | **180** | **35** |
 
 ---
 
