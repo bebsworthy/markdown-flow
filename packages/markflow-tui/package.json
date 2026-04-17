@@ -12,18 +12,24 @@
     "dev": "tsx watch src/cli.tsx",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "npm run build && vitest --config vitest.e2e.config.ts run",
+    "test:e2e:watch": "vitest --config vitest.e2e.config.ts",
+    "test:e2e:debug": "E2E_DEBUG=1 npm run build && E2E_DEBUG=1 vitest --config vitest.e2e.config.ts run",
+    "test:e2e:frames": "E2E_FRAME_DIR=./test/e2e/.frames npm run build && E2E_FRAME_DIR=./test/e2e/.frames vitest --config vitest.e2e.config.ts run"
   },
   "dependencies": {
-    "markflow": "*",
-    "ink": "^5.0.1",
     "@inkjs/ui": "^2.0.0",
+    "ink": "^5.0.1",
+    "markflow": "*",
     "react": "^18.3.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.12",
+    "@xterm/headless": "^5.5.0",
     "ink-testing-library": "^4.0.0",
+    "node-pty": "^1.1.0",
     "tsup": "^8.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.5.0",

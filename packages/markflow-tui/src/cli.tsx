@@ -1,5 +1,4 @@
 import { render } from "ink";
-import React from "react";
 import { App } from "./app.js";
 import { parseRegistryFlags } from "./cli-args.js";
 
@@ -16,6 +15,7 @@ const { unmount, waitUntilExit } = render(
     onQuit={() => unmount()}
     registryConfig={parsed.config}
     initialLaunchArgs={parsed.rest}
+    runsDir={parsed.runsDir}
   />,
 );
 
