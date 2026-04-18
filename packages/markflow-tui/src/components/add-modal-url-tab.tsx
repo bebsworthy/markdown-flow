@@ -14,7 +14,7 @@ export interface AddModalUrlTabProps {
   readonly url: string;
   readonly ingesting: boolean;
   readonly error: string | null;
-  readonly width: number;
+  readonly width?: number | string;
 }
 
 function AddModalUrlTabImpl({

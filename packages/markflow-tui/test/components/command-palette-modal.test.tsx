@@ -73,8 +73,7 @@ function renderModal(args: Args = {}): ReturnType<typeof render> {
         exec={args.exec ?? mkExec()}
         onQueryChange={args.onQueryChange ?? (() => {})}
         onClose={args.onClose ?? (() => {})}
-        width={80}
-        height={20}
+        visible={true}
       />
     </ThemeProvider>,
   );

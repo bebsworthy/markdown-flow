@@ -48,8 +48,7 @@ function renderModal(args: RenderArgs): ReturnType<typeof render> {
           args.onSubmit ?? (async () => ({ kind: "ok", runId: "r1" }))
         }
         onCancel={args.onCancel ?? (() => {})}
-        width={80}
-        height={20}
+        visible={true}
       />
     </ThemeProvider>,
   );

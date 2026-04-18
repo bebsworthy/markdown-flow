@@ -40,8 +40,7 @@ function renderOverlay(args: Args = {}): ReturnType<typeof render> {
         modeLabel={args.modeLabel ?? "RUN"}
         focusLabel={args.focusLabel ?? "graph"}
         onClose={args.onClose ?? (() => {})}
-        width={90}
-        height={24}
+        visible={true}
       />
     </ThemeProvider>,
   );

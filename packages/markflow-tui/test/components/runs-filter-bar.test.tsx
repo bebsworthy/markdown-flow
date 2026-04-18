@@ -69,7 +69,7 @@ describe("<RunsFilterBar> — render", () => {
     const f = frame();
     expect(f).toContain(">");
     expect(f).toContain("/");
-    expect(f).toContain("_");
+    expect(f).toContain("\u2588");
     cleanup();
   });
 

@@ -94,7 +94,8 @@ function PaneVisibility({
   return (
     <Box
       width={width}
-      height={visible ? height : 0}
+      height={height}
+      display={visible ? "flex" : "none"}
       overflow="hidden"
       flexDirection="column"
     >
@@ -139,7 +140,7 @@ function ViewingBottomSlotImpl(
           selectedStepId={selectedStepId}
           engineState={engineState}
           width={width}
-          height={focus === "detail" ? paneHeight : 0}
+          height={paneHeight}
           nowMs={nowMs}
         />
       </PaneVisibility>
@@ -154,7 +155,7 @@ function ViewingBottomSlotImpl(
           selectedStepId={selectedStepId}
           engineState={engineState}
           width={width}
-          height={focus === "log" ? paneHeight : 0}
+          height={paneHeight}
           nowMs={nowMs}
           streamFactory={streamFactory}
           active={focus === "log"}
@@ -170,7 +171,7 @@ function ViewingBottomSlotImpl(
           runId={runId}
           engineState={engineState}
           width={width}
-          height={focus === "events" ? paneHeight : 0}
+          height={paneHeight}
           nowMs={nowMs}
           active={focus === "events"}
           eventLogReader={eventLogReader}

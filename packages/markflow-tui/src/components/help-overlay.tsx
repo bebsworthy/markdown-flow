@@ -7,6 +7,7 @@
 import React, { useMemo, useReducer, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import { useTheme } from "../theme/context.js";
+import { Modal } from "../primitives/Modal.js";
 import type { AppContext, Binding } from "./types.js";
 import { formatKeys } from "./keybar-layout.js";
 import {
@@ -22,8 +23,9 @@ export interface HelpOverlayProps {
   readonly modeLabel: string;
   readonly focusLabel: string;
   readonly onClose: () => void;
-  readonly width: number;
-  readonly height: number;
+  readonly visible: boolean;
+  readonly width?: number | string;
+  readonly maxHeight?: number | string;
 }
 
 function HelpOverlayImpl(props: HelpOverlayProps): React.ReactElement {
@@ -33,14 +35,14 @@ function HelpOverlayImpl(props: HelpOverlayProps): React.ReactElement {
     modeLabel,
     focusLabel,
     onClose,
+    visible,
     width,
-    height,
+    maxHeight,
   } = props;
   const theme = useTheme();
 
   const [searchOpen, setSearchOpen] = useState<boolean>(false);
 
-  // Forward ref for rowCount so the reducer closure reads the current value.
   const rowCountRef = useRef<number>(0);
 
   const [state, dispatch] = useReducer(
@@ -61,58 +63,54 @@ function HelpOverlayImpl(props: HelpOverlayProps): React.ReactElement {
   const searchOpenRef = useRef<boolean>(searchOpen);
   searchOpenRef.current = searchOpen;
 
-  useInput((input, key) => {
-    if (key.escape) {
+  useInput(
+    (input, key) => {
+      if (key.escape) {
+        if (searchOpenRef.current) {
+          setSearchOpen(false);
+          return;
+        }
+        onClose();
+        return;
+      }
       if (searchOpenRef.current) {
-        setSearchOpen(false);
+        if (key.return) {
+          setSearchOpen(false);
+          return;
+        }
+        if (key.backspace) {
+          const cur = stateRef.current.search;
+          if (cur.length === 0) return;
+          dispatch({ type: "SEARCH_SET", value: cur.slice(0, -1) });
+          return;
+        }
+        if (input && input.length > 0 && !key.ctrl && !key.escape) {
+          dispatch({
+            type: "SEARCH_SET",
+            value: stateRef.current.search + input,
+          });
+        }
         return;
       }
-      onClose();
-      return;
-    }
-    if (searchOpenRef.current) {
-      if (key.return) {
-        setSearchOpen(false);
+      if (input === "?") {
+        onClose();
         return;
       }
-      if (key.backspace) {
-        const cur = stateRef.current.search;
-        if (cur.length === 0) return;
-        dispatch({ type: "SEARCH_SET", value: cur.slice(0, -1) });
+      if (input === "/") {
+        setSearchOpen(true);
         return;
       }
-      if (input && input.length > 0 && !key.ctrl && !key.escape) {
-        dispatch({
-          type: "SEARCH_SET",
-          value: stateRef.current.search + input,
-        });
+      if (key.upArrow) {
+        dispatch({ type: "CURSOR_MOVE", delta: -1 });
+        return;
       }
-      return;
-    }
-    if (input === "?") {
-      onClose();
-      return;
-    }
-    if (input === "/") {
-      setSearchOpen(true);
-      return;
-    }
-    if (key.upArrow) {
-      dispatch({ type: "CURSOR_MOVE", delta: -1 });
-      return;
-    }
-    if (key.downArrow) {
-      dispatch({ type: "CURSOR_MOVE", delta: 1 });
-      return;
-    }
-  });
-
-  // ---- Rendering ---------------------------------------------------------
-
-  const frame = theme.frame;
-  const w = Math.max(20, width);
-  const topEdge = frame.tl + frame.h.repeat(Math.max(0, w - 2)) + frame.tr;
-  const botEdge = frame.bl + frame.h.repeat(Math.max(0, w - 2)) + frame.br;
+      if (key.downArrow) {
+        dispatch({ type: "CURSOR_MOVE", delta: 1 });
+        return;
+      }
+    },
+    { isActive: visible },
+  );
 
   const title =
     focusLabel.length > 0
@@ -125,69 +123,55 @@ function HelpOverlayImpl(props: HelpOverlayProps): React.ReactElement {
       ? `/${state.search}`
       : "/search";
 
-  // Flat row ordering for cursor tracking.
   let flatIdx = 0;
 
   return (
-    <Box flexDirection="column" width={w} height={height}>
-      <Text>{topEdge}</Text>
-      <Box flexDirection="row">
-        <Text>{frame.v} </Text>
-        <Text bold>{title}</Text>
-        <Text> </Text>
-        <Text dimColor>{searchLine}</Text>
-      </Box>
-      <Text>{frame.v}</Text>
-      {model.sections.length === 0 ? (
-        <Box flexDirection="row">
-          <Text>{frame.v} </Text>
-          <Text dimColor>no bindings match</Text>
+    <Modal visible={visible} title={title} width={width} maxHeight={maxHeight}>
+      <Box flexDirection="column">
+        <Box flexDirection="row" gap={1}>
+          <Text bold>{title}</Text>
+          <Text dimColor>{searchLine}</Text>
         </Box>
-      ) : (
-        model.sections.map((sec) => (
-          <Box key={`s-${sec.category}`} flexDirection="column">
-            <Box flexDirection="row">
-              <Text>{frame.v} </Text>
+        <Text> </Text>
+        {model.sections.length === 0 ? (
+          <Text dimColor>no bindings match</Text>
+        ) : (
+          model.sections.map((sec) => (
+            <Box key={`s-${sec.category}`} flexDirection="column">
               <Text bold dimColor>
                 {sec.category}
               </Text>
+              {sec.rows.map((row) => {
+                const rowIdx = flatIdx++;
+                const selected = rowIdx === state.cursor;
+                const keysText = formatKeys(row.keys);
+                const body = row.annotation
+                  ? `${keysText}  ${row.label}  ${row.annotation}`
+                  : `${keysText}  ${row.label}`;
+                return (
+                  <Box key={`r-${sec.category}-${rowIdx}`} paddingLeft={2}>
+                    {selected ? (
+                      <Text
+                        bold
+                        color={theme.colors.accent.color}
+                        dimColor={theme.colors.accent.dim === true}
+                      >
+                        {body}
+                      </Text>
+                    ) : (
+                      <Text>{body}</Text>
+                    )}
+                  </Box>
+                );
+              })}
             </Box>
-            {sec.rows.map((row) => {
-              const rowIdx = flatIdx++;
-              const selected = rowIdx === state.cursor;
-              const keysText = formatKeys(row.keys);
-              const body = row.annotation
-                ? `${keysText}  ${row.label}  ${row.annotation}`
-                : `${keysText}  ${row.label}`;
-              return (
-                <Box key={`r-${sec.category}-${rowIdx}`} flexDirection="row">
-                  <Text>{frame.v}   </Text>
-                  {selected ? (
-                    <Text
-                      bold
-                      color={theme.colors.accent.color}
-                      dimColor={theme.colors.accent.dim === true}
-                    >
-                      {body}
-                    </Text>
-                  ) : (
-                    <Text>{body}</Text>
-                  )}
-                </Box>
-              );
-            })}
-          </Box>
-        ))
-      )}
-      <Text>{frame.v}</Text>
-      <Box flexDirection="row">
-        <Text>{frame.v} </Text>
+          ))
+        )}
+        <Text> </Text>
         <Text dimColor>{`${model.totalRows} bindings`}</Text>
       </Box>
-      <Text>{botEdge}</Text>
-    </Box>
+    </Modal>
   );
 }
 
-// React.memo removed: React 19.2 + useEffectEvent bug with SimpleMemoComponent fibers (stale useInput state).
 export const HelpOverlay = HelpOverlayImpl;

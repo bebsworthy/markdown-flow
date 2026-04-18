@@ -29,13 +29,13 @@ import { ModeTabs } from "./components/mode-tabs.js";
 import { WorkflowBrowser } from "./components/workflow-browser.js";
 import { AddWorkflowModal } from "./components/add-workflow-modal.js";
 import { Keybar } from "./components/keybar.js";
-import { WORKFLOWS_EMPTY_KEYBAR } from "./components/keybar-fixtures/workflows-empty.js";
 import { APPROVAL_KEYBAR } from "./components/keybar-fixtures/approval.js";
 import { RESUME_KEYBAR } from "./components/keybar-fixtures/resume.js";
 import { ApprovalModal } from "./components/approval-modal.js";
 import { ResumeWizardModal } from "./components/resume-wizard-modal.js";
 import { CommandPaletteModal } from "./components/command-palette-modal.js";
 import { HelpOverlay } from "./components/help-overlay.js";
+import { ModalOverlay } from "./primitives/Modal.js";
 import { selectKeybarFixture } from "./components/keybar-fixtures/registry.js";
 import type { KeybarSelection } from "./components/keybar-fixtures/registry.js";
 import type { CommandExecContext, CommandResult } from "./palette/types.js";
@@ -803,11 +803,6 @@ export function App({
     bottomSlot = <Text> </Text>;
   }
 
-  const showEmptyKeybar =
-    registryState.entries.length === 0 &&
-    state.mode.kind === "browsing" &&
-    state.mode.pane === "workflows";
-
   // Pre-overlay keybar snapshot for help overlay (P7-T3). Captures the
   // keybar fixture that was in use the moment before `?` opened the help
   // overlay, so HelpOverlay can render rows derived from exactly that
@@ -896,9 +891,9 @@ export function App({
       modePillTiers={["full"]}
       modePillGap={{ full: 3 }}
     />
-  ) : showEmptyKeybar ? (
+  ) : (
     <Keybar
-      bindings={WORKFLOWS_EMPTY_KEYBAR}
+      bindings={currentSelection.bindings}
       ctx={{
         mode: state.mode,
         overlay: state.overlay,
@@ -910,18 +905,10 @@ export function App({
         runResumable,
       }}
       width={columns}
-      modePill="WORKFLOWS"
+      modePill={currentSelection.modePill ?? undefined}
     />
-  ) : null;
+  );
 
-  const modalWidth = Math.min(
-    Math.max(40, columns - 4),
-    90,
-  );
-  const modalHeight = Math.min(
-    Math.max(10, rows - 4),
-    18,
-  );
 
   // ---- Narrow single-pane branch (P8-T2) --------------------------------
   // Uses local env+stdout detection to pick the arrow glyph for the
@@ -1072,13 +1059,9 @@ export function App({
         keybar={keybarSlot}
       />
       )}
+      {state.overlay != null ? (
+        <ModalOverlay>
       {state.overlay?.kind === "approval" && pendingForActiveRun ? (
-        <Box
-          position="absolute"
-          flexDirection="column"
-          alignItems="center"
-          width={frameWidth}
-        >
           <ApprovalModal
             approval={pendingForActiveRun}
             onDecide={async (choice) => {
@@ -1111,18 +1094,10 @@ export function App({
               }
               dispatch({ type: "OVERLAY_CLOSE" });
             }}
-            width={modalWidth}
-            height={modalHeight}
+            visible
           />
-        </Box>
       ) : null}
       {state.overlay?.kind === "resumeWizard" && resumableRun ? (
-        <Box
-          position="absolute"
-          flexDirection="column"
-          alignItems="center"
-          width={frameWidth}
-        >
           <ResumeWizardModal
             run={resumableRun}
             workflow={resumeWorkflow ?? null}
@@ -1160,13 +1135,10 @@ export function App({
               return result;
             }}
             onCancel={() => dispatch({ type: "OVERLAY_CLOSE" })}
-            width={modalWidth}
-            height={modalHeight}
+            visible
           />
-        </Box>
       ) : null}
       {state.overlay?.kind === "commandPalette" ? (
-        <Box position="absolute" flexDirection="column" alignItems="center" width={frameWidth}>
           <CommandPaletteModal
             query={state.overlay.query}
             ctx={{
@@ -1245,13 +1217,10 @@ export function App({
               dispatch({ type: "COMMAND_PALETTE_QUERY", query: q })
             }
             onClose={() => dispatch({ type: "OVERLAY_CLOSE" })}
-            width={modalWidth}
-            height={modalHeight}
+            visible
           />
-        </Box>
       ) : null}
       {state.overlay?.kind === "help" ? (
-        <Box position="absolute" flexDirection="column" alignItems="center" width={frameWidth}>
           <HelpOverlay
             ctx={{
               mode: state.mode,
@@ -1267,18 +1236,10 @@ export function App({
             modeLabel={prevFixtureRef.current?.modeLabel ?? ""}
             focusLabel={prevFixtureRef.current?.focusLabel ?? ""}
             onClose={() => dispatch({ type: "OVERLAY_CLOSE" })}
-            width={modalWidth}
-            height={modalHeight}
+            visible
           />
-        </Box>
       ) : null}
       {state.overlay?.kind === "runInput" ? (
-        <Box
-          position="absolute"
-          flexDirection="column"
-          alignItems="center"
-          width={frameWidth}
-        >
           <InputPromptModal
             workflowName={state.overlay.workflowName}
             sourceFile={state.overlay.sourceFile}
@@ -1300,18 +1261,10 @@ export function App({
               return result;
             }}
             onCancel={() => dispatch({ type: "OVERLAY_CLOSE" })}
-            width={modalWidth}
-            height={modalHeight}
+            visible
           />
-        </Box>
       ) : null}
       {state.overlay?.kind === "addWorkflow" ? (
-        <Box
-          position="absolute"
-          flexDirection="column"
-          alignItems="center"
-          width={frameWidth}
-        >
           <AddWorkflowModal
             tab={state.overlay.tab}
             baseDir={process.cwd()}
@@ -1324,10 +1277,10 @@ export function App({
               dispatch({ type: "ADD_MODAL_SET_TAB", tab })
             }
             ingestor={urlIngestor}
-            width={modalWidth}
-            height={modalHeight}
+            visible
           />
-        </Box>
+      ) : null}
+        </ModalOverlay>
       ) : null}
       </Box>
     </ThemeProvider>

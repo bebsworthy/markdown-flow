@@ -24,7 +24,7 @@ export interface AddModalFuzzyTabProps {
   readonly rootPickerOpen: boolean;
   readonly rootPickerDraft: string;
   readonly rootPickerError: string | null;
-  readonly width: number;
+  readonly width?: number | string;
 }
 
 function formatBadge(

@@ -39,8 +39,7 @@ function renderModal(args: {
         onDecide={args.onDecide ?? (async () => ({ kind: "ok" }))}
         onSuspend={args.onSuspend ?? (() => {})}
         onCancel={args.onCancel ?? (() => {})}
-        width={60}
-        height={16}
+        visible={true}
       />
     </ThemeProvider>,
   );

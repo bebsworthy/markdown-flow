@@ -16,6 +16,7 @@ import { globSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { isAbsolute, resolve as resolvePath } from "node:path";
 import { useTheme } from "../theme/context.js";
+import { Modal } from "../primitives/Modal.js";
 import { AddModalFuzzyTab } from "./add-modal-fuzzy-tab.js";
 import { AddModalUrlTab } from "./add-modal-url-tab.js";
 import { rankCandidates } from "../add-modal/fuzzy.js";
@@ -36,10 +37,6 @@ import type {
 // Props
 // ---------------------------------------------------------------------------
 
-/**
- * Injection seams for the three non-pure helpers. Tests pass deterministic
- * stand-ins; production code uses the defaults imported at module top.
- */
 export type WalkerFn = (
   root: string,
   opts?: WalkerOptions,
@@ -53,26 +50,17 @@ export type IngestorFn = (
 ) => Promise<UrlIngestResult>;
 
 export interface AddWorkflowModalProps {
-  /** Current tab, driven by the reducer. */
   readonly tab: AddModalTab;
-  /** Initial walker root + cwd for launch-arg / URL ingest. */
   readonly baseDir: string;
-  /** Called with the chosen source (absolute path or workspace dir). */
   readonly onSubmit: (source: string) => void | Promise<void>;
-  /** Called on Esc. */
   readonly onCancel: () => void;
-  /** Called when the user presses Tab inside the modal. */
   readonly onTabChange: (tab: AddModalTab) => void;
-  /** Test override for the walker. */
   readonly walker?: WalkerFn;
-  /** Test override for the validator. */
   readonly validator?: ValidatorFn;
-  /** Test override for the URL ingestor. */
   readonly ingestor?: IngestorFn;
-  /** Modal width (columns). */
-  readonly width: number;
-  /** Modal height (rows). */
-  readonly height: number;
+  readonly visible: boolean;
+  readonly width?: number | string;
+  readonly maxHeight?: number | string;
 }
 
 const VISIBLE_ROWS = 10;
@@ -86,10 +74,6 @@ function tabLabel(tab: AddModalTab): string {
   return tab === "fuzzy" ? "Fuzzy find" : "Path or URL";
 }
 
-/**
- * Adapt the default `walkCandidates` async generator into the wider
- * `AsyncIterable` shape tests can match with a plain async generator.
- */
 function defaultWalker(
   root: string,
   opts?: WalkerOptions,
@@ -113,8 +97,9 @@ function AddWorkflowModalImpl(
     walker = defaultWalker,
     validator = validateCandidate,
     ingestor = ingestUrl,
+    visible,
     width,
-    height,
+    maxHeight,
   } = props;
 
   const theme = useTheme();
@@ -136,7 +121,7 @@ function AddWorkflowModalImpl(
   const [ingesting, setIngesting] = useState<boolean>(false);
   const [ingestError, setIngestError] = useState<string | null>(null);
 
-  // --- Refs to avoid stale-closure captures in async callbacks ---------------
+  // --- Refs ------------------------------------------------------------------
   const queryRef = useRef(query);
   queryRef.current = query;
   const selectedRef = useRef(selectedRowIndex);
@@ -176,8 +161,7 @@ function AddWorkflowModalImpl(
           }
         }
       } catch {
-        // Walker failures are silent; the modal renders whatever it managed
-        // to collect.
+        // silent
       }
       if (!cancelled) {
         setCandidates([...collected]);
@@ -191,13 +175,12 @@ function AddWorkflowModalImpl(
     };
   }, [root, walker]);
 
-  // --- Ranked candidates ------------------------------------------------------
+  // --- Ranked candidates -----------------------------------------------------
   const ranked = useMemo<ReadonlyArray<RankedCandidate>>(
     () => rankCandidates(query, candidates, RANK_LIMIT),
     [query, candidates],
   );
 
-  // Clamp selection when ranked changes.
   useEffect(() => {
     if (ranked.length === 0) {
       if (selectedRowIndex !== 0) setSelectedRowIndex(0);
@@ -208,12 +191,12 @@ function AddWorkflowModalImpl(
     }
   }, [ranked, selectedRowIndex]);
 
-  // --- Lazy validation of visible rows ---------------------------------------
+  // --- Lazy validation -------------------------------------------------------
   useEffect(() => {
-    const visible = ranked.slice(0, VISIBLE_ROWS);
+    const visible_ = ranked.slice(0, VISIBLE_ROWS);
     let cancelled = false;
     (async () => {
-      for (const r of visible) {
+      for (const r of visible_) {
         const path = r.candidate.absolutePath;
         if (validationByPath.has(path)) continue;
         try {
@@ -226,7 +209,7 @@ function AddWorkflowModalImpl(
             return next;
           });
         } catch {
-          // swallow — validator is contracted not to throw.
+          // swallow
         }
       }
     })();
@@ -237,7 +220,6 @@ function AddWorkflowModalImpl(
 
   // --- Key routing -----------------------------------------------------------
   useInput((input, key) => {
-    // Esc always routes — root picker closes first, then modal.
     if (key.escape) {
       if (rootPickerOpenRef.current) {
         setRootPickerOpen(false);
@@ -249,7 +231,6 @@ function AddWorkflowModalImpl(
       return;
     }
 
-    // Root picker input has priority when open.
     if (rootPickerOpenRef.current) {
       if (key.return) {
         const draft = rootPickerDraftRef.current.trim();
@@ -287,7 +268,6 @@ function AddWorkflowModalImpl(
       return;
     }
 
-    // Tab switches tabs.
     if (key.tab) {
       onTabChange(tab === "fuzzy" ? "url" : "fuzzy");
       return;
@@ -321,10 +301,6 @@ function AddWorkflowModalImpl(
         setQuery((s) => s.slice(0, -1));
         return;
       }
-      // Ignore bare `q` so the global app-level quit still fires — we
-      // deliberately do NOT trap printable keys when `q` is pressed alone.
-      // `q` only appears as a character input here when the user is typing
-      // a query containing q; that's fine.
       if (input && !key.ctrl && !key.escape) {
         setQuery((s) => s + input);
       }
@@ -337,7 +313,6 @@ function AddWorkflowModalImpl(
       const raw = urlInputRef.current.trim();
       if (raw.length === 0) return;
 
-      // URL flow
       if (/^https?:\/\//i.test(raw)) {
         setIngestError(null);
         setIngesting(true);
@@ -353,7 +328,6 @@ function AddWorkflowModalImpl(
         return;
       }
 
-      // Path / glob flow
       const hasGlob = /[*?{]/.test(raw);
       if (hasGlob) {
         const pattern = isAbsolute(raw) ? raw : resolvePath(baseDir, raw);
@@ -384,50 +358,37 @@ function AddWorkflowModalImpl(
     }
   });
 
-  // --- Render ---------------------------------------------------------------
-  const innerWidth = Math.max(10, width - 4);
-  const frame = theme.frame;
-  const topEdge =
-    frame.tl + frame.h.repeat(Math.max(0, width - 2)) + frame.tr;
-  const botEdge =
-    frame.bl + frame.h.repeat(Math.max(0, width - 2)) + frame.br;
-
+  // --- Render ----------------------------------------------------------------
   return (
-    <Box flexDirection="column" width={width} height={height}>
-      {/* Top edge with title */}
-      <Text>{topEdge}</Text>
+    <Modal visible={visible} title="ADD WORKFLOW" width={width} maxHeight={maxHeight}>
+      <Box flexDirection="column">
+        {/* Tab header */}
+        <Box flexDirection="row" gap={2}>
+          {tab === "fuzzy" ? (
+            <Text inverse bold>{`[ ${tabLabel("fuzzy")} ]`}</Text>
+          ) : (
+            <Text
+              color={theme.colors.accent.color}
+              dimColor={theme.colors.accent.dim === true}
+            >
+              {tabLabel("fuzzy")}
+            </Text>
+          )}
+          {tab === "url" ? (
+            <Text inverse bold>{`[ ${tabLabel("url")} ]`}</Text>
+          ) : (
+            <Text
+              color={theme.colors.accent.color}
+              dimColor={theme.colors.accent.dim === true}
+            >
+              {tabLabel("url")}
+            </Text>
+          )}
+        </Box>
 
-      {/* Tab header */}
-      <Box flexDirection="row">
-        <Text>{frame.v} </Text>
-        {tab === "fuzzy" ? (
-          <Text inverse bold>{`[ ${tabLabel("fuzzy")} ]`}</Text>
-        ) : (
-          <Text
-            color={theme.colors.accent.color}
-            dimColor={theme.colors.accent.dim === true}
-          >
-            {tabLabel("fuzzy")}
-          </Text>
-        )}
-        <Text>   </Text>
-        {tab === "url" ? (
-          <Text inverse bold>{`[ ${tabLabel("url")} ]`}</Text>
-        ) : (
-          <Text
-            color={theme.colors.accent.color}
-            dimColor={theme.colors.accent.dim === true}
-          >
-            {tabLabel("url")}
-          </Text>
-        )}
-      </Box>
+        <Text> </Text>
 
-      <Text>{frame.v}</Text>
-
-      {/* Body */}
-      <Box flexDirection="row">
-        <Text>{frame.v} </Text>
+        {/* Body */}
         {tab === "fuzzy" ? (
           <AddModalFuzzyTab
             root={root}
@@ -441,23 +402,18 @@ function AddWorkflowModalImpl(
             rootPickerOpen={rootPickerOpen}
             rootPickerDraft={rootPickerDraft}
             rootPickerError={rootPickerError}
-            width={innerWidth}
           />
         ) : (
           <AddModalUrlTab
             url={urlInput}
             ingesting={ingesting}
             error={ingestError}
-            width={innerWidth}
           />
         )}
-      </Box>
 
-      <Text>{frame.v}</Text>
+        <Text> </Text>
 
-      {/* Footer */}
-      <Box flexDirection="row">
-        <Text>{frame.v} </Text>
+        {/* Footer */}
         <Text
           color={theme.colors.dim.color}
           dimColor={theme.colors.dim.dim === true}
@@ -465,12 +421,8 @@ function AddWorkflowModalImpl(
           {"Tab  switch input mode    \u23ce  Add    Esc  Cancel"}
         </Text>
       </Box>
-
-      {/* Bottom edge */}
-      <Text>{botEdge}</Text>
-    </Box>
+    </Modal>
   );
 }
 
-// React.memo removed: React 19.2 + useEffectEvent bug with SimpleMemoComponent fibers (stale useInput state).
 export const AddWorkflowModal = AddWorkflowModalImpl;

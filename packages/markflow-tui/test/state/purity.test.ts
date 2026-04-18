@@ -66,7 +66,8 @@ const files = [
   // path / engine / global fetch by design.
   "../../src/add-modal/types.ts",
   "../../src/add-modal/fuzzy.ts",
-  // Empty-state keybar fixture (P4-T3). Pure declarative array of bindings.
+  // Keybar fixtures for workflow browser (P3-T4 / P4-T3). Pure binding arrays.
+  "../../src/components/keybar-fixtures/workflows.ts",
   "../../src/components/keybar-fixtures/workflows-empty.ts",
   // Runs-table pure surface (P5-T1). NOTE: runs/index.ts is a barrel and is
   // NOT scanned (just re-exports), and runs-table*.tsx are Ink by design.
@@ -326,6 +327,13 @@ describe("pure-module purity", () => {
     const mod = await import("../../src/add-modal/fuzzy.js");
     expect(typeof mod.rankCandidates).toBe("function");
     expect(typeof mod.scoreSubsequence).toBe("function");
+  });
+
+  it("workflows keybar fixture loads without Ink/React/fs", async () => {
+    const mod = await import(
+      "../../src/components/keybar-fixtures/workflows.js"
+    );
+    expect(Array.isArray(mod.WORKFLOWS_KEYBAR)).toBe(true);
   });
 
   it("workflows-empty keybar fixture loads without Ink/React/fs", async () => {

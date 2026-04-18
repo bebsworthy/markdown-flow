@@ -83,8 +83,7 @@ function renderModal(args: RenderArgs = {}): ReturnType<typeof render> {
         onSetInput={args.onSetInput ?? (() => {})}
         onConfirm={args.onConfirm ?? (async () => ({ kind: "ok" }))}
         onCancel={args.onCancel ?? (() => {})}
-        width={80}
-        height={20}
+        visible={true}
       />
     </ThemeProvider>,
   );

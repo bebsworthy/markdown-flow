@@ -69,8 +69,6 @@ interface RenderArgs {
   onSubmit?: (src: string) => void;
   onCancel?: () => void;
   onTabChange?: (t: "fuzzy" | "url") => void;
-  width?: number;
-  height?: number;
 }
 
 function renderModal(args: RenderArgs = {}) {
@@ -83,8 +81,6 @@ function renderModal(args: RenderArgs = {}) {
     onSubmit = vi.fn(),
     onCancel = vi.fn(),
     onTabChange = vi.fn(),
-    width = 72,
-    height = 20,
   } = args;
 
   const utils = render(
@@ -98,8 +94,7 @@ function renderModal(args: RenderArgs = {}) {
         walker={walker}
         validator={validator}
         ingestor={ingestor}
-        width={width}
-        height={height}
+        visible={true}
       />
     </ThemeProvider>,
   );
