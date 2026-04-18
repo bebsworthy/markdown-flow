@@ -6,8 +6,8 @@
 // <Box flexDirection="row">.
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Box, Text, useInput } from "ink";
-import { useTheme } from "../theme/context.js";
+import { useInput } from "ink";
+import { SplitPane } from "../primitives/SplitPane.js";
 import { WorkflowList } from "./workflow-list.js";
 import { WorkflowPreview } from "./workflow-preview.js";
 import { WorkflowBrowserEmpty } from "./workflow-browser-empty.js";
@@ -82,7 +82,6 @@ function WorkflowBrowserImpl({
   onStartRun,
   inputDisabled,
 }: WorkflowBrowserProps): React.ReactElement {
-  const theme = useTheme();
   const paneWidth = width ?? DEFAULT_WIDTH;
   const paneHeight = height ?? DEFAULT_HEIGHT;
 
@@ -216,7 +215,15 @@ function WorkflowBrowserImpl({
       : null;
 
   return (
-    <Box flexDirection="row" width={paneWidth} height={paneHeight}>
+    <SplitPane
+      direction="row"
+      ratio={LEFT_RATIO}
+      divider
+      width={paneWidth}
+      height={paneHeight}
+      minFirst={20}
+      minSecond={20}
+    >
       <WorkflowList
         title={title}
         rows={rows}
@@ -224,20 +231,12 @@ function WorkflowBrowserImpl({
         width={leftWidth}
         height={paneHeight}
       />
-      <Box width={1} height={paneHeight} flexShrink={0}>
-        <Text
-          color={theme.colors.dim.color}
-          dimColor={theme.colors.dim.dim === true}
-        >
-          {theme.frame.v}
-        </Text>
-      </Box>
       <WorkflowPreview
         resolved={selectedResolved}
         width={rightWidth}
         height={paneHeight}
       />
-    </Box>
+    </SplitPane>
   );
 }
 

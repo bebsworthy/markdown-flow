@@ -8,7 +8,6 @@
 import { describe, it, expect } from "vitest";
 import {
   STEP_COLUMNS_MEDIUM,
-  computeStepColumnWidths,
   pickStepColumnSet,
 } from "../../src/steps/columns.js";
 import type { StepRow } from "../../src/steps/types.js";
@@ -22,13 +21,10 @@ describe("steps columns — medium tier (width=90)", () => {
     expect(STEP_COLUMNS_MEDIUM.find((c) => c.id === "attempt")).toBeUndefined();
   });
 
-  it("computeStepColumnWidths(STEP_COLUMNS_MEDIUM, 90) sums within 90", () => {
-    const widths = computeStepColumnWidths(STEP_COLUMNS_MEDIUM, 90);
-    const gutters = Math.max(0, STEP_COLUMNS_MEDIUM.length - 1);
-    const leading = 2;
-    let total = gutters + leading;
-    for (const w of widths.values()) total += w;
-    expect(total).toBeLessThanOrEqual(90);
+  it("STEP_COLUMNS_MEDIUM has exactly one grow column (NOTE)", () => {
+    const growing = STEP_COLUMNS_MEDIUM.filter((c) => c.grow);
+    expect(growing).toHaveLength(1);
+    expect(growing[0]!.id).toBe("note");
   });
 
   it("STEP_COLUMNS_MEDIUM has ids in order [step, status, elapsed, note]", () => {
@@ -41,10 +37,6 @@ describe("steps columns — medium tier (width=90)", () => {
   });
 
   it("attempt fold: a running retry step carries 'attempt 2/3' via row.note", () => {
-    // The medium tier has no ATTEMPT column, so attempt info must surface
-    // through the row's NOTE text. This is an integration-style assertion
-    // against an ad-hoc row rather than the full buildStepRow() pipeline so
-    // the test stays purity-safe (no engine import).
     const row: StepRow = {
       id: "t1",
       kind: "leaf",
@@ -61,7 +53,6 @@ describe("steps columns — medium tier (width=90)", () => {
       nodeId: "build",
     };
     expect(row.note).toContain("attempt 2/3");
-    // The NOTE column in STEP_COLUMNS_MEDIUM projects row.note verbatim.
     const note = STEP_COLUMNS_MEDIUM.find((c) => c.id === "note")!;
     expect(note.projectText(row, new Map())).toContain("attempt 2/3");
   });

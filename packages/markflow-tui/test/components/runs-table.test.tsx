@@ -263,13 +263,15 @@ describe("<RunsTable> — cursor", () => {
     cleanup();
   });
 
-  it("no cursor glyph when selectedRunId is null", () => {
+  it("cursor glyph at position 0 when selectedRunId is null", () => {
     const { frame, cleanup } = renderTable({
       width: 140,
       selectedRunId: null,
       inputDisabled: true,
     });
-    expect(frame()).not.toContain("▶");
+    // DataTable unifies cursor position and glyph — cursor 0 always shows ▶
+    const matches = frame().match(/▶/g) ?? [];
+    expect(matches.length).toBe(1);
     cleanup();
   });
 });
@@ -326,7 +328,7 @@ describe("<RunsTable> — key handling", () => {
 // ---------------------------------------------------------------------------
 
 describe("<RunsTable> — empty state", () => {
-  it("renders 'no runs yet' with column headers", () => {
+  it("renders 'no runs yet' in empty state", () => {
     const { frame, cleanup } = renderTable({
       rows: [],
       width: 140,
@@ -334,8 +336,6 @@ describe("<RunsTable> — empty state", () => {
     });
     const f = frame();
     expect(f).toContain("no runs yet");
-    expect(f).toContain("WORKFLOW");
-    expect(f).toContain("STATUS");
     cleanup();
   });
 

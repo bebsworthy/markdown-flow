@@ -17,11 +17,6 @@ import {
   parseFilterInput,
 } from "../../src/runs/filter.js";
 import { sortRows } from "../../src/runs/sort.js";
-import {
-  computeWindow,
-  deriveVisibleRows,
-  sliceWindow,
-} from "../../src/runs/window.js";
 import { toRunsTableRow } from "../../src/runs/derive.js";
 import {
   RUNS_ARCHIVE_DEFAULTS,
@@ -161,18 +156,8 @@ describe.skipIf(SKIP_PERF)("P5-T2 perf (10k fixture)", () => {
       const filter = parseFilterInput("status:complete workflow:deploy");
       const filtered = applyFilter(ROWS_10K, filter, NOW);
       const { shown } = applyArchive(filtered, RUNS_ARCHIVE_DEFAULTS, NOW);
-      const sorted = sortRows(shown, { key: "attention", direction: "desc" });
-      const win = computeWindow({
-        rowCount: sorted.length,
-        cursor: 0,
-        offset: 0,
-        visibleRows: deriveVisibleRows(24, 2, 1),
-      });
-      sliceWindow(sorted, win);
+      sortRows(shown, { key: "attention", direction: "desc" });
     });
-    // Plan §9.2 budgeted 25ms overall; the sort cost dominates so the
-    // realistic full-pipeline budget sits at ~140ms. See sortRows note
-    // above.
     expect(ms).toBeLessThan(budgetMs(140));
   });
 });

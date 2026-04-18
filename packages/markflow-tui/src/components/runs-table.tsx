@@ -2,8 +2,7 @@
 //
 // Stateless runs-table pane. Composes:
 //   - optional `<RunsFilterBar>` when `runsFilter.open === true`
-//   - column header row
-//   - windowed slice of `<RunsTableRow>` per row (virtualised)
+//   - `<DataTable>` with column-set selection + themed status cell
 //   - `<RunsFooter>` showing N shown / M archived / a Show all
 //
 // Owns key bindings:
@@ -19,17 +18,8 @@
 //   Enter      → MODE_OPEN_RUN(rows[cursor].id)
 // All suppressed while the filter bar is open (the bar owns keys then)
 // or while `inputDisabled` is set.
-//
-// Authoritative references:
-//   - docs/tui/features.md §3.2
-//   - docs/tui/mockups.md §1 (top half)
-//   - docs/tui/plans/P5-T2.md §7, §8
-//   - docs/tui/plans/P5-T3.md §6 (cursor keybindings + gating)
-//
-// Width-as-prop: ink-testing-library does not expose a `cols` option, so
-// callers pass `width` explicitly.
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Box, Text, useInput } from "ink";
 import { useTheme } from "../theme/context.js";
 import type {
@@ -37,17 +27,13 @@ import type {
   RunsFilterState,
   RunsSortState,
   RunsTableRow as RowData,
+  RunsTableColumn,
 } from "../runs/types.js";
-import { pickColumnSet, computeColumnWidths, fitCell } from "../runs/columns.js";
+import { pickColumnSet } from "../runs/columns.js";
 import { sortRows } from "../runs/sort.js";
 import { applyArchive, applyFilter } from "../runs/filter.js";
-import {
-  computeWindow,
-  deriveVisibleRows,
-  sliceWindow,
-} from "../runs/window.js";
 import { reconcileCursorAfterRowsChange } from "../runs/cursor.js";
-import { RunsTableRow } from "./runs-table-row.js";
+import { DataTable, type ColumnDef } from "../primitives/DataTable.js";
 import { RunsFilterBar } from "./runs-filter-bar.js";
 import { RunsFooter } from "./runs-footer.js";
 import type { Action } from "../state/types.js";
@@ -59,40 +45,58 @@ export interface RunsTableProps {
   readonly runsFilter: RunsFilterState;
   readonly runsArchive: RunsArchivePolicy;
   readonly selectedRunId: string | null;
-  /**
-   * Index into the sorted-filtered-archived row list. Threaded from
-   * `state.runsCursor`. Required as of P5-T3 — callers may pass `0` when
-   * they don't care, but they MUST pass something so cursor math stays
-   * deterministic.
-   */
   readonly cursor: number;
   readonly width: number;
   readonly height?: number;
   readonly nowMs: number;
   readonly dispatch: (action: Action) => void;
-  /**
-   * Disable ALL key bindings owned by this component. Tests set this so
-   * a sibling keybar fixture can own routing, and so snapshot tests
-   * don't race.
-   */
   readonly inputDisabled?: boolean;
-  /**
-   * Test hook — injected mock of `applyFilter` so memoisation tests can
-   * observe call counts. Production callers omit this.
-   */
   readonly applyFilterImpl?: typeof applyFilter;
-  /**
-   * Callback fired when the user presses `r` on a terminal-state row
-   * (complete / error / cancelled). App wires it to the run-entry flow
-   * (plan §4.2). Silently ignored on active rows — hide-don't-grey.
-   */
   readonly onStartRun?: (info: RunInfo) => void;
 }
 
 const DEFAULT_HEIGHT = 10;
-const HEADER_ROWS = 1;
-const FILTER_BAR_ROWS = 2; // input line + parsed-terms line
+const FILTER_BAR_ROWS = 2;
 const FOOTER_ROWS = 1;
+
+function toDataTableColumns(
+  columns: ReadonlyArray<RunsTableColumn>,
+  theme: ReturnType<typeof useTheme>,
+): ReadonlyArray<ColumnDef<RowData>> {
+  return columns.map((col) => {
+    const base = {
+      id: col.id,
+      header: col.header,
+      width: col.width,
+      grow: col.grow,
+      align: col.align,
+      render: (row: RowData) => col.projectText(row),
+    };
+
+    if (col.id === "status" && col.projectStatus) {
+      const projectStatus = col.projectStatus;
+      return {
+        ...base,
+        renderCell: (row: RowData) => {
+          const cell = projectStatus(row);
+          const themeGlyph = theme.glyphs[cell.glyphKey];
+          const spec = theme.colors[cell.role];
+          return (
+            <Text
+              color={spec.color}
+              dimColor={spec.dim === true}
+              wrap="truncate-end"
+            >
+              {themeGlyph} {cell.label}
+            </Text>
+          );
+        },
+      };
+    }
+
+    return base;
+  });
+}
 
 function RunsTableImpl({
   rows,
@@ -113,8 +117,6 @@ function RunsTableImpl({
   const paneHeight = height ?? DEFAULT_HEIGHT;
   const cursorIndex = cursor;
 
-  const [viewportOffset, setViewportOffset] = useState<number>(0);
-
   // ---------------------------------------------------------------------
   // Filter → archive → sort pipeline (memoised)
   // ---------------------------------------------------------------------
@@ -132,44 +134,21 @@ function RunsTableImpl({
   );
 
   // ---------------------------------------------------------------------
-  // Window math
+  // Visible row count (for page up/down)
   // ---------------------------------------------------------------------
-  const headerOverhead =
-    HEADER_ROWS + (runsFilter.open ? FILTER_BAR_ROWS : 0) + FOOTER_ROWS;
-  const visibleRows = deriveVisibleRows(paneHeight, headerOverhead, 0);
+  const nonTableOverhead =
+    (runsFilter.open ? FILTER_BAR_ROWS : 0) + FOOTER_ROWS;
+  const dataHeight = Math.max(0, paneHeight - nonTableOverhead);
+  const pageSize = Math.max(0, dataHeight - 1); // minus DataTable header
 
-  const windowState = useMemo(
-    () =>
-      computeWindow({
-        rowCount: sortedRows.length,
-        cursor: cursorIndex,
-        offset: viewportOffset,
-        visibleRows,
-      }),
-    [sortedRows.length, cursorIndex, viewportOffset, visibleRows],
-  );
-
-  // Keep local offset in sync with computed offset (runs on scroll).
-  useEffect(() => {
-    if (windowState.offset !== viewportOffset) {
-      setViewportOffset(windowState.offset);
-    }
-  }, [windowState.offset, viewportOffset]);
-
-  // Reset viewport on major input changes (filter apply, archive toggle).
-  useEffect(() => {
-    setViewportOffset(0);
-  }, [runsFilter.applied, runsArchive.shown]);
+  // Clamped cursor for derived selection + key handlers
+  const clampedCursor =
+    sortedRows.length > 0
+      ? Math.max(0, Math.min(cursorIndex, sortedRows.length - 1))
+      : 0;
 
   // ---------------------------------------------------------------------
-  // Cursor reconciliation (P5-T3 §4.5)
-  //
-  // When the sorted row set changes (filter apply, archive toggle, new
-  // rows from the feed), re-place the cursor: prefer preserving the
-  // selected run-id, fall back to clamping to the last visible index.
-  // The reducer does not know `rows.length` so this runs at the component
-  // layer; the dispatched `RUNS_CURSOR_JUMP` is a no-op when the target
-  // already equals `state.runsCursor`, keeping the effect idempotent.
+  // Cursor reconciliation
   // ---------------------------------------------------------------------
   useEffect(() => {
     const next = reconcileCursorAfterRowsChange(
@@ -183,14 +162,10 @@ function RunsTableImpl({
   }, [sortedRows, cursorIndex, selectedRunId, dispatch]);
 
   // ---------------------------------------------------------------------
-  // Derived selection: whenever the row under the *clamped* cursor has a
-  // different id from `state.selectedRunId`, emit `RUNS_SELECT`. Using
-  // `windowState.cursor` guarantees the index is within bounds even when
-  // the raw `state.runsCursor` is momentarily stale. The reducer coerces
-  // `RUNS_SELECT` to a no-op when the id matches, so the loop is bounded.
+  // Derived selection
   // ---------------------------------------------------------------------
   const derivedSelected =
-    sortedRows.length > 0 ? sortedRows[windowState.cursor]?.id ?? null : null;
+    sortedRows.length > 0 ? sortedRows[clampedCursor]?.id ?? null : null;
   useEffect(() => {
     if (derivedSelected !== selectedRunId) {
       dispatch({ type: "RUNS_SELECT", runId: derivedSelected });
@@ -199,15 +174,9 @@ function RunsTableImpl({
 
   // ---------------------------------------------------------------------
   // Key routing
-  //
-  // Single `useInput` for all component-owned keys. Suppressed while the
-  // filter bar is open (it owns keystrokes) or while `inputDisabled` is
-  // set. Each branch dispatches a single action and returns — keystrokes
-  // never fall through to sibling handlers.
   // ---------------------------------------------------------------------
   useInput(
     (input, key) => {
-      // Existing component-owned letter keys.
       if (input === "s") {
         dispatch({ type: "RUNS_SORT_CYCLE" });
         return;
@@ -221,10 +190,8 @@ function RunsTableImpl({
         return;
       }
 
-      // `r` Run — start a fresh run of the same workflow (P9-T1). Scoped
-      // to terminal rows (hide-don't-grey on active runs).
       if (input === "r") {
-        const row = sortedRows[windowState.cursor];
+        const row = sortedRows[clampedCursor];
         if (!row) return;
         const terminal =
           row.info.status === "complete" || row.info.status === "error";
@@ -233,7 +200,6 @@ function RunsTableImpl({
         return;
       }
 
-      // Cursor movement.
       if (key.upArrow || input === "k") {
         dispatch({ type: "RUNS_CURSOR_MOVE", delta: -1 });
         return;
@@ -243,22 +209,22 @@ function RunsTableImpl({
         return;
       }
       if (key.pageUp) {
-        if (visibleRows > 0 && sortedRows.length > 0) {
+        if (pageSize > 0 && sortedRows.length > 0) {
           dispatch({
             type: "RUNS_CURSOR_PAGE",
             direction: "up",
-            pageSize: visibleRows,
+            pageSize,
             rowCount: sortedRows.length,
           });
         }
         return;
       }
       if (key.pageDown) {
-        if (visibleRows > 0 && sortedRows.length > 0) {
+        if (pageSize > 0 && sortedRows.length > 0) {
           dispatch({
             type: "RUNS_CURSOR_PAGE",
             direction: "down",
-            pageSize: visibleRows,
+            pageSize,
             rowCount: sortedRows.length,
           });
         }
@@ -276,9 +242,8 @@ function RunsTableImpl({
         return;
       }
 
-      // Enter — zoom into RUN mode on the currently selected row.
       if (key.return) {
-        const id = sortedRows[windowState.cursor]?.id;
+        const id = sortedRows[clampedCursor]?.id;
         if (id !== undefined && id.length > 0) {
           dispatch({ type: "MODE_OPEN_RUN", runId: id });
         }
@@ -288,19 +253,28 @@ function RunsTableImpl({
     { isActive: !inputDisabled && !runsFilter.open },
   );
 
-  const windowSlice = useMemo(
-    () => sliceWindow(sortedRows, windowState),
-    [sortedRows, windowState.offset, windowState.visibleRows],
-  );
-
+  // ---------------------------------------------------------------------
+  // DataTable columns (memoised on column set + theme)
+  // ---------------------------------------------------------------------
   const columns = pickColumnSet(width);
-  const widths = computeColumnWidths(columns, width);
+  const dtColumns = useMemo(
+    () => toDataTableColumns(columns, theme),
+    [columns, theme],
+  );
 
   const filterHasTerms = runsFilter.applied.terms.some(
     (t) => t.kind !== "malformed",
   );
   const archiveActive = !runsArchive.shown && archivedRows.length > 0;
-  const zeroVisible = sortedRows.length === 0;
+
+  const emptyNode = (
+    <Text
+      color={theme.colors.dim.color}
+      dimColor={theme.colors.dim.dim === true}
+    >
+      {filterHasTerms || archiveActive ? "no runs match" : "no runs yet"}
+    </Text>
+  );
 
   return (
     <Box flexDirection="column" width={width} height={paneHeight}>
@@ -313,51 +287,17 @@ function RunsTableImpl({
         />
       ) : null}
 
-      {/* Header row */}
-      <Box flexDirection="row">
-        <Text>{"  "}</Text>
-        {columns.map((col, idx) => {
-          const colWidth = widths[idx] ?? col.width;
-          const isLast = idx === columns.length - 1;
-          const text = fitCell(col.header, colWidth, col.align);
-          return (
-            <React.Fragment key={col.id}>
-              <Text
-                bold
-                color={theme.colors.dim.color}
-                dimColor={theme.colors.dim.dim === true}
-              >
-                {text}
-              </Text>
-              {isLast ? null : <Text> </Text>}
-            </React.Fragment>
-          );
-        })}
-      </Box>
+      <DataTable<RowData>
+        columns={dtColumns}
+        rows={sortedRows}
+        rowKey={(r) => r.id}
+        cursorIndex={clampedCursor}
+        width={width}
+        height={dataHeight}
+        cursorGlyph="▶"
+        emptyState={emptyNode}
+      />
 
-      {/* Data rows — only the current window is mounted. */}
-      {zeroVisible ? (
-        <Text
-          color={theme.colors.dim.color}
-          dimColor={theme.colors.dim.dim === true}
-        >
-          {filterHasTerms || archiveActive
-            ? "no runs match"
-            : "no runs yet"}
-        </Text>
-      ) : (
-        windowSlice.map((row) => (
-          <RunsTableRow
-            key={row.id}
-            row={row}
-            columns={columns}
-            selected={row.id === selectedRunId}
-            width={width}
-          />
-        ))
-      )}
-
-      {/* Footer — live counts */}
       <RunsFooter
         shown={archiveShown.length}
         archived={archivedRows.length}

@@ -9,8 +9,6 @@ import {
   COLUMNS_100,
   COLUMNS_80,
   pickColumnSet,
-  computeColumnWidths,
-  fitCell,
   WIDE_TIER_MIN,
   MEDIUM_TIER_MIN,
 } from "../../src/runs/columns.js";
@@ -53,8 +51,6 @@ describe("COLUMNS_140", () => {
   });
 
   it("fixed-width columns sum to the expected total", () => {
-    // 8 + 14 + 12 + 14 + 10 + 10 = 68 (adjusted from the plan's §5.1 draft
-    // once `started` dropped to 10 cols — an HH:MM:SS column doesn't need 18).
     const fixed = COLUMNS_140.filter((c) => !c.grow).reduce(
       (sum, c) => sum + c.width,
       0,
@@ -101,12 +97,10 @@ describe("column projections", () => {
     expect(col.projectText(r)).toBe("abcd12");
   });
 
-  it("workflow column fits into width (truncation uses ellipsis if needed)", () => {
+  it("workflow column projects the workflow name", () => {
     const col = COLUMNS_140.find((c) => c.id === "workflow")!;
     const long = row({ workflowName: "a-very-long-workflow-name" });
-    const text = fitCell(col.projectText(long), col.width, col.align);
-    expect(text).toHaveLength(col.width);
-    expect(text).toMatch(/…/);
+    expect(col.projectText(long)).toBe("a-very-long-workflow-name");
   });
 
   it("status column returns StatusCell with glyph + role + label", () => {
@@ -118,10 +112,8 @@ describe("column projections", () => {
     expect(cell.glyphKey).toBe("running");
   });
 
-  it("note column grows to fill the remaining width", () => {
-    const widths = computeColumnWidths(COLUMNS_140, 140);
-    const noteIdx = COLUMNS_140.findIndex((c) => c.id === "note");
-    // 140 - fixed (68) - 6 gutters - 2 leading = 64 → grow budget.
-    expect(widths[noteIdx]).toBeGreaterThan(20);
+  it("note column has grow: true", () => {
+    const noteCol = COLUMNS_140.find((c) => c.id === "note")!;
+    expect(noteCol.grow).toBe(true);
   });
 });

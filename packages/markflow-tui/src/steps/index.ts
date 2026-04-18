@@ -45,8 +45,6 @@ export {
   STEP_COLUMNS_MEDIUM,
   STEP_COLUMNS_NARROW,
   pickStepColumnSet,
-  computeStepColumnWidths,
-  fitStepCell,
 } from "./columns.js";
 
 export {

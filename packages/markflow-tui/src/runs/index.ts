@@ -17,7 +17,6 @@ export type {
   RunsFilterInput,
   RunsFilterState,
   RunsArchivePolicy,
-  RunsWindowState,
 } from "./types.js";
 
 export { RUNS_ARCHIVE_DEFAULTS } from "./types.js";
@@ -36,8 +35,6 @@ export {
   COLUMNS_100,
   COLUMNS_80,
   pickColumnSet,
-  computeColumnWidths,
-  fitCell,
   WIDE_TIER_MIN,
   MEDIUM_TIER_MIN,
 } from "./columns.js";
@@ -65,11 +62,6 @@ export {
   applyArchive,
 } from "./filter.js";
 
-export {
-  computeWindow,
-  sliceWindow,
-  deriveVisibleRows,
-} from "./window.js";
 
 export {
   clampCursor,

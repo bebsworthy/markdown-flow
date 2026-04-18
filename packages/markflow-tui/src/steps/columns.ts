@@ -15,7 +15,6 @@
 import { UNICODE_GLYPHS } from "../theme/glyphs.js";
 import { toStepStatusCell } from "./derive.js";
 import type {
-  StepColumnId,
   StepColumnWidths,
   StepProgressCell,
   StepRow,
@@ -172,61 +171,3 @@ export function pickStepColumnSet(
   return STEP_COLUMNS_NARROW;
 }
 
-// ---------------------------------------------------------------------------
-// Width distribution — mirrors runs/columns.ts::computeColumnWidths
-// ---------------------------------------------------------------------------
-
-export function computeStepColumnWidths(
-  columns: ReadonlyArray<StepTableColumn>,
-  paneWidth: number,
-): StepColumnWidths {
-  if (columns.length === 0) return new Map();
-  let fixedTotal = 0;
-  let growIndex = -1;
-  for (let i = 0; i < columns.length; i++) {
-    const c = columns[i]!;
-    if (c.grow) {
-      growIndex = i;
-    } else {
-      fixedTotal += c.width;
-    }
-  }
-  const gutters = Math.max(0, columns.length - 1);
-  const leading = 2; // cursor column
-  const growBudget = Math.max(
-    4,
-    paneWidth - fixedTotal - gutters - leading,
-  );
-  const entries: Array<[StepColumnId, number]> = [];
-  columns.forEach((c, i) => {
-    const w = i === growIndex ? growBudget : c.width;
-    entries.push([c.id, w]);
-  });
-  return new Map(entries);
-}
-
-// ---------------------------------------------------------------------------
-// Cell text preparation
-// ---------------------------------------------------------------------------
-
-const ELLIPSIS = "\u2026";
-
-/**
- * Truncate + pad a cell value to exactly `width` columns. Right-truncates
- * with a single-char ellipsis for overflow; pads with spaces on the right
- * (align: "left") or on the left (align: "right") for underflow.
- */
-export function fitStepCell(
-  text: string,
-  width: number,
-  align: "left" | "right" = "left",
-): string {
-  if (width <= 0) return "";
-  if (text.length === width) return text;
-  if (text.length > width) {
-    if (width === 1) return ELLIPSIS;
-    return text.slice(0, width - 1) + ELLIPSIS;
-  }
-  const pad = " ".repeat(width - text.length);
-  return align === "right" ? pad + text : text + pad;
-}

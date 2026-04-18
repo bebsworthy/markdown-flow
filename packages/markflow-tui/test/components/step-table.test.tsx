@@ -139,12 +139,12 @@ describe("<StepTable> rows", () => {
     expect(cursorMarkers.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("selectedStepId highlights the matching row", () => {
+  it("cursorRowIndex=1 highlights the second row", () => {
     const rows = [
       leaf({ id: "a", label: "build", status: "complete", glyphKey: "ok" }),
       leaf({ id: "b", label: "test", status: "complete", glyphKey: "ok" }),
     ];
-    const frame = stripAnsi(renderTable({ rows, selectedStepId: "b" }));
+    const frame = stripAnsi(renderTable({ rows, cursorRowIndex: 1 }));
     expect(frame).toMatch(/\u25b6 .*test/);
   });
 

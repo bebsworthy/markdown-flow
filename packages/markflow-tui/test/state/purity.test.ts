@@ -78,7 +78,6 @@ const files = [
   // P5-T2 pure modules — duration mirror, filter pipeline, virtualisation math.
   "../../src/runs/duration.ts",
   "../../src/runs/filter.ts",
-  "../../src/runs/window.ts",
   // P5-T3 pure module — cursor math for the runs table.
   "../../src/runs/cursor.ts",
   // P6-T1 pure modules — step-table surface. NOTE: steps/index.ts is a
@@ -389,13 +388,6 @@ describe("pure-module purity", () => {
     expect(typeof mod.isArchived).toBe("function");
   });
 
-  it("runs window module loads without Ink/React/fs", async () => {
-    const mod = await import("../../src/runs/window.js");
-    expect(typeof mod.computeWindow).toBe("function");
-    expect(typeof mod.sliceWindow).toBe("function");
-    expect(typeof mod.deriveVisibleRows).toBe("function");
-  });
-
   it("runs cursor module loads without Ink/React/fs", async () => {
     const mod = await import("../../src/runs/cursor.js");
     expect(typeof mod.clampCursor).toBe("function");
@@ -440,8 +432,6 @@ describe("pure-module purity", () => {
     expect(Array.isArray(mod.STEP_COLUMNS_MEDIUM)).toBe(true);
     expect(Array.isArray(mod.STEP_COLUMNS_NARROW)).toBe(true);
     expect(typeof mod.pickStepColumnSet).toBe("function");
-    expect(typeof mod.computeStepColumnWidths).toBe("function");
-    expect(typeof mod.fitStepCell).toBe("function");
   });
 
   it("steps derive module loads without Ink/React/fs", async () => {

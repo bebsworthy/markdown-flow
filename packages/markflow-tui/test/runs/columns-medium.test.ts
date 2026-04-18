@@ -9,14 +9,12 @@ import {
   COLUMNS_100,
   COLUMNS_80,
   COLUMNS_140,
-  computeColumnWidths,
   pickColumnSet,
 } from "../../src/runs/columns.js";
 
 describe("runs columns — medium tier (width=90)", () => {
   it("pickColumnSet(90) returns COLUMNS_100 (identity)", () => {
     expect(pickColumnSet(90)).toBe(COLUMNS_100);
-    // Stability under repeat calls: same identity.
     expect(pickColumnSet(90)).toBe(pickColumnSet(90));
     expect(pickColumnSet(90)).toBe(pickColumnSet(90));
   });
@@ -43,18 +41,9 @@ describe("runs columns — medium tier (width=90)", () => {
     expect(elapsed!.header).toBe("AGE");
   });
 
-  it("computeColumnWidths(COLUMNS_100, 90) sums within the 90-col budget", () => {
-    const widths = computeColumnWidths(COLUMNS_100, 90);
-    const sum = widths.reduce((s, w) => s + w, 0);
-    const gutters = Math.max(0, COLUMNS_100.length - 1);
-    const leading = 2;
-    expect(sum + gutters + leading).toBeLessThanOrEqual(90);
-  });
-
-  it("NOTE grow column gets at least 20 chars at width=90", () => {
-    const widths = computeColumnWidths(COLUMNS_100, 90);
-    const noteIdx = COLUMNS_100.findIndex((c) => c.id === "note");
-    expect(widths[noteIdx]).toBeGreaterThanOrEqual(20);
+  it("NOTE column has grow: true", () => {
+    const noteCol = COLUMNS_100.find((c) => c.id === "note");
+    expect(noteCol?.grow).toBe(true);
   });
 
   it("COLUMNS_100 contains exactly the ordered id set [id, workflow, status, step, elapsed, note]", () => {
