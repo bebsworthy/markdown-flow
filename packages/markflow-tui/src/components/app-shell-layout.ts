@@ -113,6 +113,7 @@ export function keyToMode(
   ctx: {
     readonly mode: AppState["mode"];
     readonly selectedRunId: string | null;
+    readonly runsDir: string | null;
   },
 ): Action | null {
   // In viewing.* mode, raw `1`/`2`/`3` are consumed by the pane-focus /
@@ -131,7 +132,8 @@ export function keyToMode(
     if (ctx.mode.kind === "viewing") return null;
     // Hide-don't-grey: F3 is silently unbound when no run is selected.
     if (ctx.selectedRunId === null) return null;
-    return { type: "MODE_OPEN_RUN", runId: ctx.selectedRunId };
+    if (ctx.runsDir === null) return null;
+    return { type: "MODE_OPEN_RUN", runId: ctx.selectedRunId, runsDir: ctx.runsDir };
   }
   return null;
 }

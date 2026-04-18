@@ -26,6 +26,7 @@ const viewingGraph: AppState["mode"] = {
   kind: "viewing",
   runId: "r1",
   focus: "graph",
+  runsDir: "/tmp/runs",
 };
 
 describe("selectKeybarFixture", () => {
@@ -122,7 +123,7 @@ describe("selectKeybarFixture", () => {
 
   it("viewing.log + following → LOG_FOLLOWING_KEYBAR", () => {
     const sel = selectKeybarFixture({
-      mode: { kind: "viewing", runId: "r1", focus: "log" },
+      mode: { kind: "viewing", runId: "r1", focus: "log", runsDir: "/tmp/runs" },
       overlay: null,
       logFollowing: true,
       eventsFollowing: false,
@@ -133,7 +134,7 @@ describe("selectKeybarFixture", () => {
 
   it("viewing.log + paused → LOG_PAUSED_KEYBAR", () => {
     const sel = selectKeybarFixture({
-      mode: { kind: "viewing", runId: "r1", focus: "log" },
+      mode: { kind: "viewing", runId: "r1", focus: "log", runsDir: "/tmp/runs" },
       overlay: null,
       logFollowing: false,
       eventsFollowing: false,
@@ -144,7 +145,7 @@ describe("selectKeybarFixture", () => {
 
   it("viewing.events following/paused → correct fixture", () => {
     const follow = selectKeybarFixture({
-      mode: { kind: "viewing", runId: "r1", focus: "events" },
+      mode: { kind: "viewing", runId: "r1", focus: "events", runsDir: "/tmp/runs" },
       overlay: null,
       logFollowing: false,
       eventsFollowing: true,
@@ -152,7 +153,7 @@ describe("selectKeybarFixture", () => {
     });
     expect(follow.bindings).toBe(EVENTS_FOLLOWING_KEYBAR);
     const paused = selectKeybarFixture({
-      mode: { kind: "viewing", runId: "r1", focus: "events" },
+      mode: { kind: "viewing", runId: "r1", focus: "events", runsDir: "/tmp/runs" },
       overlay: null,
       logFollowing: false,
       eventsFollowing: false,
@@ -163,7 +164,7 @@ describe("selectKeybarFixture", () => {
 
   it("viewing.detail reuses GRAPH_KEYBAR", () => {
     const sel = selectKeybarFixture({
-      mode: { kind: "viewing", runId: "r1", focus: "detail" },
+      mode: { kind: "viewing", runId: "r1", focus: "detail", runsDir: "/tmp/runs" },
       overlay: null,
       logFollowing: false,
       eventsFollowing: false,

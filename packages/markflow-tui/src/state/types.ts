@@ -27,7 +27,7 @@ import type { RunInputRow } from "../runStart/types.js";
 /** Which top-level area of the app is active. §5.1 "app mode" tree. */
 export type Mode =
   | { readonly kind: "browsing"; readonly pane: BrowsingPane }
-  | { readonly kind: "viewing"; readonly runId: string; readonly focus: ViewingFocus };
+  | { readonly kind: "viewing"; readonly runId: string; readonly focus: ViewingFocus; readonly runsDir: string };
 
 /** Sub-panes of `browsing` mode. §5.1. */
 export type BrowsingPane = "workflows" | "runs";
@@ -86,6 +86,7 @@ export type Overlay =
       readonly workflowId: string;
       readonly sourceFile: string;
       readonly workspaceDir: string;
+      readonly runsDir: string;
       readonly workflowName: string;
       readonly seedRows: readonly RunInputRow[];
       readonly state: "idle" | "submitting";
@@ -159,7 +160,7 @@ export type Action =
   // --- Mode transitions (top-level) ---------------------------------------
   | { readonly type: "MODE_SHOW_WORKFLOWS" }
   | { readonly type: "MODE_SHOW_RUNS" }
-  | { readonly type: "MODE_OPEN_RUN"; readonly runId: string; readonly focus?: ViewingFocus }
+  | { readonly type: "MODE_OPEN_RUN"; readonly runId: string; readonly runsDir: string; readonly focus?: ViewingFocus }
   | { readonly type: "MODE_CLOSE_RUN" }
   // --- Focus transitions (within a mode) ----------------------------------
   | { readonly type: "FOCUS_BROWSING_PANE"; readonly pane: BrowsingPane }

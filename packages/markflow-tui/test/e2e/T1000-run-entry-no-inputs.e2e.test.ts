@@ -2,10 +2,11 @@
 //
 // T1000 — `r` on a workflow with zero declared inputs starts a run
 // immediately; the TUI transitions to `viewing` mode within 300 ms of
-// the engine's `run:start`; the run appears in `runs/<id>/events.jsonl`.
+// the engine's `run:start`; the run appears in
+// `.markflow-tui/workspaces/<slug>/runs/<id>/events.jsonl`.
 // Refs: features.md §3.1, §5.7.
 
-import { readdir } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, test } from "vitest";
@@ -45,13 +46,28 @@ describe.skipIf(process.platform === "win32")(
 
       await session.waitForRegex(/\[ RUN \]/, DEFAULT_RUN_MS);
 
-      const runsDir = session.scratch.runsDir;
-      const entries = await readdir(runsDir);
-      const runDirs = entries.filter((e) => !e.startsWith("."));
-      expect(runDirs.length).toBeGreaterThanOrEqual(1);
+      const wsRoot = path.join(
+        session.scratch.workspaceDir,
+        ".markflow-tui",
+        "workspaces",
+      );
 
-      const runId = runDirs[0]!;
-      await session.waitForEventLog(runId, 1, DEFAULT_RUN_MS);
+      await session.waitFor(async () => {
+        try {
+          const slugs = await readdir(wsRoot);
+          const slug = slugs.find((s) => !s.startsWith("."));
+          if (!slug) return false;
+          const runsDir = path.join(wsRoot, slug, "runs");
+          const entries = await readdir(runsDir);
+          const runDirs = entries.filter((e) => !e.startsWith("."));
+          if (runDirs.length === 0) return false;
+          const eventsPath = path.join(runsDir, runDirs[0]!, "events.jsonl");
+          const raw = await readFile(eventsPath, "utf8");
+          return raw.trim().split("\n").filter(Boolean).length >= 1;
+        } catch {
+          return false;
+        }
+      }, DEFAULT_RUN_MS);
 
       const snap = session.snapshot();
       expect(snap).toMatch(/RUN/);

@@ -20,10 +20,12 @@ try {
   process.exit(1);
 }
 
+const runsDir = process.env.MARKFLOW_RUNS_DIR ?? null;
+
 const initialRunRows = await (async () => {
-  if (!parsed.runsDir) return undefined;
+  if (!runsDir) return undefined;
   try {
-    const infos = await createRunManager(parsed.runsDir).listRuns();
+    const infos = await createRunManager(runsDir).listRuns();
     const now = Date.now();
     return infos.map((info) => toRunsTableRow(info, now));
   } catch {
@@ -41,7 +43,7 @@ const { unmount, waitUntilExit } = render(
     }}
     registryConfig={parsed.config}
     initialLaunchArgs={parsed.rest}
-    runsDir={parsed.runsDir}
+    runsDir={runsDir}
     initialRunRows={initialRunRows}
   />,
   { alternateScreen: !process.env.MARKFLOW_TEST },

@@ -53,6 +53,7 @@ export interface RunsTableProps {
   readonly inputDisabled?: boolean;
   readonly applyFilterImpl?: typeof applyFilter;
   readonly onStartRun?: (info: RunInfo) => void;
+  readonly runsDir?: string | null;
 }
 
 const DEFAULT_HEIGHT = 10;
@@ -112,6 +113,7 @@ function RunsTableImpl({
   inputDisabled,
   applyFilterImpl,
   onStartRun,
+  runsDir: runsDirProp,
 }: RunsTableProps): React.ReactElement {
   const theme = useTheme();
   const paneHeight = height ?? DEFAULT_HEIGHT;
@@ -244,8 +246,8 @@ function RunsTableImpl({
 
       if (key.return) {
         const id = sortedRows[clampedCursor]?.id;
-        if (id !== undefined && id.length > 0) {
-          dispatch({ type: "MODE_OPEN_RUN", runId: id });
+        if (id !== undefined && id.length > 0 && runsDirProp) {
+          dispatch({ type: "MODE_OPEN_RUN", runId: id, runsDir: runsDirProp });
         }
         return;
       }

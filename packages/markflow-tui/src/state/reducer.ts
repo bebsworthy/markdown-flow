@@ -121,6 +121,7 @@ export function reducer(state: AppState, action: Action): AppState {
           kind: "viewing",
           runId: action.runId,
           focus: action.focus ?? "graph",
+          runsDir: action.runsDir,
         },
         selectedRunId: action.runId,
         filter: "",

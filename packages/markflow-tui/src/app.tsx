@@ -21,7 +21,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { dirname } from "node:path";
+import { resolveEntryWorkspace } from "./workspace.js";
 import { Box, Text, useInput, useWindowSize } from "ink";
 import { ThemeProvider } from "./theme/context.js";
 import { AppShell } from "./components/app-shell.js";
@@ -374,22 +374,22 @@ export function App({
   //   2. `startRunFromWorkflow(workflow, sourceFile)` — same logic but
   //      sourced from a parsed WorkflowDefinition (palette path).
   // Both funnel into the same bridge call + overlay open.
+  const registryBaseDir = process.cwd();
+
   const launchRun = async (args: {
     readonly sourceFile: string;
     readonly workspaceDir: string;
+    readonly runsDir: string;
     readonly inputs: Readonly<Record<string, string>>;
   }): Promise<RunWorkflowResult> => {
-    if (!runsDir) {
-      return { kind: "error", message: "runsDir is not configured" };
-    }
     return startRun({
-      runsDir,
+      runsDir: args.runsDir,
       workspaceDir: args.workspaceDir,
       sourceFile: args.sourceFile,
       inputs: args.inputs,
       onRunStart: (runId) => {
         dispatch({ type: "OVERLAY_CLOSE" });
-        dispatch({ type: "MODE_OPEN_RUN", runId });
+        dispatch({ type: "MODE_OPEN_RUN", runId, runsDir: args.runsDir });
       },
     });
   };
@@ -398,13 +398,15 @@ export function App({
     readonly workflowId: string;
     readonly workflow: WorkflowDefinition;
     readonly sourceFile: string;
+    readonly workspaceDir: string;
+    readonly runsDir: string;
   }): void => {
     const inputRows = deriveRunInputRows(args.workflow);
     if (inputRows.length === 0) {
-      // Direct launch — no modal.
       void launchRun({
         sourceFile: args.sourceFile,
-        workspaceDir: dirname(args.sourceFile),
+        workspaceDir: args.workspaceDir,
+        runsDir: args.runsDir,
         inputs: {},
       });
       return;
@@ -415,7 +417,8 @@ export function App({
         kind: "runInput",
         workflowId: args.workflowId,
         sourceFile: args.sourceFile,
-        workspaceDir: dirname(args.sourceFile),
+        workspaceDir: args.workspaceDir,
+        runsDir: args.runsDir,
         workflowName: args.workflow.name,
         seedRows: inputRows as readonly RunInputRow[],
         state: "idle",
@@ -426,11 +429,21 @@ export function App({
   const startRunFromEntry = (entry: ResolvedEntry): void => {
     if (entry.status !== "valid") return;
     if (!entry.workflow || !entry.absolutePath) return;
-    startRunForWorkflow({
-      workflowId: entry.id,
-      workflow: entry.workflow,
-      sourceFile: entry.absolutePath,
-    });
+    const { workflow, absolutePath, sourceKind, id: workflowId } = entry;
+    void (async () => {
+      const ws = await resolveEntryWorkspace({
+        sourceKind,
+        absolutePath,
+        baseDir: registryBaseDir,
+      });
+      startRunForWorkflow({
+        workflowId,
+        workflow,
+        sourceFile: absolutePath,
+        workspaceDir: ws.workspaceDir,
+        runsDir: ws.runsDir,
+      });
+    })();
   };
 
   const runsTableStartRun = (info: RunInfo): void => {
@@ -497,11 +510,20 @@ export function App({
     // next tick.
     const resolvedMatch = match;
     setImmediate(() => {
-      startRunForWorkflow({
-        workflowId: resolvedMatch.id,
-        workflow: resolvedMatch.workflow!,
-        sourceFile: resolvedMatch.absolutePath!,
-      });
+      void (async () => {
+        const ws = await resolveEntryWorkspace({
+          sourceKind: resolvedMatch.sourceKind,
+          absolutePath: resolvedMatch.absolutePath!,
+          baseDir: registryBaseDir,
+        });
+        startRunForWorkflow({
+          workflowId: resolvedMatch.id,
+          workflow: resolvedMatch.workflow!,
+          sourceFile: resolvedMatch.absolutePath!,
+          workspaceDir: ws.workspaceDir,
+          runsDir: ws.runsDir,
+        });
+      })();
     });
     return { kind: "ok" };
   };
@@ -751,6 +773,7 @@ export function App({
         dispatch={dispatch}
         onStartRun={runsTableStartRun}
         inputDisabled={state.overlay !== null}
+        runsDir={runsDir}
       />
     );
     bottomSlot = (
@@ -795,7 +818,7 @@ export function App({
       bottomSlot = (
         <ViewingBottomSlot
           focus={state.mode.focus}
-          runsDir={runsDir ?? null}
+          runsDir={state.mode.runsDir}
           runId={state.mode.runId}
           selectedStepId={state.selectedStepId}
           engineState={effectiveEngineState}
@@ -950,6 +973,7 @@ export function App({
           dispatch={dispatch}
           onStartRun={runsTableStartRun}
           inputDisabled={state.overlay !== null}
+          runsDir={runsDir}
         />
       );
       narrowBreadcrumb = composeBreadcrumb(
@@ -1063,6 +1087,7 @@ export function App({
           <ModeTabs
             mode={state.mode}
             selectedRunId={state.selectedRunId}
+            runsDir={runsDir ?? null}
             dispatch={dispatch}
           />
         }
@@ -1267,6 +1292,7 @@ export function App({
               const result = await launchRun({
                 sourceFile: ov.sourceFile,
                 workspaceDir: ov.workspaceDir,
+                runsDir: ov.runsDir,
                 inputs,
               });
               if (result.kind === "ok") {

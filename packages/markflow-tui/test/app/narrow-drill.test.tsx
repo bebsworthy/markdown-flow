@@ -148,6 +148,7 @@ function appTree(): React.ReactElement {
       registryConfig={{ listPath: null, persist: false }}
       initialRunRows={ROWS}
       engineState={buildEngineState("ijkl5678")}
+      runsDir="/tmp/runs"
     />
   );
 }

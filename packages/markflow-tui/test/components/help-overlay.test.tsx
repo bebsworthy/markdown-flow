@@ -12,7 +12,7 @@ import { flush } from "../helpers/flush.js";
 const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 function mkCtx(overrides: Partial<AppContext> = {}): AppContext {
   return {
-    mode: { kind: "viewing", runId: "r1", focus: "graph" },
+    mode: { kind: "viewing", runId: "r1", focus: "graph", runsDir: "/tmp/runs" },
     overlay: { kind: "help" },
     approvalsPending: true,
     isFollowing: false,

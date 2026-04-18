@@ -431,7 +431,7 @@ describe("Keybar — rule coverage (features.md §5.6)", () => {
 
 describe("Keybar — LOG fixture auto-switch (plan §6.4)", () => {
   const runDetailCtx: AppContext = {
-    mode: { kind: "viewing", runId: "r1", focus: "detail" },
+    mode: { kind: "viewing", runId: "r1", focus: "detail", runsDir: "/tmp/runs" },
     overlay: null,
     approvalsPending: false,
     isFollowing: false,

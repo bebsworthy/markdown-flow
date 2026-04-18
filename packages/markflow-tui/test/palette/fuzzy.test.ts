@@ -5,7 +5,7 @@ import { COMMANDS } from "../../src/palette/commands.js";
 import type { AppContext } from "../../src/components/types.js";
 
 const ctx: AppContext = {
-  mode: { kind: "viewing", runId: "r1", focus: "graph" },
+  mode: { kind: "viewing", runId: "r1", focus: "graph", runsDir: "/tmp/runs" },
   overlay: null,
   approvalsPending: false,
   isFollowing: false,

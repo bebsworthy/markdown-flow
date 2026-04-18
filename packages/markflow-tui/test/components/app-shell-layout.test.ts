@@ -36,6 +36,7 @@ describe("activeTabFromMode", () => {
       kind: "viewing",
       runId: "r1",
       focus: "graph",
+      runsDir: "/tmp/runs",
     };
     expect(activeTabFromMode(mode)).toBe("RUN");
   });
@@ -54,6 +55,7 @@ const VIEWING_R1: AppState["mode"] = {
   kind: "viewing",
   runId: "r1",
   focus: "graph",
+  runsDir: "/tmp/runs",
 };
 
 function ev(overrides: Partial<KeyEvent> = {}): KeyEvent {
@@ -65,6 +67,7 @@ describe("keyToMode", () => {
     const action = keyToMode(ev({ f1: true }), {
       mode: BROWSING_RUNS,
       selectedRunId: null,
+      runsDir: "/tmp/runs",
     });
     expect(action).toEqual({ type: "MODE_SHOW_WORKFLOWS" });
   });
@@ -73,6 +76,7 @@ describe("keyToMode", () => {
     const action = keyToMode(ev({ f2: true }), {
       mode: BROWSING_WORKFLOWS,
       selectedRunId: null,
+      runsDir: "/tmp/runs",
     });
     expect(action).toEqual({ type: "MODE_SHOW_RUNS" });
   });
@@ -81,6 +85,7 @@ describe("keyToMode", () => {
     const action = keyToMode(ev({ input: "1" }), {
       mode: BROWSING_RUNS,
       selectedRunId: null,
+      runsDir: "/tmp/runs",
     });
     expect(action).toEqual({ type: "MODE_SHOW_WORKFLOWS" });
   });
@@ -89,6 +94,7 @@ describe("keyToMode", () => {
     const action = keyToMode(ev({ input: "2" }), {
       mode: BROWSING_WORKFLOWS,
       selectedRunId: null,
+      runsDir: "/tmp/runs",
     });
     expect(action).toEqual({ type: "MODE_SHOW_RUNS" });
   });
@@ -97,14 +103,16 @@ describe("keyToMode", () => {
     const action = keyToMode(ev({ f3: true }), {
       mode: BROWSING_RUNS,
       selectedRunId: "run-42",
+      runsDir: "/tmp/runs",
     });
-    expect(action).toEqual({ type: "MODE_OPEN_RUN", runId: "run-42" });
+    expect(action).toEqual({ type: "MODE_OPEN_RUN", runId: "run-42", runsDir: "/tmp/runs" });
   });
 
   it("F3 with no selectedRunId → null (hide-don't-grey)", () => {
     const action = keyToMode(ev({ f3: true }), {
       mode: BROWSING_RUNS,
       selectedRunId: null,
+      runsDir: "/tmp/runs",
     });
     expect(action).toBeNull();
   });
@@ -113,6 +121,7 @@ describe("keyToMode", () => {
     const action = keyToMode(ev({ f3: true }), {
       mode: VIEWING_R1,
       selectedRunId: "r1",
+      runsDir: "/tmp/runs",
     });
     expect(action).toBeNull();
   });
@@ -121,18 +130,21 @@ describe("keyToMode", () => {
     const action1 = keyToMode(ev({ input: "3" }), {
       mode: BROWSING_RUNS,
       selectedRunId: "run-9",
+      runsDir: "/tmp/runs",
     });
-    expect(action1).toEqual({ type: "MODE_OPEN_RUN", runId: "run-9" });
+    expect(action1).toEqual({ type: "MODE_OPEN_RUN", runId: "run-9", runsDir: "/tmp/runs" });
 
     const action2 = keyToMode(ev({ input: "3" }), {
       mode: BROWSING_RUNS,
       selectedRunId: null,
+      runsDir: "/tmp/runs",
     });
     expect(action2).toBeNull();
 
     const action3 = keyToMode(ev({ input: "3" }), {
       mode: VIEWING_R1,
       selectedRunId: "r1",
+      runsDir: "/tmp/runs",
     });
     expect(action3).toBeNull();
   });
@@ -141,6 +153,7 @@ describe("keyToMode", () => {
     const action = keyToMode(ev({ input: "x" }), {
       mode: BROWSING_WORKFLOWS,
       selectedRunId: "r1",
+      runsDir: "/tmp/runs",
     });
     expect(action).toBeNull();
   });
@@ -151,20 +164,23 @@ describe("keyToMode", () => {
       keyToMode(ev({ input: "\x1bOP" }), {
         mode: BROWSING_RUNS,
         selectedRunId: null,
+        runsDir: "/tmp/runs",
       }),
     ).toEqual({ type: "MODE_SHOW_WORKFLOWS" });
     expect(
       keyToMode(ev({ input: "\x1bOQ" }), {
         mode: BROWSING_WORKFLOWS,
         selectedRunId: null,
+        runsDir: "/tmp/runs",
       }),
     ).toEqual({ type: "MODE_SHOW_RUNS" });
     expect(
       keyToMode(ev({ input: "\x1bOR" }), {
         mode: BROWSING_RUNS,
         selectedRunId: "r9",
+        runsDir: "/tmp/runs",
       }),
-    ).toEqual({ type: "MODE_OPEN_RUN", runId: "r9" });
+    ).toEqual({ type: "MODE_OPEN_RUN", runId: "r9", runsDir: "/tmp/runs" });
   });
 });
 

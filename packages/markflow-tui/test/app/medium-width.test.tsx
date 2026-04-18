@@ -178,6 +178,7 @@ function appTree(opts?: {
       registryConfig={{ listPath: null, persist: false }}
       initialRunRows={opts?.initialRunRows ?? ROWS}
       engineState={opts?.engineState}
+      runsDir="/tmp/runs"
     />
   );
 }

@@ -18,7 +18,7 @@ function match(id: string): CommandMatch {
 function mkCtx(overrides: Partial<CommandExecContext> = {}): CommandExecContext {
   const state: AppState = {
     ...initialAppState,
-    mode: { kind: "viewing", runId: "r1", focus: "graph" },
+    mode: { kind: "viewing", runId: "r1", focus: "graph", runsDir: "/tmp/runs" },
   };
   return {
     state,

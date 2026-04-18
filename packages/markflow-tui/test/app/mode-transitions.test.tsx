@@ -96,6 +96,7 @@ function renderApp(opts?: {
       onQuit={() => {}}
       registryConfig={{ listPath: null, persist: false }}
       initialRunRows={opts?.initialRunRows ?? ROWS}
+      runsDir="/tmp/runs"
     />,
   );
 }
@@ -222,6 +223,7 @@ describe("App — mode transitions (P5-T3)", () => {
         onQuit={() => {}}
         registryConfig={{ listPath: null, persist: false }}
         initialRunRows={single}
+        runsDir="/tmp/runs"
       />,
     );
     await flush();
@@ -240,6 +242,7 @@ describe("App — mode transitions (P5-T3)", () => {
         onQuit={() => {}}
         registryConfig={{ listPath: null, persist: false }}
         initialRunRows={[]}
+        runsDir="/tmp/runs"
       />,
     );
     await flush();

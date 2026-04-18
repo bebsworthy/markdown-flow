@@ -7,7 +7,7 @@ import type { AppContext, Binding } from "../../src/components/types.js";
 const viewingCtx = (
   overrides: Partial<AppContext> = {},
 ): AppContext => ({
-  mode: { kind: "viewing", runId: "r1", focus: "graph" },
+  mode: { kind: "viewing", runId: "r1", focus: "graph", runsDir: "/tmp/runs" },
   overlay: null,
   approvalsPending: false,
   isFollowing: false,

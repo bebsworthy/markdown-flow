@@ -12,8 +12,6 @@ export interface ParsedRegistryArgs {
     readonly listPath: string | null;
     readonly persist: boolean;
   };
-  readonly runsDir: string | null;
-  readonly workspaceDir: string | null;
   readonly rest: ReadonlyArray<string>;
 }
 
@@ -40,12 +38,9 @@ function matchValueFlag(
 
 export function parseRegistryFlags(
   argv: ReadonlyArray<string>,
-  env: NodeJS.ProcessEnv = process.env,
 ): ParsedRegistryArgs {
   let listPath: string | null = null;
   let persist = true;
-  let runsDir: string | null = null;
-  let workspaceDir: string | null = null;
   const rest: string[] = [];
 
   let i = 0;
@@ -62,32 +57,14 @@ export function parseRegistryFlags(
       i += list.consumed;
       continue;
     }
-    const runs = matchValueFlag(arg, argv[i + 1], "runs-dir");
-    if (runs) {
-      runsDir = runs.value;
-      i += runs.consumed;
-      continue;
-    }
-    const ws = matchValueFlag(arg, argv[i + 1], "workspace-dir");
-    if (ws) {
-      workspaceDir = ws.value;
-      i += ws.consumed;
-      continue;
-    }
     rest.push(arg);
     i += 1;
   }
-
-  // Env fallbacks — flags win.
-  runsDir = runsDir ?? env.MARKFLOW_RUNS_DIR ?? null;
-  workspaceDir = workspaceDir ?? env.MARKFLOW_WORKSPACE_DIR ?? null;
 
   // --no-save wins: in-memory only, ignore any --list value for persistence.
   const finalPath = persist ? listPath : null;
   return {
     config: { listPath: finalPath, persist },
-    runsDir,
-    workspaceDir,
     rest,
   };
 }

@@ -14,7 +14,7 @@ import type { AppContext } from "../../src/components/types.js";
 const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 const ctx: AppContext = {
-  mode: { kind: "viewing", runId: "r1", focus: "graph" },
+  mode: { kind: "viewing", runId: "r1", focus: "graph", runsDir: "/tmp/runs" },
   overlay: null,
   approvalsPending: false,
   isFollowing: false,

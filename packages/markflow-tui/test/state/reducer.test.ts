@@ -7,7 +7,7 @@ import type { Action, AppState, Overlay } from "../../src/state/types.js";
 
 const viewingState = (runId = "run-1", focus: "graph" | "detail" | "log" = "graph"): AppState => ({
   ...initialAppState,
-  mode: { kind: "viewing", runId, focus },
+  mode: { kind: "viewing", runId, focus, runsDir: "/tmp/runs" },
 });
 
 const withOverlay = (state: AppState, overlay: Overlay): AppState => ({ ...state, overlay });
@@ -44,13 +44,13 @@ describe("MODE_SHOW_RUNS", () => {
 
 describe("MODE_OPEN_RUN", () => {
   it("enters viewing with default graph focus", () => {
-    const s = reducer(initialAppState, { type: "MODE_OPEN_RUN", runId: "r1" });
-    expect(s.mode).toEqual({ kind: "viewing", runId: "r1", focus: "graph" });
+    const s = reducer(initialAppState, { type: "MODE_OPEN_RUN", runId: "r1", runsDir: "/tmp/runs" });
+    expect(s.mode).toEqual({ kind: "viewing", runId: "r1", focus: "graph", runsDir: "/tmp/runs" });
     expect(s.selectedRunId).toBe("r1");
   });
   it("honours explicit focus argument", () => {
-    const s = reducer(initialAppState, { type: "MODE_OPEN_RUN", runId: "r1", focus: "log" });
-    expect(s.mode).toEqual({ kind: "viewing", runId: "r1", focus: "log" });
+    const s = reducer(initialAppState, { type: "MODE_OPEN_RUN", runId: "r1", runsDir: "/tmp/runs", focus: "log" });
+    expect(s.mode).toEqual({ kind: "viewing", runId: "r1", focus: "log", runsDir: "/tmp/runs" });
   });
 });
 
@@ -81,9 +81,9 @@ describe("FOCUS_VIEWING_PANE", () => {
   it("moves focus graph → detail → log", () => {
     let s = viewingState();
     s = reducer(s, { type: "FOCUS_VIEWING_PANE", focus: "detail" });
-    expect(s.mode).toEqual({ kind: "viewing", runId: "run-1", focus: "detail" });
+    expect(s.mode).toEqual({ kind: "viewing", runId: "run-1", focus: "detail", runsDir: "/tmp/runs" });
     s = reducer(s, { type: "FOCUS_VIEWING_PANE", focus: "log" });
-    expect(s.mode).toEqual({ kind: "viewing", runId: "run-1", focus: "log" });
+    expect(s.mode).toEqual({ kind: "viewing", runId: "run-1", focus: "log", runsDir: "/tmp/runs" });
   });
   it("is ignored in browsing mode", () => {
     const s = reducer(initialAppState, { type: "FOCUS_VIEWING_PANE", focus: "log" });
@@ -552,7 +552,7 @@ describe("P5-T2 slice preservation across mode switches", () => {
       ...initialAppState,
       runsArchive: { ...initialAppState.runsArchive, shown: true },
     };
-    const s = reducer(base, { type: "MODE_OPEN_RUN", runId: "r1" });
+    const s = reducer(base, { type: "MODE_OPEN_RUN", runId: "r1", runsDir: "/tmp/runs" });
     expect(s.runsArchive.shown).toBe(true);
   });
 });
@@ -760,7 +760,7 @@ describe("RUNS_SELECT", () => {
 
 describe("MODE_OPEN_RUN — P5-T3 empty-string guard", () => {
   it("empty runId is a no-op", () => {
-    const s = reducer(initialAppState, { type: "MODE_OPEN_RUN", runId: "" });
+    const s = reducer(initialAppState, { type: "MODE_OPEN_RUN", runId: "", runsDir: "/tmp/runs" });
     expect(s).toBe(initialAppState);
   });
 });
@@ -785,6 +785,7 @@ describe("MODE_OPEN_RUN / MODE_CLOSE_RUN — no orphan state", () => {
     const opened = reducer(base, {
       type: "MODE_OPEN_RUN",
       runId: "abcd",
+      runsDir: "/tmp/runs",
     });
     const closed = reducer(opened, { type: "MODE_CLOSE_RUN" });
     expect(closed.mode).toEqual({ kind: "browsing", pane: "runs" });
@@ -802,7 +803,7 @@ describe("MODE_OPEN_RUN / MODE_CLOSE_RUN — no orphan state", () => {
     });
     let s: AppState = base;
     for (let i = 0; i < 3; i += 1) {
-      s = reducer(s, { type: "MODE_OPEN_RUN", runId: "r1" });
+      s = reducer(s, { type: "MODE_OPEN_RUN", runId: "r1", runsDir: "/tmp/runs" });
       s = reducer(s, { type: "MODE_CLOSE_RUN" });
     }
     expect(s.mode).toEqual({ kind: "browsing", pane: "runs" });
@@ -844,7 +845,7 @@ describe("SELECT_STEP", () => {
 describe("MODE_OPEN_RUN / MODE_CLOSE_RUN — selectedStepId lifecycle", () => {
   it("MODE_OPEN_RUN resets selectedStepId to null", () => {
     const base: AppState = { ...initialAppState, selectedStepId: "leftover" };
-    const s = reducer(base, { type: "MODE_OPEN_RUN", runId: "r1" });
+    const s = reducer(base, { type: "MODE_OPEN_RUN", runId: "r1", runsDir: "/tmp/runs" });
     expect(s.selectedStepId).toBeNull();
   });
   it("MODE_CLOSE_RUN clears selectedStepId", () => {
@@ -875,7 +876,7 @@ describe("reducer purity", () => {
     expect(initialAppState).toEqual(before);
   });
   it("is deterministic", () => {
-    const a: Action = { type: "MODE_OPEN_RUN", runId: "r1" };
+    const a: Action = { type: "MODE_OPEN_RUN", runId: "r1", runsDir: "/tmp/runs" };
     const s1 = reducer(initialAppState, a);
     const s2 = reducer(initialAppState, a);
     expect(s1).toEqual(s2);

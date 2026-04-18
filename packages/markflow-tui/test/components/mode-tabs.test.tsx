@@ -21,11 +21,13 @@ const VIEWING_R1: AppState["mode"] = {
   kind: "viewing",
   runId: "r1",
   focus: "graph",
+  runsDir: "/tmp/runs",
 };
 
 function renderTabs(props: {
   mode: AppState["mode"];
   selectedRunId: string | null;
+  runsDir?: string | null;
   dispatch?: (a: Action) => void;
   color?: boolean;
   unicode?: boolean;
@@ -39,6 +41,7 @@ function renderTabs(props: {
       <ModeTabs
         mode={props.mode}
         selectedRunId={props.selectedRunId}
+        runsDir={props.runsDir ?? "/tmp/runs"}
         dispatch={props.dispatch ?? (() => {})}
       />
     </ThemeProvider>,
@@ -175,6 +178,7 @@ describe("ModeTabs — key dispatch", () => {
     expect(dispatch).toHaveBeenCalledWith({
       type: "MODE_OPEN_RUN",
       runId: "r-42",
+      runsDir: "/tmp/runs",
     });
   });
 

@@ -84,6 +84,7 @@ describe("App — RUN-mode log panel (P6-T3)", () => {
         registryConfig={{ listPath: null, persist: false }}
         initialRunRows={ROWS}
         engineState={buildEngineState("abcd1234")}
+        runsDir="/tmp/runs"
       />,
     );
     await flush();
@@ -116,6 +117,7 @@ describe("App — RUN-mode log panel (P6-T3)", () => {
         registryConfig={{ listPath: null, persist: false }}
         initialRunRows={ROWS}
         engineState={buildEngineState("abcd1234")}
+        runsDir="/tmp/runs"
       />,
     );
     await flush();
@@ -141,6 +143,7 @@ describe("App — RUN-mode log panel (P6-T3)", () => {
         registryConfig={{ listPath: null, persist: false }}
         initialRunRows={ROWS}
         engineState={buildEngineState("abcd1234")}
+        runsDir="/tmp/runs"
       />,
     );
     await flush();

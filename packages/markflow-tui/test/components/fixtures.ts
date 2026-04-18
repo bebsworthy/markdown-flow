@@ -36,7 +36,7 @@ export const runsCtx: AppContext = {
 };
 
 export const runGraphCtx: AppContext = {
-  mode: { kind: "viewing", runId: "r1", focus: "graph" },
+  mode: { kind: "viewing", runId: "r1", focus: "graph", runsDir: "/tmp/runs" },
   overlay: null,
   approvalsPending: true,
   isFollowing: false,
@@ -45,7 +45,7 @@ export const runGraphCtx: AppContext = {
 };
 
 export const logFollowCtx: AppContext = {
-  mode: { kind: "viewing", runId: "r1", focus: "log" },
+  mode: { kind: "viewing", runId: "r1", focus: "log", runsDir: "/tmp/runs" },
   overlay: null,
   approvalsPending: false,
   isFollowing: true,
@@ -54,7 +54,7 @@ export const logFollowCtx: AppContext = {
 };
 
 export const logPausedCtx: AppContext = {
-  mode: { kind: "viewing", runId: "r1", focus: "log" },
+  mode: { kind: "viewing", runId: "r1", focus: "log", runsDir: "/tmp/runs" },
   overlay: null,
   approvalsPending: false,
   isFollowing: false,
@@ -63,7 +63,7 @@ export const logPausedCtx: AppContext = {
 };
 
 export const approvalCtx: AppContext = {
-  mode: { kind: "viewing", runId: "r1", focus: "detail" },
+  mode: { kind: "viewing", runId: "r1", focus: "detail", runsDir: "/tmp/runs" },
   overlay: { kind: "approval", runId: "r1", nodeId: "n1", state: "idle" },
   approvalsPending: true,
   isFollowing: false,
@@ -72,7 +72,7 @@ export const approvalCtx: AppContext = {
 };
 
 export const resumeCtx: AppContext = {
-  mode: { kind: "viewing", runId: "r1", focus: "detail" },
+  mode: { kind: "viewing", runId: "r1", focus: "detail", runsDir: "/tmp/runs" },
   overlay: {
     kind: "resumeWizard",
     runId: "r1",

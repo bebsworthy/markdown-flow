@@ -52,7 +52,7 @@ const browsingCtx: AppContext = {
 };
 
 const graphCtx: AppContext = {
-  mode: { kind: "viewing", runId: "r1", focus: "graph" },
+  mode: { kind: "viewing", runId: "r1", focus: "graph", runsDir: "/tmp/runs" },
   overlay: null,
   approvalsPending: true,
   isFollowing: false,
@@ -75,7 +75,7 @@ const passiveCtx: AppContext = {
 };
 
 const approvalCtx: AppContext = {
-  mode: { kind: "viewing", runId: "r1", focus: "detail" },
+  mode: { kind: "viewing", runId: "r1", focus: "detail", runsDir: "/tmp/runs" },
   overlay: { kind: "approval", runId: "r1", nodeId: "n1", state: "idle" },
   approvalsPending: true,
   isFollowing: false,
@@ -84,7 +84,7 @@ const approvalCtx: AppContext = {
 };
 
 const resumeCtx: AppContext = {
-  mode: { kind: "viewing", runId: "r1", focus: "detail" },
+  mode: { kind: "viewing", runId: "r1", focus: "detail", runsDir: "/tmp/runs" },
   overlay: {
     kind: "resumeWizard",
     runId: "r1",

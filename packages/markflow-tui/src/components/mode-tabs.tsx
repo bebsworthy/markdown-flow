@@ -32,6 +32,7 @@ import {
 export interface ModeTabsProps {
   readonly mode: AppState["mode"];
   readonly selectedRunId: string | null;
+  readonly runsDir: string | null;
   readonly dispatch: (action: Action) => void;
 }
 
@@ -101,6 +102,7 @@ function wordToTab(word: string): ModeTabKey | null {
 function ModeTabsImpl({
   mode,
   selectedRunId,
+  runsDir: runsDirProp,
   dispatch,
 }: ModeTabsProps): React.ReactElement {
   const theme = useTheme();
@@ -109,7 +111,7 @@ function ModeTabsImpl({
     // Ink 5's Key type does not expose explicit F1/F2/F3 flags; F-keys
     // arrive as raw ANSI escape sequences in `input` (e.g. "\x1bOP"). The
     // pure helper `keyToMode` recognises the common SS3 / CSI variants.
-    const action = keyToMode({ input }, { mode, selectedRunId });
+    const action = keyToMode({ input }, { mode, selectedRunId, runsDir: runsDirProp });
     if (action !== null) {
       dispatch(action);
     }

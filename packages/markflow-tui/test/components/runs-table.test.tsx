@@ -109,6 +109,7 @@ function renderTable(props: {
   dispatch?: ReturnType<typeof vi.fn>;
   inputDisabled?: boolean;
   applyFilterImpl?: RunsTableProps["applyFilterImpl"];
+  runsDir?: string | null;
 }) {
   const dispatch = props.dispatch ?? vi.fn();
   const rendered = render(
@@ -126,6 +127,7 @@ function renderTable(props: {
         dispatch={dispatch as unknown as (action: any) => void}
         inputDisabled={props.inputDisabled}
         applyFilterImpl={props.applyFilterImpl}
+        runsDir={props.runsDir ?? "/tmp/runs"}
       />
     </ThemeProvider>,
   );

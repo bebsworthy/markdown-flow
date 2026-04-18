@@ -13,11 +13,10 @@
 // that a future task can swap this implementation for a direct engine
 // export with zero on-disk churn.
 
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, join, resolve as resolvePath } from "node:path";
 import type { UrlIngestResult } from "./types.js";
-
-const WORKSPACES_SUBDIR = ".markflow-tui/workspaces";
+import { exists, WORKSPACES_SUBDIR } from "../workspace.js";
 
 interface MarkflowJsonShape {
   readonly workflow: string;
@@ -47,15 +46,6 @@ export function urlSlug(url: string): string {
     return safe.length > 0 ? safe : "flow";
   } catch {
     return "flow";
-  }
-}
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
   }
 }
 

@@ -10,7 +10,7 @@ import type { AppContext } from "../../../src/components/types.js";
 
 function ctxWith(overrides: Partial<AppContext>): AppContext {
   return {
-    mode: { kind: "viewing", runId: "r1", focus: "graph" },
+    mode: { kind: "viewing", runId: "r1", focus: "graph", runsDir: "/tmp/runs" },
     overlay: null,
     approvalsPending: false,
     isFollowing: false,
