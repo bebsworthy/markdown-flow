@@ -99,8 +99,7 @@ describe.skipIf(process.platform === "win32")(
       // Press down again to wrap or stay at bottom — either way, one of
       // the two DOWN presses must have landed on the broken entry.
       session.write(keys.DOWN);
-      // Small settle.
-      await new Promise((r) => setTimeout(r, 100));
+      await session.waitForText("2 entries", DEFAULT_READY_MS);
 
       // The broken entry row should still be visible after cursor movement.
       const afterMove = session.snapshot();

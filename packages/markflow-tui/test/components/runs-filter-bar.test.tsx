@@ -7,6 +7,7 @@ import { render } from "ink-testing-library";
 import { ThemeProvider } from "../../src/theme/context.js";
 import { RunsFilterBar } from "../../src/components/runs-filter-bar.js";
 import { parseFilterInput } from "../../src/runs/filter.js";
+import { type } from "../helpers/type.js";
 import type { RunsFilterState } from "../../src/runs/types.js";
 import { flush } from "../helpers/flush.js";
 
@@ -218,8 +219,7 @@ describe("<RunsFilterBar> — key handling", () => {
     const dispatch = vi.fn();
     const { stdin, cleanup } = renderBar({ dispatch, inputDisabled: true });
     await flush();
-    stdin.write("abc");
-    await flush();
+    await type(stdin, "abc");
     stdin.write("\r");
     await flush();
     expect(dispatch).not.toHaveBeenCalled();

@@ -145,7 +145,7 @@ function InputPromptModalImpl(
       }
       return;
     }
-    if (input && input.length > 0 && !key.ctrl && !key.meta) {
+    if (input && input.length > 0 && !key.ctrl && !key.escape) {
       const next = liveDraft + input;
       draftsRef.current.set(row.key, next);
       dispatch({ type: "SET_DRAFT", key: row.key, value: next });

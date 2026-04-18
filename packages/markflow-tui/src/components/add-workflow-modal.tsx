@@ -279,7 +279,7 @@ function AddWorkflowModalImpl(
         setRootPickerError(null);
         return;
       }
-      if (input && !key.ctrl && !key.meta) {
+      if (input && !key.ctrl && !key.escape) {
         setRootPickerDraft((s) => s + input);
         setRootPickerError(null);
         return;
@@ -325,7 +325,7 @@ function AddWorkflowModalImpl(
       // deliberately do NOT trap printable keys when `q` is pressed alone.
       // `q` only appears as a character input here when the user is typing
       // a query containing q; that's fine.
-      if (input && !key.ctrl && !key.meta) {
+      if (input && !key.ctrl && !key.escape) {
         setQuery((s) => s + input);
       }
       return;
@@ -378,7 +378,7 @@ function AddWorkflowModalImpl(
       setIngestError(null);
       return;
     }
-    if (input && !key.ctrl && !key.meta) {
+    if (input && !key.ctrl && !key.escape) {
       setUrlInput((s) => s + input);
       setIngestError(null);
     }

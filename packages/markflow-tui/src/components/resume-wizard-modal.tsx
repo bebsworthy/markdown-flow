@@ -143,7 +143,7 @@ function ResumeWizardModalImpl(
         }
         return;
       }
-      if (input && input.length > 0 && !key.ctrl && !key.meta) {
+      if (input && input.length > 0 && !key.ctrl && !key.escape) {
         const next = current + input;
         onSetInput(row.key, next);
         dispatch({ type: "INPUT_EDIT", key: row.key, value: next });

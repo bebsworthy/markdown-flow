@@ -10,6 +10,7 @@ import { render } from "ink-testing-library";
 import { ThemeProvider } from "../../src/theme/context.js";
 import { AddWorkflowModal } from "../../src/components/add-workflow-modal.js";
 import { flush } from "../helpers/flush.js";
+import { type } from "../helpers/type.js";
 
 import type {
   Candidate,
@@ -210,8 +211,7 @@ describe("AddWorkflowModal — key routing", () => {
     ]);
     const { frame, stdin } = renderModal({ walker });
     await flush(5);
-    stdin.write("alpha");
-    await flush(5);
+    await type(stdin, "alpha");
     const f = frame();
     expect(f).toContain("./alpha.md");
     // With a tight "alpha" query, only alpha should remain.
@@ -270,8 +270,7 @@ describe("AddWorkflowModal — URL tab", () => {
       onSubmit,
     });
     await flush();
-    stdin.write("/some/path.md");
-    await flush();
+    await type(stdin, "/some/path.md");
     stdin.write("\r"); // Enter
     await flush(5);
     expect(ingestor).not.toHaveBeenCalled();
@@ -293,8 +292,7 @@ describe("AddWorkflowModal — URL tab", () => {
       onSubmit,
     });
     await flush();
-    stdin.write("https://example.com/flow.md");
-    await flush();
+    await type(stdin, "https://example.com/flow.md");
     stdin.write("\r");
     await flush(6);
     expect(ingestor).toHaveBeenCalledTimes(1);
@@ -315,8 +313,7 @@ describe("AddWorkflowModal — URL tab", () => {
       onSubmit,
     });
     await flush();
-    stdin.write("https://example.com/flow.md");
-    await flush();
+    await type(stdin, "https://example.com/flow.md");
     stdin.write("\r");
     await flush(6);
     expect(onSubmit).not.toHaveBeenCalled();

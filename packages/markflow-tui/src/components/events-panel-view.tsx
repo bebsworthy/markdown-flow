@@ -170,7 +170,7 @@ function EventsPanelViewImpl({
             type: "SET_SEARCH_DRAFT",
             draft: state.searchDraft.slice(0, -1),
           };
-        } else if (input && input.length > 0 && !key.ctrl && !key.meta) {
+        } else if (input && input.length > 0 && !key.ctrl && !key.escape) {
           act = {
             type: "SET_SEARCH_DRAFT",
             draft: state.searchDraft + input,

@@ -1,5 +1,4 @@
 // test/components/command-palette-modal.test.tsx
-import React from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render } from "ink-testing-library";
 import { ThemeProvider } from "../../src/theme/context.js";

@@ -82,7 +82,7 @@ function RunsFilterBarImpl({
         return;
       }
 
-      if (input && !key.ctrl && !key.meta) {
+      if (input && !key.ctrl && !key.escape) {
         dispatch({
           type: "RUNS_FILTER_INPUT",
           value: filter.draft + input,

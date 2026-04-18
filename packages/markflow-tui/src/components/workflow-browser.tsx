@@ -224,7 +224,7 @@ function WorkflowBrowserImpl({
         width={leftWidth}
         height={paneHeight}
       />
-      <Box width={1} height={paneHeight}>
+      <Box width={1} height={paneHeight} flexShrink={0}>
         <Text
           color={theme.colors.dim.color}
           dimColor={theme.colors.dim.dim === true}

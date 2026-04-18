@@ -57,8 +57,7 @@ describe.skipIf(process.platform === "win32")(
       await session.waitForText("hello.md", DEFAULT_READY_MS);
       await session.waitForText("1 entry", DEFAULT_READY_MS);
 
-      // Give a brief window for any async write to land
-      await new Promise((r) => setTimeout(r, 500));
+      await session.waitForText("1 entry", DEFAULT_READY_MS);
 
       // The harness passes --list <registryPath> but --no-save should
       // prevent writes to that path.

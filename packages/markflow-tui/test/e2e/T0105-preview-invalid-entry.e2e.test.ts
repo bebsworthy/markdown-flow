@@ -110,7 +110,7 @@ describe.skipIf(process.platform === "win32")(
 
       // Press `r` — should be a no-op; we stay in browsing mode.
       session.write("r");
-      await new Promise((r) => setTimeout(r, 200));
+      await session.waitForText("WORKFLOWS", DEFAULT_READY_MS);
       const afterR = session.snapshot();
 
       // Still in the browser — "2 entries" footer present, no mode change.

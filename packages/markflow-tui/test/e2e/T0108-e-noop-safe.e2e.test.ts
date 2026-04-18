@@ -85,7 +85,7 @@ describe.skipIf(process.platform === "win32")(
       // Press `e` — should be a no-op or open $EDITOR (which won't be set
       // in our hermetic env). Either way, state should not corrupt.
       session.write("e");
-      await new Promise((r) => setTimeout(r, 300));
+      await session.waitForText("2 entries", DEFAULT_READY_MS);
 
       const afterSnap = session.snapshot();
 

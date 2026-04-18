@@ -23,20 +23,12 @@ import type { ResolvedEntry } from "../../src/browser/types.js";
 import type { RunsTableRow } from "../../src/runs/types.js";
 import type { RunWorkflowResult } from "../../src/runStart/types.js";
 import { flush } from "../helpers/flush.js";
+import { type } from "../helpers/type.js";
 
 const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 const ENTER = "\r";
 const ESC = "\x1b";
-async function type(
-  stdin: { write: (chunk: string) => unknown },
-  text: string,
-): Promise<void> {
-  for (const ch of text) {
-    stdin.write(ch);
-    await flush(1);
-  }
-}
 
 function makeWorkflow(
   name: string,

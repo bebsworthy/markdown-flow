@@ -125,7 +125,7 @@ function CommandPaletteModalImpl(
       dispatch({ type: "CURSOR_RESET_TO_FIRST" });
       return;
     }
-    if (input && input.length > 0 && !key.ctrl && !key.meta) {
+    if (input && input.length > 0 && !key.ctrl && !key.escape) {
       onQueryChange(query + input);
       dispatch({ type: "CURSOR_RESET_TO_FIRST" });
     }

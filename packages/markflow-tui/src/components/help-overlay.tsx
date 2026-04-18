@@ -81,7 +81,7 @@ function HelpOverlayImpl(props: HelpOverlayProps): React.ReactElement {
         dispatch({ type: "SEARCH_SET", value: cur.slice(0, -1) });
         return;
       }
-      if (input && input.length > 0 && !key.ctrl && !key.meta) {
+      if (input && input.length > 0 && !key.ctrl && !key.escape) {
         dispatch({
           type: "SEARCH_SET",
           value: stateRef.current.search + input,
