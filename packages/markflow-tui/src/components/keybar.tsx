@@ -26,7 +26,6 @@
 //
 // Width-as-prop rationale: ink-testing-library@4's `render()` does not
 // accept a `cols` option; tests pin tiers deterministically via `width`.
-// The app-shell task (P3-T5) will wrap this with `useStdout().stdout.columns`.
 
 import React, { useMemo } from "react";
 import { Box, Text } from "ink";
@@ -79,10 +78,7 @@ function selectLogOverride(
 export interface KeybarProps {
   readonly bindings: ReadonlyArray<Binding>;
   readonly ctx: AppContext;
-  /**
-   * Terminal width in columns. Tests pass an explicit value; the future
-   * app-shell reads `useStdout().stdout.columns`.
-   */
+  /** Terminal width in columns. */
   readonly width: number;
   /**
    * Optional mode-pill content (rule 8). The component wraps the string

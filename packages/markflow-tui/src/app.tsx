@@ -15,7 +15,6 @@
 //   - restricted empty-state keybar under AppShell's `keybar` slot
 
 import React, {
-  useCallback,
   useEffect,
   useMemo,
   useReducer,
@@ -23,7 +22,7 @@ import React, {
   useState,
 } from "react";
 import { dirname } from "node:path";
-import { Box, Text, useInput, useStdout } from "ink";
+import { Box, Text, useInput, useWindowSize } from "ink";
 import { ThemeProvider } from "./theme/context.js";
 import { AppShell } from "./components/app-shell.js";
 import { ModeTabs } from "./components/mode-tabs.js";
@@ -206,7 +205,7 @@ export function App({
 }: AppProps): React.ReactElement {
   const effectiveEngineState: EngineState = engineState ?? initialEngineState;
   const [state, dispatch] = useReducer(reducer, initialAppState);
-  const { stdout } = useStdout();
+  const { columns, rows } = useWindowSize();
 
   // ---- Pending approvals derivation (P7-T1) -----------------------------
   // Recompute on every render — the activeRun.events ring is capped and
@@ -303,7 +302,7 @@ export function App({
 
   // ---- Persistence callbacks ---------------------------------------------
 
-  const onAddEntry = useCallback(async (source: string): Promise<void> => {
+  const onAddEntry = async (source: string): Promise<void> => {
     const addedAt = new Date().toISOString();
     const next = addEntry(latestStateRef.current, { source, addedAt });
     latestStateRef.current = next;
@@ -316,9 +315,9 @@ export function App({
         /* Persistence failures are swallowed; a toast surface lands later. */
       }
     }
-  }, []);
+  };
 
-  const onRemoveEntry = useCallback(async (source: string): Promise<void> => {
+  const onRemoveEntry = async (source: string): Promise<void> => {
     const next = removeEntry(
       latestStateRef.current,
       (e) => e.source === source,
@@ -333,7 +332,7 @@ export function App({
         /* Persistence failures swallowed; toast surface deferred. */
       }
     }
-  }, []);
+  };
 
   // ---- Launch-arg ingestion ---------------------------------------------
 
@@ -362,7 +361,8 @@ export function App({
         }
       }
     })();
-  }, [registryLoaded, initialLaunchArgs, urlIngestor, onAddEntry]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [registryLoaded, initialLaunchArgs, urlIngestor]);
 
   // ---- Run-entry helpers (P9-T1) ----------------------------------------
   //
@@ -374,152 +374,137 @@ export function App({
   //   2. `startRunFromWorkflow(workflow, sourceFile)` — same logic but
   //      sourced from a parsed WorkflowDefinition (palette path).
   // Both funnel into the same bridge call + overlay open.
-  const launchRun = useCallback(
-    async (args: {
-      readonly sourceFile: string;
-      readonly workspaceDir: string;
-      readonly inputs: Readonly<Record<string, string>>;
-    }): Promise<RunWorkflowResult> => {
-      if (!runsDir) {
-        return { kind: "error", message: "runsDir is not configured" };
-      }
-      return startRun({
-        runsDir,
-        workspaceDir: args.workspaceDir,
+  const launchRun = async (args: {
+    readonly sourceFile: string;
+    readonly workspaceDir: string;
+    readonly inputs: Readonly<Record<string, string>>;
+  }): Promise<RunWorkflowResult> => {
+    if (!runsDir) {
+      return { kind: "error", message: "runsDir is not configured" };
+    }
+    return startRun({
+      runsDir,
+      workspaceDir: args.workspaceDir,
+      sourceFile: args.sourceFile,
+      inputs: args.inputs,
+      onRunStart: (runId) => {
+        dispatch({ type: "OVERLAY_CLOSE" });
+        dispatch({ type: "MODE_OPEN_RUN", runId });
+      },
+    });
+  };
+
+  const startRunForWorkflow = (args: {
+    readonly workflowId: string;
+    readonly workflow: WorkflowDefinition;
+    readonly sourceFile: string;
+  }): void => {
+    const inputRows = deriveRunInputRows(args.workflow);
+    if (inputRows.length === 0) {
+      // Direct launch — no modal.
+      void launchRun({
         sourceFile: args.sourceFile,
-        inputs: args.inputs,
-        onRunStart: (runId) => {
-          dispatch({ type: "OVERLAY_CLOSE" });
-          dispatch({ type: "MODE_OPEN_RUN", runId });
-        },
+        workspaceDir: dirname(args.sourceFile),
+        inputs: {},
       });
-    },
-    [runsDir, startRun],
-  );
+      return;
+    }
+    dispatch({
+      type: "OVERLAY_OPEN",
+      overlay: {
+        kind: "runInput",
+        workflowId: args.workflowId,
+        sourceFile: args.sourceFile,
+        workspaceDir: dirname(args.sourceFile),
+        workflowName: args.workflow.name,
+        seedRows: inputRows as readonly RunInputRow[],
+        state: "idle",
+      },
+    });
+  };
 
-  const startRunForWorkflow = useCallback(
-    (args: {
-      readonly workflowId: string;
-      readonly workflow: WorkflowDefinition;
-      readonly sourceFile: string;
-    }): void => {
-      const rows = deriveRunInputRows(args.workflow);
-      if (rows.length === 0) {
-        // Direct launch — no modal.
-        void launchRun({
-          sourceFile: args.sourceFile,
-          workspaceDir: dirname(args.sourceFile),
-          inputs: {},
-        });
-        return;
-      }
-      dispatch({
-        type: "OVERLAY_OPEN",
-        overlay: {
-          kind: "runInput",
-          workflowId: args.workflowId,
-          sourceFile: args.sourceFile,
-          workspaceDir: dirname(args.sourceFile),
-          workflowName: args.workflow.name,
-          seedRows: rows as readonly RunInputRow[],
-          state: "idle",
-        },
-      });
-    },
-    [launchRun],
-  );
+  const startRunFromEntry = (entry: ResolvedEntry): void => {
+    if (entry.status !== "valid") return;
+    if (!entry.workflow || !entry.absolutePath) return;
+    startRunForWorkflow({
+      workflowId: entry.id,
+      workflow: entry.workflow,
+      sourceFile: entry.absolutePath,
+    });
+  };
 
-  const startRunFromEntry = useCallback(
-    (entry: ResolvedEntry): void => {
-      if (entry.status !== "valid") return;
-      if (!entry.workflow || !entry.absolutePath) return;
-      startRunForWorkflow({
-        workflowId: entry.id,
-        workflow: entry.workflow,
-        sourceFile: entry.absolutePath,
-      });
-    },
-    [startRunForWorkflow],
-  );
+  const runsTableStartRun = (info: RunInfo): void => {
+    const entries = runRegistryLookup ?? [];
+    const match = entries.find(
+      (e) =>
+        e.workflow !== null &&
+        (e.workflow.name === info.workflowName ||
+          (e.absolutePath !== null && e.absolutePath === info.sourceFile)),
+    );
+    if (match) startRunFromEntry(match);
+  };
 
-  const runsTableStartRun = useCallback(
-    (info: RunInfo): void => {
-      const entries = runRegistryLookup ?? [];
-      const match = entries.find(
+  const paletteRunWorkflow = async (arg: string): Promise<CommandResult> => {
+    const entries = runRegistryLookup ?? [];
+    if (entries.length === 0) {
+      return {
+        kind: "unavailable",
+        message: "no workflows registered",
+      };
+    }
+    const needle = arg.trim();
+    if (needle === "") {
+      return { kind: "usage", message: "usage: :run <workflow>" };
+    }
+    // Exact match on name or id.
+    let match: ResolvedEntry | null =
+      entries.find(
         (e) =>
-          e.workflow !== null &&
-          (e.workflow.name === info.workflowName ||
-            (e.absolutePath !== null && e.absolutePath === info.sourceFile)),
+          (e.workflow && e.workflow.name === needle) || e.id === needle,
+      ) ?? null;
+    if (!match) {
+      // Unique prefix match on name.
+      const prefixMatches = entries.filter(
+        (e) => e.workflow && e.workflow.name.startsWith(needle),
       );
-      if (match) startRunFromEntry(match);
-    },
-    [runRegistryLookup, startRunFromEntry],
-  );
-
-  const paletteRunWorkflow = useCallback(
-    async (arg: string): Promise<CommandResult> => {
-      const entries = runRegistryLookup ?? [];
-      if (entries.length === 0) {
+      if (prefixMatches.length === 1) {
+        match = prefixMatches[0]!;
+      } else if (prefixMatches.length > 1) {
         return {
-          kind: "unavailable",
-          message: "no workflows registered",
+          kind: "usage",
+          message: `ambiguous: matches ${prefixMatches
+            .map((e) => (e.workflow ? e.workflow.name : e.id))
+            .join(", ")}`,
         };
       }
-      const needle = arg.trim();
-      if (needle === "") {
-        return { kind: "usage", message: "usage: :run <workflow>" };
-      }
-      // Exact match on name or id.
-      let match: ResolvedEntry | null =
-        entries.find(
-          (e) =>
-            (e.workflow && e.workflow.name === needle) || e.id === needle,
-        ) ?? null;
-      if (!match) {
-        // Unique prefix match on name.
-        const prefixMatches = entries.filter(
-          (e) => e.workflow && e.workflow.name.startsWith(needle),
-        );
-        if (prefixMatches.length === 1) {
-          match = prefixMatches[0]!;
-        } else if (prefixMatches.length > 1) {
-          return {
-            kind: "usage",
-            message: `ambiguous: matches ${prefixMatches
-              .map((e) => (e.workflow ? e.workflow.name : e.id))
-              .join(", ")}`,
-          };
-        }
-      }
-      if (!match) {
-        return {
-          kind: "unavailable",
-          message: `no workflow matching '${needle}'`,
-        };
-      }
-      if (match.status !== "valid" || !match.workflow || !match.absolutePath) {
-        return {
-          kind: "unavailable",
-          message: "workflow is not resolvable",
-        };
-      }
-      // Schedule the run-entry dispatch for the NEXT macrotask so the
-      // palette's `{kind:"ok"}` branch can run its own `OVERLAY_CLOSE`
-      // first without clobbering the new `runInput` overlay. Palette
-      // sees `ok`, closes itself; then we open the input modal on the
-      // next tick.
-      const resolvedMatch = match;
-      setImmediate(() => {
-        startRunForWorkflow({
-          workflowId: resolvedMatch.id,
-          workflow: resolvedMatch.workflow!,
-          sourceFile: resolvedMatch.absolutePath!,
-        });
+    }
+    if (!match) {
+      return {
+        kind: "unavailable",
+        message: `no workflow matching '${needle}'`,
+      };
+    }
+    if (match.status !== "valid" || !match.workflow || !match.absolutePath) {
+      return {
+        kind: "unavailable",
+        message: "workflow is not resolvable",
+      };
+    }
+    // Schedule the run-entry dispatch for the NEXT macrotask so the
+    // palette's `{kind:"ok"}` branch can run its own `OVERLAY_CLOSE`
+    // first without clobbering the new `runInput` overlay. Palette
+    // sees `ok`, closes itself; then we open the input modal on the
+    // next tick.
+    const resolvedMatch = match;
+    setImmediate(() => {
+      startRunForWorkflow({
+        workflowId: resolvedMatch.id,
+        workflow: resolvedMatch.workflow!,
+        sourceFile: resolvedMatch.absolutePath!,
       });
-      return { kind: "ok" };
-    },
-    [runRegistryLookup, startRunForWorkflow],
-  );
+    });
+    return { kind: "ok" };
+  };
 
   // ---- Global key bindings ----------------------------------------------
   //
@@ -567,7 +552,7 @@ export function App({
   ]);
 
   // ---- Narrow-tier layout detection (P8-T2) -----------------------------
-  const colsForNarrow = stdout?.columns ?? 80;
+  const colsForNarrow = columns;
   const isNarrow = colsForNarrow < NARROW_TIER_MAX;
   const narrowLevel: NarrowLevel | null = isNarrow
     ? pickNarrowLevel({
@@ -711,8 +696,8 @@ export function App({
     return s;
   }, [runRows]);
 
-  const shellWidth = stdout?.columns ?? 80;
-  const shellHeight = stdout?.rows ?? 30;
+  const shellWidth = columns;
+  const shellHeight = rows;
   // `innerWidth` is the content budget handed to panes. Use `shellWidth`
   // directly so tier pickers (docs/tui/plans/P8-T1.md §3.2 — "At width=90
   // → runs=medium") see the full terminal width. The AppShell box chrome
@@ -735,7 +720,7 @@ export function App({
         }}
         selectedWorkflowId={state.selectedWorkflowId}
         dispatch={dispatch}
-        width={stdout?.columns}
+        width={columns}
         onRemoveEntry={(source) => {
           void onRemoveEntry(source);
         }}
@@ -856,7 +841,7 @@ export function App({
         pendingApprovalsCount,
         runResumable,
       }}
-      width={stdout?.columns ?? 80}
+      width={columns}
       modePill="APPROVAL"
     />
   ) : resumeOverlayOpen ? (
@@ -872,7 +857,7 @@ export function App({
         pendingApprovalsCount,
         runResumable,
       }}
-      width={stdout?.columns ?? 80}
+      width={columns}
       modePill="RESUME"
     />
   ) : commandOverlayOpen ? (
@@ -888,7 +873,7 @@ export function App({
         pendingApprovalsCount,
         runResumable,
       }}
-      width={stdout?.columns ?? 80}
+      width={columns}
       modePill="COMMAND"
       modePillTiers={["full"]}
       modePillGap={{ full: 3 }}
@@ -906,7 +891,7 @@ export function App({
         pendingApprovalsCount,
         runResumable,
       }}
-      width={stdout?.columns ?? 80}
+      width={columns}
       modePill="HELP"
       modePillTiers={["full"]}
       modePillGap={{ full: 3 }}
@@ -924,17 +909,17 @@ export function App({
         pendingApprovalsCount,
         runResumable,
       }}
-      width={stdout?.columns ?? 80}
+      width={columns}
       modePill="WORKFLOWS"
     />
   ) : null;
 
   const modalWidth = Math.min(
-    Math.max(40, (stdout?.columns ?? 100) - 4),
+    Math.max(40, columns - 4),
     90,
   );
   const modalHeight = Math.min(
-    Math.max(10, (stdout?.rows ?? 30) - 4),
+    Math.max(10, rows - 4),
     18,
   );
 
@@ -949,7 +934,7 @@ export function App({
   let narrowSingleSlot: React.ReactNode = null;
   let narrowBreadcrumb: string = "";
   if (narrowLevel !== null) {
-    const narrowRows = stdout?.rows ?? 30;
+    const narrowRows = rows;
     const slotRows = Math.max(1, narrowRows - 2);
     if (narrowLevel === "runs") {
       narrowSingleSlot = (
@@ -1050,15 +1035,15 @@ export function App({
     }
   }
 
-  const frameWidth = stdout?.columns ?? 80;
+  const frameWidth = columns;
 
   return (
     <ThemeProvider>
-      <Box width={frameWidth} flexDirection="column" height={stdout?.rows} overflow="hidden">
+      <Box width={frameWidth} flexDirection="column" height={rows} overflow="hidden">
       {narrowLevel !== null ? (
         <AppShell
-          width={stdout?.columns}
-          height={stdout?.rows}
+          width={columns}
+          height={rows}
           mode={state.mode}
           selectedRunId={state.selectedRunId}
           modeTabs={null}
@@ -1071,8 +1056,8 @@ export function App({
         />
       ) : (
       <AppShell
-        width={stdout?.columns}
-        height={stdout?.rows}
+        width={columns}
+        height={rows}
         mode={state.mode}
         selectedRunId={state.selectedRunId}
         modeTabs={

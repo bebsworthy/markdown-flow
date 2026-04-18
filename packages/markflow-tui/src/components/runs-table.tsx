@@ -27,8 +27,7 @@
 //   - docs/tui/plans/P5-T3.md §6 (cursor keybindings + gating)
 //
 // Width-as-prop: ink-testing-library does not expose a `cols` option, so
-// callers pass `width` explicitly. The app-shell threads
-// `useStdout().stdout.columns` through.
+// callers pass `width` explicitly.
 
 import React, { useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";

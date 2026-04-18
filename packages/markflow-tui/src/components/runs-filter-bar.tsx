@@ -62,7 +62,7 @@ function RunsFilterBarImpl({
         return;
       }
 
-      if (key.backspace || key.delete) {
+      if (key.backspace) {
         dispatch({
           type: "RUNS_FILTER_INPUT",
           value: filter.draft.slice(0, -1),

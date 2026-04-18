@@ -75,7 +75,7 @@ function HelpOverlayImpl(props: HelpOverlayProps): React.ReactElement {
         setSearchOpen(false);
         return;
       }
-      if (key.backspace || key.delete) {
+      if (key.backspace) {
         const cur = stateRef.current.search;
         if (cur.length === 0) return;
         dispatch({ type: "SEARCH_SET", value: cur.slice(0, -1) });

@@ -135,6 +135,15 @@ describe("<CommandPaletteModal>", () => {
     expect(exec.dispatch).toHaveBeenCalledWith({ type: "OVERLAY_CLOSE" });
   });
 
+  it("forward-Delete does not erase query (Ink 7 key.delete regression)", async () => {
+    const onQueryChange = vi.fn();
+    const out = renderModal({ onQueryChange, query: "abc" });
+    await flush();
+    out.stdin.write("\x1b[3~"); // forward-Delete
+    await flush();
+    expect(onQueryChange).not.toHaveBeenCalled();
+  });
+
   it("empty match shows 'no commands match'", () => {
     const out = renderModal({ query: "zzzzzz" });
     const frame = stripAnsi(out.lastFrame() ?? "");

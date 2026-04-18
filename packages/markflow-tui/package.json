@@ -4,6 +4,7 @@
   "private": true,
   "description": "Terminal UI for the markflow workflow engine.",
   "type": "module",
+  "engines": { "node": ">=22" },
   "bin": {
     "markflow-tui": "./dist/cli.js"
   },

@@ -274,7 +274,7 @@ function AddWorkflowModalImpl(
         })();
         return;
       }
-      if (key.backspace || key.delete) {
+      if (key.backspace) {
         setRootPickerDraft((s) => s.slice(0, -1));
         setRootPickerError(null);
         return;
@@ -317,7 +317,7 @@ function AddWorkflowModalImpl(
         void onSubmit(row.candidate.absolutePath);
         return;
       }
-      if (key.backspace || key.delete) {
+      if (key.backspace) {
         setQuery((s) => s.slice(0, -1));
         return;
       }
@@ -373,7 +373,7 @@ function AddWorkflowModalImpl(
       }
       return;
     }
-    if (key.backspace || key.delete) {
+    if (key.backspace) {
       setUrlInput((s) => s.slice(0, -1));
       setIngestError(null);
       return;

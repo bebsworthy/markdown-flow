@@ -119,7 +119,7 @@ function CommandPaletteModalImpl(
       })();
       return;
     }
-    if (key.backspace || key.delete) {
+    if (key.backspace) {
       if (query.length === 0) return;
       onQueryChange(query.slice(0, -1));
       dispatch({ type: "CURSOR_RESET_TO_FIRST" });

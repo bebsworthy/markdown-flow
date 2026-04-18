@@ -130,6 +130,26 @@ describe("<RunsFilterBar> — key handling", () => {
     cleanup();
   });
 
+  it("forward-Delete does not erase draft (Ink 7 key.delete regression)", async () => {
+    const dispatch = vi.fn();
+    const { stdin, cleanup } = renderBar({
+      dispatch,
+      filter: {
+        open: true,
+        draft: "abc",
+        applied: { raw: "", terms: [] },
+      },
+    });
+    await flush();
+    dispatch.mockClear();
+    stdin.write("\x1b[3~"); // forward-Delete
+    await flush();
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "RUNS_FILTER_INPUT" }),
+    );
+    cleanup();
+  });
+
   it("Enter dispatches RUNS_FILTER_APPLY", async () => {
     const dispatch = vi.fn();
     const { stdin, cleanup } = renderBar({

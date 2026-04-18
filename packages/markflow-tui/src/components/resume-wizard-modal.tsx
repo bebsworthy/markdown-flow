@@ -135,7 +135,7 @@ function ResumeWizardModalImpl(
       const row = inputs[form.inputsCursor];
       if (!row) return;
       const current = inputOverrides[row.key] ?? row.draft;
-      if (key.backspace || key.delete) {
+      if (key.backspace) {
         const next = current.length > 0 ? current.slice(0, -1) : current;
         if (next !== current) {
           onSetInput(row.key, next);

@@ -9,8 +9,7 @@
 //   - docs/tui/mockups.md §4 (running) + §6 (terminal)
 //
 // Width-as-prop: ink-testing-library does not expose a `cols` option, so
-// callers pass `width` explicitly. The app-shell threads
-// `useStdout().stdout.columns - 2` through.
+// callers pass `width` explicitly.
 
 import React from "react";
 import { Box, Text } from "ink";

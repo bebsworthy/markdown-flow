@@ -9,6 +9,26 @@ Stack context (from `packages/markflow-tui/package.json`): `ink ^7.0.1`, `react 
 
 ---
 
+## 0. Status (2026-04-18)
+
+| # | Gap | Status | Commit / note |
+|---|---|---|---|
+| G1 | Dual React / dual Ink | ✅ **Done** | `ef62fa7` — dropped `@inkjs/ui`; root-level `ink` + `react` devDeps force hoisting of the workspace versions |
+| G2 | `@inkjs/ui` declared but unused | ✅ **Done** | `ef62fa7` — removed from `dependencies` and `tsup.config.ts` externals |
+| G3 | `ink-testing-library` lag | ✅ **Done** | `ink-testing-library@4.2.0` works with Ink 7 + React 19 after G1; all 1664 tests pass |
+| G4 | `engines.node >=22` missing | ✅ **Done** | Added `"engines": { "node": ">=22" }` to `packages/markflow-tui/package.json` |
+| G5 | `key.backspace \|\| key.delete` makes forward-Delete erase chars | ✅ **Done** | Removed `\|\| key.delete` from 9 sites across 7 files; added 2 regression tests |
+| G6 | Manual `stdout.columns/rows` instead of `useWindowSize()` | ✅ **Done** | Replaced `useStdout()` with `useWindowSize()` in `app.tsx`; live-resize now works |
+| G7 | Keybar width=90 overflow | ✅ **Done** | `matrix-90.test.tsx` 30/30 green (resolved prior to or during the Ink-7 stabilisation work) |
+| G8 | `key.meta && !key.escape` guards | ✅ Clean | No work needed |
+| G9 | Manual `measureElement` / SIGWINCH | ✅ Clean | No work needed |
+| G10 | Redundant `useCallback` wrappers in `app.tsx` | ✅ **Done** | Removed all 7 `useCallback` wrappers; consumers have no `React.memo` (G11) |
+| **G11** | **React 19.2 `useEffectEvent` skips commit flush for `SimpleMemoComponent` fibers → stale `useInput` state in every `React.memo`-wrapped component** | ✅ **Done** | `c48339c` — removed `React.memo` from the 16 components that use `useInput`; also centralised `test/helpers/flush.ts` with a 25 ms real-time drain for Ink 7's 20 ms escape-debounce timer |
+
+All gaps resolved. 1666 tests pass.
+
+---
+
 ## 1. Summary
 
 | # | Gap | Severity | Affected | Fix shape |
@@ -201,6 +221,72 @@ This looks like off-by-3 layout math, **not** directly attributable to the Ink b
 **Playbook:** Ink 7 playbook §"useInput callback stability": *"you can remove `useCallback` wrappers used only to calm Ink 5."*
 
 **Evidence:** `src/app.tsx` lines 306, 321, 377, 400, 432, 445, 459 — all wrap closures in `useCallback`. Several of these are passed to children as props (legitimate React memoization reason) and several just sit on the component (legacy). Low priority cleanup.
+
+---
+
+### G11 — React 19.2 `useEffectEvent` + `React.memo` staleness (RESOLVED)
+
+**Not in the original review — discovered while stabilising the test suite post-bump.**
+
+**Symptom.** After G1/G2/G3 were fixed, ~14 tests still failed with the same shape: a keystroke written via `ink-testing-library`'s `stdin.write` fired the `useInput` handler, but the handler saw **stale internal state** (e.g. `resolved.length === 0` even though the last render had already committed `resolved.length === 1`).
+
+**Root cause.** Ink 7's `useInput` is built on React's `useEffectEvent` (`node_modules/ink/build/hooks/use-input.js`):
+
+```js
+const handleData = useEffectEvent((data) => { ... inputHandler(input, key); });
+useEffect(() => { emitter.on('input', handleData); ... }, [isActive, emitter]);
+```
+
+`useEffectEvent` stores the latest callback in a `ref` whose `.impl` field is updated during `commitBeforeMutationEffects`:
+
+```js
+// react-reconciler/cjs/react-reconciler.development.js:11430
+case 0: // FunctionComponent
+  if (flags & 4) {
+    for (const ev of updateQueue.events) ev.ref.impl = ev.nextImpl;
+  }
+  break;
+case 11: // ForwardRef
+case 15: // SimpleMemoComponent — falls through, events are NEVER flushed
+  break;
+```
+
+When a component is wrapped in `React.memo(Fn)` **without** a custom comparator, React 19 represents it as a `SimpleMemoComponent` fiber (tag 15). Hooks run on that fiber directly, so `useEffectEventImpl` queues its events on the tag-15 fiber's updateQueue — but `commitBeforeMutationEffects` only processes events for tag-0 fibers. The ref never updates, and `useInput`'s stable listener keeps calling the **initial** `inputHandler` closure forever.
+
+**Reproduction** (minimal):
+
+```tsx
+function Impl() {
+  const [n, setN] = useState(0);
+  useEffect(() => { Promise.resolve().then(() => setN(5)); }, []);
+  useInput((input) => console.log("key=", input, "n=", n));  // logs n=0
+  return <Text>{n}</Text>;
+}
+const C = React.memo(Impl);          // 👈 with memo: n=0 (stale)
+// const C = Impl;                     // 👈 without memo: n=5 (correct)
+```
+
+Confirmed on `react@19.2.5` + `ink@7.0.1` + `ink-testing-library@4.2.0`.
+
+**Affected components** (all used `React.memo` + `useInput`):
+
+`workflow-browser`, `step-table`, `resume-wizard-modal`, `events-panel-view`, `help-overlay`, `approval-modal`, `log-panel-view`, `runs-filter-bar`, `mode-tabs`, `command-palette-modal`, `runs-table`, `workflow-list`, `input-prompt-modal`, `workflow-preview`, `app-shell`, `add-workflow-modal` — 16 components.
+
+**Fix applied.** Removed `React.memo(...)` from each and export the raw `Impl` function, with a pinned comment explaining the React 19.2 bug. Production impact: a small perf regression when these components re-render despite unchanged props — acceptable trade-off for a correctness bug that also affected real user flows (not just tests: any user typing fast on a slow-rendering screen could hit stale state). Components that do **not** use `useInput` (e.g. `graph-panel-view`, `step-detail-panel`, `runs-table-row`, `runs-footer`, `run-detail-placeholder`, `workflow-browser-empty`, `keybar`, `events-panel`, `log-panel`, `graph-panel`, `step-table-view`, `step-table-row`, `step-detail-panel-view`, `add-modal-fuzzy-tab`, `add-modal-url-tab`, `viewing-panes`) keep `React.memo` — they are unaffected because `useEffectEvent` is unused there.
+
+**Secondary fix (Ink 7 20 ms escape debounce).** Separately, Ink 7 added `pendingInputFlushDelayMilliseconds = 20` to disambiguate a lone `Esc` from the prefix of an arrow/function key (`node_modules/ink/build/components/App.js:160`). Local `flush()` test helpers built only on `setImmediate` loops don't advance that timer, so any test writing `\x1b` and asserting immediately saw 0 dispatches. Centralised `test/helpers/flush.ts`:
+
+```ts
+export async function flush(n = 6): Promise<void> {
+  for (let i = 0; i < n; i++) await new Promise<void>((r) => setImmediate(r));
+  await new Promise<void>((r) => setTimeout(r, 25));  // drains Ink 7 escape timer
+  for (let i = 0; i < n; i++) await new Promise<void>((r) => setImmediate(r));
+}
+```
+
+Migrated ~24 test files from local `flush()` copies to the shared helper.
+
+**Upstream follow-up.** G11 is a React bug, not an Ink bug — file upstream at `facebook/react` once isolated with a pure-React repro (no Ink). Until fixed upstream, avoid `React.memo` on any component that uses `useEffectEvent` (directly or via `useInput`).
 
 ---
 

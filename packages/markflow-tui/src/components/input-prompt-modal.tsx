@@ -137,7 +137,7 @@ function InputPromptModalImpl(
     const row = current.rows[current.cursor];
     if (!row) return;
     const liveDraft = draftsRef.current.get(row.key) ?? row.draft;
-    if (key.backspace || key.delete) {
+    if (key.backspace) {
       const next = liveDraft.length > 0 ? liveDraft.slice(0, -1) : liveDraft;
       if (next !== liveDraft) {
         draftsRef.current.set(row.key, next);

@@ -96,15 +96,9 @@ export interface AppShellProps {
   readonly mode?: AppState["mode"];
   /** Whether to render the RUN tab in the title. Follows hide-don't-grey. */
   readonly selectedRunId?: string | null;
-  /**
-   * Width override for tests. Defaults to 80 when neither this prop nor
-   * `process.stdout.columns` resolves to a value.
-   */
+  /** Width override for tests. Defaults to 80. */
   readonly width?: number;
-  /**
-   * Height override for tests. Defaults to 30 when neither this prop nor
-   * `process.stdout.rows` resolves to a value.
-   */
+  /** Height override for tests. Defaults to 30. */
   readonly height?: number;
 }
 

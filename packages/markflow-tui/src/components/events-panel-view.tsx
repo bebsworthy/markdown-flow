@@ -165,7 +165,7 @@ function EventsPanelViewImpl({
           act = { type: "CLOSE_SEARCH", commit: true };
         } else if (key.escape) {
           act = { type: "CLOSE_SEARCH", commit: false };
-        } else if (key.backspace || key.delete) {
+        } else if (key.backspace) {
           act = {
             type: "SET_SEARCH_DRAFT",
             draft: state.searchDraft.slice(0, -1),
