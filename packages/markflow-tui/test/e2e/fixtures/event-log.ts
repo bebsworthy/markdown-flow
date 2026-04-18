@@ -105,13 +105,15 @@ export async function writeEventLog(
 
 function terminalStatusFrom(
   events: ReadonlyArray<Record<string, unknown>>,
-): "running" | "complete" | "error" | "cancelled" {
+): "running" | "complete" | "error" | "cancelled" | "suspended" {
   for (let i = events.length - 1; i >= 0; i -= 1) {
     const t = events[i]?.type;
     if (t === "workflow:complete") return "complete";
     if (t === "workflow:error") return "error";
     if (t === "workflow:cancelled") return "cancelled";
   }
+  const hasWaiting = events.some((e) => e.type === "step:waiting");
+  if (hasWaiting) return "suspended";
   return "running";
 }
 

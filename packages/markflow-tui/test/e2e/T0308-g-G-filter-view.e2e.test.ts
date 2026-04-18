@@ -146,7 +146,7 @@ describe.skipIf(process.platform === "win32")(
 
       // Apply workflow:Alpha filter — should narrow to 3 rows
       session.write("/");
-      await session.waitForText("/", DEFAULT_READY_MS);
+      await session.waitForText("> /", DEFAULT_READY_MS);
       session.write("workflow:Alpha");
       session.write("\r");
       await session.waitForText("3 shown", DEFAULT_READY_MS);

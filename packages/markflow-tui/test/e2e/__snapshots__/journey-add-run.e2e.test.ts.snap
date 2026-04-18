@@ -3,23 +3,23 @@
 exports[`e2e journey 1: add → run > launch-arg ingestion persists workflow to registry and renders it 1`] = `
 "+ [ WORKFLOWS ]  RUNS -------------------------------------------------------------------------------------------------+
 |Workflows                                                        |Select a workflow to preview                        |
-|(<tmp>                                                     |
-|e-<uuid>/registry/registry.json)                                                        |
-|-----------------------------------------------------------------                                                     |
-|  /Users/boyd/wip/markdown-flow/pack…hello.md[file]      — never                                                      |
-|                                                                                                                      |
-|1 entry                                                                                                               |
-|                                                                                                                      |
-|                                                                                                                      |
-|                                                                                                                      |
-|                                                                                                                      |
-|                                                                                                                      |
-|                                                                                                                      |
-|                                                                                                                      |
-|                                                                                                                      |
-|                                                                                                                      |
-|                                                                                                                      |
-|                                                                                                                      |
+|(<tmp>                                                    |
+|e-<uuid>/registry/registry.json)   |                                                    |
+|-----------------------------------------------------------------|                                                    |
+|  /Users/boyd/wip/markdown-flow/pack…hello.md[file]      — never |                                                    |
+|                                                                 |                                                    |
+|1 entry                                                          |                                                    |
+|                                                                 |                                                    |
+|                                                                 |                                                    |
+|                                                                 |                                                    |
+|                                                                 |                                                    |
+|                                                                 |                                                    |
+|                                                                 |                                                    |
+|                                                                 |                                                    |
+|                                                                 |                                                    |
+|                                                                 |                                                    |
+|                                                                 |                                                    |
+|                                                                 |                                                    |
 +----------------------------------------------------------------------------------------------------------------------+
 |                                                                                                                      |
 |                                                                                                                      |
@@ -39,5 +39,6 @@ exports[`e2e journey 1: add → run > launch-arg ingestion persists workflow to 
 |                                                                                                                      |
 |                                                                                                                      |
 |                                                                                                                      |
-+----------------------------------------------------------------------------------------------------------------------+"
++----------------------------------------------------------------------------------------------------------------------+
+↑↓ Select  ⏎ Open  r Run  a Add  d Remove  e Edit in $EDITOR  ? Help     q Quit"
 `;

@@ -85,6 +85,12 @@ export interface AppContext {
    *  arg (P7-T3). */
   readonly runsDirReady?: boolean;
   /**
+   * Count of suspended (approval-waiting) runs visible in the runs table.
+   * Used by the `r Resume (N)` binding's `when(ctx)` predicate
+   * (hide-don't-grey) and its `toggleLabel`. Defaults to 0 when omitted.
+   */
+  readonly suspendedRunsCount?: number;
+  /**
    * Generic payload threaded to `toggleLabel`. For the log `f` binding
    * this is `isFollowing`; for the `w` binding it is `isWrapped`. The
    * binding author picks which field to narrow, so the type is `unknown`.

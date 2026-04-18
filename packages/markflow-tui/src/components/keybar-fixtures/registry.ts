@@ -16,6 +16,7 @@ import { GRAPH_KEYBAR } from "./graph.js";
 import { HELP_KEYBAR } from "./help.js";
 import { LOG_FOLLOWING_KEYBAR, LOG_PAUSED_KEYBAR } from "./log.js";
 import { RESUME_KEYBAR } from "./resume.js";
+import { RUNS_KEYBAR } from "./runs.js";
 import { WORKFLOWS_KEYBAR } from "./workflows.js";
 import { WORKFLOWS_EMPTY_KEYBAR } from "./workflows-empty.js";
 
@@ -100,7 +101,7 @@ export function selectKeybarFixture(
       };
     }
     return {
-      bindings: EMPTY,
+      bindings: RUNS_KEYBAR,
       modePill: null,
       modeLabel: "RUNS",
       focusLabel: "runs",

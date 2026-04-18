@@ -140,7 +140,7 @@ describe.skipIf(process.platform === "win32")(
 
       // Apply workflow:Alpha
       session.write("/");
-      await session.waitForText("/", DEFAULT_READY_MS);
+      await session.waitForText("> /", DEFAULT_READY_MS);
       session.write("workflow:Alpha");
       session.write("\r");
 
@@ -178,7 +178,7 @@ describe.skipIf(process.platform === "win32")(
 
       // Apply id prefix "bb"
       session.write("/");
-      await session.waitForText("/", DEFAULT_READY_MS);
+      await session.waitForText("> /", DEFAULT_READY_MS);
       session.write("bb");
       session.write("\r");
 
@@ -215,7 +215,7 @@ describe.skipIf(process.platform === "win32")(
 
       // Apply since:1h
       session.write("/");
-      await session.waitForText("/", DEFAULT_READY_MS);
+      await session.waitForText("> /", DEFAULT_READY_MS);
       session.write("since:1h");
       session.write("\r");
 

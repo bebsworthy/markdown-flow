@@ -93,7 +93,7 @@ describe.skipIf(process.platform === "win32")(
 
       // Open filter bar with `/`
       session.write("/");
-      await session.waitForText("/", DEFAULT_READY_MS);
+      await session.waitForText("> /", DEFAULT_READY_MS);
 
       // Type the filter query
       session.write("status:running");

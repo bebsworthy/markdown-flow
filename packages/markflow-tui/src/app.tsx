@@ -695,6 +695,13 @@ export function App({
     for (const r of runRows) s.add(r.id);
     return s;
   }, [runRows]);
+  const suspendedRunsCount = useMemo<number>(() => {
+    let n = 0;
+    for (const r of runRows) {
+      if (r.info.status === "suspended") n += 1;
+    }
+    return n;
+  }, [runRows]);
 
   const shellWidth = columns;
   const shellHeight = rows;
@@ -832,8 +839,9 @@ export function App({
         approvalsPending: true,
         isFollowing: false,
         isWrapped: false,
-        toggleState: { pendingApprovalsCount: pendingApprovalsCount },
+        toggleState: { pendingApprovalsCount: pendingApprovalsCount, suspendedRunsCount },
         pendingApprovalsCount,
+        suspendedRunsCount,
         runResumable,
       }}
       width={columns}
@@ -848,8 +856,9 @@ export function App({
         approvalsPending: pendingApprovalsCount > 0,
         isFollowing: false,
         isWrapped: false,
-        toggleState: { pendingApprovalsCount },
+        toggleState: { pendingApprovalsCount, suspendedRunsCount },
         pendingApprovalsCount,
+        suspendedRunsCount,
         runResumable,
       }}
       width={columns}
@@ -864,8 +873,9 @@ export function App({
         approvalsPending: pendingApprovalsCount > 0,
         isFollowing: false,
         isWrapped: false,
-        toggleState: { pendingApprovalsCount },
+        toggleState: { pendingApprovalsCount, suspendedRunsCount },
         pendingApprovalsCount,
+        suspendedRunsCount,
         runResumable,
       }}
       width={columns}
@@ -882,8 +892,9 @@ export function App({
         approvalsPending: pendingApprovalsCount > 0,
         isFollowing: false,
         isWrapped: false,
-        toggleState: { pendingApprovalsCount },
+        toggleState: { pendingApprovalsCount, suspendedRunsCount },
         pendingApprovalsCount,
+        suspendedRunsCount,
         runResumable,
       }}
       width={columns}
@@ -900,8 +911,9 @@ export function App({
         approvalsPending: pendingApprovalsCount > 0,
         isFollowing: false,
         isWrapped: false,
-        toggleState: { pendingApprovalsCount },
+        toggleState: { pendingApprovalsCount, suspendedRunsCount },
         pendingApprovalsCount,
+        suspendedRunsCount,
         runResumable,
       }}
       width={columns}
@@ -1147,8 +1159,9 @@ export function App({
               approvalsPending: pendingApprovalsCount > 0,
               isFollowing: false,
               isWrapped: false,
-              toggleState: { pendingApprovalsCount },
+              toggleState: { pendingApprovalsCount, suspendedRunsCount },
               pendingApprovalsCount,
+              suspendedRunsCount,
               runResumable,
               runActive: false,
               runsDirReady: runsDir != null,
@@ -1228,8 +1241,9 @@ export function App({
               approvalsPending: pendingApprovalsCount > 0,
               isFollowing: false,
               isWrapped: false,
-              toggleState: { pendingApprovalsCount },
+              toggleState: { pendingApprovalsCount, suspendedRunsCount },
               pendingApprovalsCount,
+              suspendedRunsCount,
               runResumable,
             }}
             bindings={prevFixtureRef.current?.bindings ?? []}

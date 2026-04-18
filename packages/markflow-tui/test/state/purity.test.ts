@@ -70,6 +70,7 @@ const files = [
   // Keybar fixtures for workflow browser (P3-T4 / P4-T3). Pure binding arrays.
   "../../src/components/keybar-fixtures/workflows.ts",
   "../../src/components/keybar-fixtures/workflows-empty.ts",
+  "../../src/components/keybar-fixtures/runs.ts",
   // Runs-table pure surface (P5-T1). NOTE: runs/index.ts is a barrel and is
   // NOT scanned (just re-exports), and runs-table*.tsx are Ink by design.
   "../../src/runs/types.ts",

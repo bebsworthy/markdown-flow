@@ -62,6 +62,7 @@ export function deriveHelpModel(args: DeriveHelpArgs): HelpModel {
 function resolveToggleTarget(b: Binding, ctx: AppContext): unknown {
   const keys0 = b.keys[0] ?? "";
   if (keys0 === "a") return ctx.pendingApprovalsCount ?? 0;
+  if (keys0 === "r") return ctx.suspendedRunsCount ?? 0;
   if (keys0 === "f") return ctx.isFollowing;
   if (keys0 === "w") return ctx.isWrapped;
   return ctx.toggleState;
