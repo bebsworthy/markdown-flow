@@ -125,7 +125,7 @@ scripts — deterministic and fast.
 | T0311 | `r Resume (N)` keybar count reflects the number of suspended rows; vanishes when N=0 (hide-don't-grey). | mockups.md §1, §3 | [x] |
 | T0312 | Virtualised render: opening a 10 000-row runs table paints the first frame in <500 ms and scrolling with `j` does not recompute off-screen rows. | features.md §3.2 | [ ] |
 | T0313 | `Enter` on a terminal (complete/error) row opens the zoomed run viewer (RUN mode); keybar flips from RUNS to RUN. | mockups.md §1, §4, §6 | [ ] |
-| T0314 | `q` inside RUN mode returns to RUNS mode (not all the way out). | mockups.md §15 | [ ] |
+| T0314 | `q` inside RUN mode returns to RUNS mode (not all the way out). | mockups.md §15 | [x] |
 
 ## 5. Run viewer — step table  (P6-T1)
 
@@ -394,7 +394,7 @@ Update this table after each test lands.
 | 1 Launch & lifecycle | 13 | 13 |
 | 2 Workflow browser | 11 | 11 |
 | 3 Add modal | 11 | 11 |
-| 4 Runs table | 15 | 11 |
+| 4 Runs table | 15 | 12 |
 | 5 Step table | 10 | 0 |
 | 6 Tabbed pane | 17 | 0 |
 | 7 Approval | 10 | 0 |
@@ -412,7 +412,7 @@ Update this table after each test lands.
 | 19 Engine integration | 6 | 0 |
 | 20 Registry | 4 | 0 |
 | 21 Exit discipline | 3 | 0 |
-| **Total** | **180** | **41** |
+| **Total** | **180** | **42** |
 
 ---
 
