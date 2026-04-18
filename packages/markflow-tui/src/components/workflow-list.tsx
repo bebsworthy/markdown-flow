@@ -89,5 +89,5 @@ function WorkflowListImpl({
   );
 }
 
-export const WorkflowList = React.memo(WorkflowListImpl);
-WorkflowList.displayName = "WorkflowList";
+// React.memo removed: React 19.2 + useEffectEvent bug with SimpleMemoComponent fibers (stale useInput state).
+export const WorkflowList = WorkflowListImpl;

@@ -7,15 +7,9 @@ import { buildTheme } from "../../src/theme/theme.js";
 import { HelpOverlay } from "../../src/components/help-overlay.js";
 import { GRAPH_KEYBAR } from "../../src/components/keybar-fixtures/graph.js";
 import type { AppContext } from "../../src/components/types.js";
+import { flush } from "../helpers/flush.js";
 
 const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
-
-async function flush(n = 3): Promise<void> {
-  for (let i = 0; i < n; i++) {
-    await new Promise<void>((r) => setImmediate(r));
-  }
-}
-
 function mkCtx(overrides: Partial<AppContext> = {}): AppContext {
   return {
     mode: { kind: "viewing", runId: "r1", focus: "graph" },

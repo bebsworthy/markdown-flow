@@ -10,6 +10,8 @@ import type { EngineEvent, RunInfo } from "markflow";
 import { App } from "../../src/app.js";
 import { toRunsTableRow } from "../../src/runs/derive.js";
 import type { RunsTableRow } from "../../src/runs/types.js";
+import { flush } from "../helpers/flush.js";
+
 import type {
   EngineState,
   LiveRunSnapshot,
@@ -43,13 +45,6 @@ function row(overrides: Partial<RunInfo>): RunsTableRow {
 const ROWS: ReadonlyArray<RunsTableRow> = [
   row({ id: "abcd1234", workflowName: "deploy-prod", status: "running" }),
 ];
-
-async function flush(n = 6): Promise<void> {
-  for (let i = 0; i < n; i++) {
-    await new Promise<void>((r) => setImmediate(r));
-  }
-}
-
 function buildEngineState(runId: string): EngineState {
   const events: EngineEvent[] = [
     {

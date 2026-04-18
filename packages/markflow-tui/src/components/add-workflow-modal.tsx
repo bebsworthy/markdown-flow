@@ -472,5 +472,5 @@ function AddWorkflowModalImpl(
   );
 }
 
-export const AddWorkflowModal = React.memo(AddWorkflowModalImpl);
-AddWorkflowModal.displayName = "AddWorkflowModal";
+// React.memo removed: React 19.2 + useEffectEvent bug with SimpleMemoComponent fibers (stale useInput state).
+export const AddWorkflowModal = AddWorkflowModalImpl;

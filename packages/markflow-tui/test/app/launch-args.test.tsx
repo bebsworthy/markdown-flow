@@ -13,12 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { App } from "../../src/app.js";
 import type { UrlIngestResult } from "../../src/add-modal/types.js";
-
-async function flush(n = 4): Promise<void> {
-  for (let i = 0; i < n; i++) {
-    await new Promise<void>((r) => setImmediate(r));
-  }
-}
+import { flush } from "../helpers/flush.js";
 
 /**
  * Poll for a predicate up to `timeoutMs` — avoids brittle microtask counts

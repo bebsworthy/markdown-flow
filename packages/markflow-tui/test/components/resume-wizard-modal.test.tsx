@@ -8,6 +8,8 @@ import { render } from "ink-testing-library";
 import { ThemeProvider } from "../../src/theme/context.js";
 import { buildTheme } from "../../src/theme/theme.js";
 import { ResumeWizardModal } from "../../src/components/resume-wizard-modal.js";
+import { flush } from "../helpers/flush.js";
+
 import type {
   InputRow,
   RerunNode,
@@ -58,13 +60,6 @@ function inputs(): InputRow[] {
     },
   ];
 }
-
-async function flush(n = 3): Promise<void> {
-  for (let i = 0; i < n; i++) {
-    await new Promise<void>((r) => setImmediate(r));
-  }
-}
-
 interface RenderArgs {
   readonly rerun?: ReadonlySet<string>;
   readonly inputOverrides?: Readonly<Record<string, string>>;

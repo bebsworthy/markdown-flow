@@ -225,5 +225,5 @@ function longestCommonPrefix(xs: readonly string[]): string {
   return p;
 }
 
-export const CommandPaletteModal = React.memo(CommandPaletteModalImpl);
-CommandPaletteModal.displayName = "CommandPaletteModal";
+// React.memo removed: React 19.2 + useEffectEvent bug with SimpleMemoComponent fibers (stale useInput state).
+export const CommandPaletteModal = CommandPaletteModalImpl;

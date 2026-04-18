@@ -225,5 +225,5 @@ function EventsPanelViewImpl({
   );
 }
 
-export const EventsPanelView = React.memo(EventsPanelViewImpl);
-EventsPanelView.displayName = "EventsPanelView";
+// React.memo removed: React 19.2 + useEffectEvent bug with SimpleMemoComponent fibers (stale useInput state).
+export const EventsPanelView = EventsPanelViewImpl;

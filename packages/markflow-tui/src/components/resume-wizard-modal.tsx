@@ -295,5 +295,5 @@ function ResumeWizardModalImpl(
   );
 }
 
-export const ResumeWizardModal = React.memo(ResumeWizardModalImpl);
-ResumeWizardModal.displayName = "ResumeWizardModal";
+// React.memo removed: React 19.2 + useEffectEvent bug with SimpleMemoComponent fibers (stale useInput state).
+export const ResumeWizardModal = ResumeWizardModalImpl;

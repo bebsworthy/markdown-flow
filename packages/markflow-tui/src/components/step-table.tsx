@@ -112,5 +112,5 @@ function StepTableImpl({
   );
 }
 
-export const StepTable = React.memo(StepTableImpl);
-StepTable.displayName = "StepTable";
+// React.memo removed: React 19.2 + useEffectEvent bug with SimpleMemoComponent fibers (stale useInput state).
+export const StepTable = StepTableImpl;

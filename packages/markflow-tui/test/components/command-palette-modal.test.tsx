@@ -11,15 +11,9 @@ import type {
   CommandResult,
 } from "../../src/palette/types.js";
 import { initialAppState } from "../../src/state/reducer.js";
+import { flush } from "../helpers/flush.js";
 
 const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
-
-async function flush(n = 3): Promise<void> {
-  for (let i = 0; i < n; i++) {
-    await new Promise<void>((r) => setImmediate(r));
-  }
-}
-
 function mkCtx(): AppContext {
   return {
     mode: { kind: "viewing", runId: "r1", focus: "graph" },

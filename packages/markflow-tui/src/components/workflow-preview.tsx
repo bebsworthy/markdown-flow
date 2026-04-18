@@ -156,5 +156,5 @@ function WorkflowPreviewImpl({
   );
 }
 
-export const WorkflowPreview = React.memo(WorkflowPreviewImpl);
-WorkflowPreview.displayName = "WorkflowPreview";
+// React.memo removed: React 19.2 + useEffectEvent bug with SimpleMemoComponent fibers (stale useInput state).
+export const WorkflowPreview = WorkflowPreviewImpl;

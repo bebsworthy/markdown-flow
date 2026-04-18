@@ -8,6 +8,8 @@ import { render } from "ink-testing-library";
 import { ThemeProvider } from "../../src/theme/context.js";
 import { buildTheme } from "../../src/theme/theme.js";
 import { InputPromptModal } from "../../src/components/input-prompt-modal.js";
+import { flush } from "../helpers/flush.js";
+
 import type {
   RunInputRow,
   RunWorkflowResult,
@@ -27,13 +29,6 @@ function row(partial: Partial<RunInputRow> & Pick<RunInputRow, "key">): RunInput
     draft: partial.draft ?? "",
   };
 }
-
-async function flush(n = 3): Promise<void> {
-  for (let i = 0; i < n; i++) {
-    await new Promise<void>((r) => setImmediate(r));
-  }
-}
-
 interface RenderArgs {
   readonly rows: readonly RunInputRow[];
   readonly onSubmit?: (

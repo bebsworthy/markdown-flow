@@ -12,6 +12,7 @@ import type {
   ApprovalSubmitResult,
   PendingApproval,
 } from "../../src/approval/types.js";
+import { flush } from "../helpers/flush.js";
 
 const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 
@@ -24,12 +25,6 @@ function approval(): PendingApproval {
     options: ["approve", "reject"],
     waitingSeq: 1,
   };
-}
-
-async function flush(n = 3): Promise<void> {
-  for (let i = 0; i < n; i++) {
-    await new Promise<void>((r) => setImmediate(r));
-  }
 }
 
 function renderModal(args: {

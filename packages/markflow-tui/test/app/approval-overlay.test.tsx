@@ -13,6 +13,7 @@ import type { EngineState, LiveRunSnapshot } from "../../src/engine/types.js";
 import type { ApprovalSubmitResult } from "../../src/approval/types.js";
 import { toRunsTableRow } from "../../src/runs/derive.js";
 import type { RunsTableRow } from "../../src/runs/types.js";
+import { flush } from "../helpers/flush.js";
 
 const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 
@@ -63,13 +64,6 @@ function buildEngineState(
     activeRun,
   };
 }
-
-async function flush(n = 4): Promise<void> {
-  for (let i = 0; i < n; i++) {
-    await new Promise<void>((r) => setImmediate(r));
-  }
-}
-
 function rowsFor(runId: string): ReadonlyArray<RunsTableRow> {
   return [toRunsTableRow(info({ id: runId }), NOW)];
 }

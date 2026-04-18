@@ -11,6 +11,7 @@ import type {
   RegistryState,
 } from "../../src/registry/types.js";
 import type { ResolvedEntry } from "../../src/browser/types.js";
+import { flush } from "../helpers/flush.js";
 
 const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 
@@ -61,12 +62,6 @@ const noSaveConfig: RegistryConfig = {
 function staticResolver(resolved: ReadonlyArray<ResolvedEntry>) {
   return (): Promise<ReadonlyArray<ResolvedEntry>> =>
     Promise.resolve(resolved);
-}
-
-async function flush(): Promise<void> {
-  // Allow microtasks (resolver promise + effects) to settle.
-  await new Promise((r) => setImmediate(r));
-  await new Promise((r) => setImmediate(r));
 }
 
 describe("WorkflowBrowser", () => {

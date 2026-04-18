@@ -9,6 +9,8 @@ import { describe, it, expect, vi } from "vitest";
 import { render } from "ink-testing-library";
 import { ThemeProvider } from "../../src/theme/context.js";
 import { AddWorkflowModal } from "../../src/components/add-workflow-modal.js";
+import { flush } from "../helpers/flush.js";
+
 import type {
   Candidate,
   TruncatedSentinel,
@@ -18,13 +20,6 @@ import type {
 } from "../../src/add-modal/types.js";
 
 const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
-
-async function flush(n = 3): Promise<void> {
-  for (let i = 0; i < n; i++) {
-    await new Promise<void>((r) => setImmediate(r));
-  }
-}
-
 function cand(
   displayPath: string,
   kind: "file" | "workspace" = "file",

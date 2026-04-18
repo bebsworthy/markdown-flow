@@ -8,13 +8,9 @@ import { ThemeProvider } from "../../src/theme/context.js";
 import { RunsFilterBar } from "../../src/components/runs-filter-bar.js";
 import { parseFilterInput } from "../../src/runs/filter.js";
 import type { RunsFilterState } from "../../src/runs/types.js";
+import { flush } from "../helpers/flush.js";
 
 const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
-
-async function flush(): Promise<void> {
-  await new Promise((resolve) => setImmediate(resolve));
-  await new Promise((resolve) => setImmediate(resolve));
-}
 
 function emptyFilter(): RunsFilterState {
   return {

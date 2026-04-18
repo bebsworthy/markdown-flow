@@ -154,5 +154,5 @@ function ModeTabsImpl({
   );
 }
 
-export const ModeTabs = React.memo(ModeTabsImpl);
-ModeTabs.displayName = "ModeTabs";
+// React.memo removed: React 19.2 + useEffectEvent bug with SimpleMemoComponent fibers (stale useInput state).
+export const ModeTabs = ModeTabsImpl;

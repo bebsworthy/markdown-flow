@@ -370,5 +370,5 @@ function RunsTableImpl({
   );
 }
 
-export const RunsTable = React.memo(RunsTableImpl);
-RunsTable.displayName = "RunsTable";
+// React.memo removed: React 19.2 + useEffectEvent bug with SimpleMemoComponent fibers (stale useInput state).
+export const RunsTable = RunsTableImpl;

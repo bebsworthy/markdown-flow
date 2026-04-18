@@ -212,5 +212,5 @@ function wrapText(text: string, width: number): readonly string[] {
   return out;
 }
 
-export const ApprovalModal = React.memo(ApprovalModalImpl);
-ApprovalModal.displayName = "ApprovalModal";
+// React.memo removed: React 19.2 + useEffectEvent bug with SimpleMemoComponent fibers (stale useInput state).
+export const ApprovalModal = ApprovalModalImpl;

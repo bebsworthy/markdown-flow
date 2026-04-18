@@ -22,6 +22,7 @@ import type { RunInfo, StepResult } from "markflow";
 import { App } from "../../src/app.js";
 import { toRunsTableRow } from "../../src/runs/derive.js";
 import type { RunsTableRow } from "../../src/runs/types.js";
+import { flush } from "../helpers/flush.js";
 
 const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 
@@ -86,14 +87,6 @@ const ROWS: ReadonlyArray<RunsTableRow> = [
     steps: [step({ node: "smoke", exit_code: 0 })],
   }),
 ];
-
-async function flush(n = 4): Promise<void> {
-  for (let i = 0; i < n; i++) {
-    // One microtask + one setImmediate per tick; enough for reducer +
-    // derived-selection + reconciliation effects to settle.
-    await new Promise<void>((r) => setImmediate(r));
-  }
-}
 
 function renderApp(opts?: {
   initialRunRows?: ReadonlyArray<RunsTableRow>;

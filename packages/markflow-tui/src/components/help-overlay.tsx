@@ -189,5 +189,5 @@ function HelpOverlayImpl(props: HelpOverlayProps): React.ReactElement {
   );
 }
 
-export const HelpOverlay = React.memo(HelpOverlayImpl);
-HelpOverlay.displayName = "HelpOverlay";
+// React.memo removed: React 19.2 + useEffectEvent bug with SimpleMemoComponent fibers (stale useInput state).
+export const HelpOverlay = HelpOverlayImpl;

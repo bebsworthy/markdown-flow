@@ -271,5 +271,5 @@ function InputPromptModalImpl(
   );
 }
 
-export const InputPromptModal = React.memo(InputPromptModalImpl);
-InputPromptModal.displayName = "InputPromptModal";
+// React.memo removed: React 19.2 + useEffectEvent bug with SimpleMemoComponent fibers (stale useInput state).
+export const InputPromptModal = InputPromptModalImpl;

@@ -22,18 +22,12 @@ import { App } from "../../src/app.js";
 import type { ResolvedEntry } from "../../src/browser/types.js";
 import type { RunsTableRow } from "../../src/runs/types.js";
 import type { RunWorkflowResult } from "../../src/runStart/types.js";
+import { flush } from "../helpers/flush.js";
 
 const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 const ENTER = "\r";
 const ESC = "\x1b";
-
-async function flush(n = 6): Promise<void> {
-  for (let i = 0; i < n; i++) {
-    await new Promise<void>((r) => setImmediate(r));
-  }
-}
-
 async function type(
   stdin: { write: (chunk: string) => unknown },
   text: string,

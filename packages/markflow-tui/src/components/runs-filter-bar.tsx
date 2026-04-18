@@ -159,5 +159,5 @@ function RunsFilterBarImpl({
   );
 }
 
-export const RunsFilterBar = React.memo(RunsFilterBarImpl);
-RunsFilterBar.displayName = "RunsFilterBar";
+// React.memo removed: React 19.2 + useEffectEvent bug with SimpleMemoComponent fibers (stale useInput state).
+export const RunsFilterBar = RunsFilterBarImpl;

@@ -156,7 +156,7 @@ function AppShellImpl({
     );
 
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" height={rows}>
         <Text>{narrowTopEdge}</Text>
         <Box flexDirection="column">
           {fullSlotShell.map((line, idx) => (
@@ -164,7 +164,7 @@ function AppShellImpl({
           ))}
         </Box>
         {fullRows > 0 ? (
-          <Box marginTop={-fullRows} marginLeft={1} flexDirection="column">
+          <Box marginTop={-fullRows} marginLeft={1} flexDirection="column" height={fullRows} overflowY="hidden">
             {singleSlot}
           </Box>
         ) : null}
@@ -204,7 +204,7 @@ function AppShellImpl({
   );
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" height={rows}>
       {/* Top edge (plain chrome with title baked in) */}
       <Text>{topEdge}</Text>
 
@@ -221,7 +221,7 @@ function AppShellImpl({
         ))}
       </Box>
       {topRows > 0 ? (
-        <Box marginTop={-topRows} marginLeft={1} flexDirection="column">
+        <Box marginTop={-topRows} marginLeft={1} flexDirection="column" height={topRows} overflowY="hidden">
           {top}
         </Box>
       ) : null}
@@ -236,7 +236,7 @@ function AppShellImpl({
         ))}
       </Box>
       {bottomRows > 0 ? (
-        <Box marginTop={-bottomRows} marginLeft={1} flexDirection="column">
+        <Box marginTop={-bottomRows} marginLeft={1} flexDirection="column" height={bottomRows} overflowY="hidden">
           {bottom}
         </Box>
       ) : null}
@@ -250,5 +250,5 @@ function AppShellImpl({
   );
 }
 
-export const AppShell = React.memo(AppShellImpl);
-AppShell.displayName = "AppShell";
+// React.memo removed: React 19.2 + useEffectEvent bug with SimpleMemoComponent fibers (stale useInput state).
+export const AppShell = AppShellImpl;

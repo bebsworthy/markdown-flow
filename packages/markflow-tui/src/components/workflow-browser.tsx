@@ -241,5 +241,7 @@ function WorkflowBrowserImpl({
   );
 }
 
-export const WorkflowBrowser = React.memo(WorkflowBrowserImpl);
-WorkflowBrowser.displayName = "WorkflowBrowser";
+// React.memo removed: React 19.2 + useEffectEvent (used by Ink 7's useInput)
+// fails to update the effect-event ref for SimpleMemoComponent fibers, so
+// useInput closures see stale state.
+export const WorkflowBrowser = WorkflowBrowserImpl;

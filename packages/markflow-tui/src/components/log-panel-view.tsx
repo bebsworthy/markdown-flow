@@ -282,5 +282,5 @@ function keyToAction(
   return null;
 }
 
-export const LogPanelView = React.memo(LogPanelViewImpl);
-LogPanelView.displayName = "LogPanelView";
+// React.memo removed: React 19.2 + useEffectEvent bug with SimpleMemoComponent fibers (stale useInput state).
+export const LogPanelView = LogPanelViewImpl;

@@ -6,6 +6,7 @@ import { render } from "ink-testing-library";
 import { Text } from "ink";
 import { useSidecarStream } from "../../src/hooks/useSidecarStream.js";
 import type { StreamFactory } from "../../src/hooks/useSidecarStream.js";
+import { flush } from "../helpers/flush.js";
 
 function makeStream(chunks: string[]): ReadableStream<Uint8Array> {
   const enc = new TextEncoder();
@@ -42,13 +43,6 @@ function Harness({
   });
   return <Text>{r.state}</Text>;
 }
-
-async function flush(n = 5): Promise<void> {
-  for (let i = 0; i < n; i++) {
-    await new Promise<void>((r) => setImmediate(r));
-  }
-}
-
 describe("useSidecarStream", () => {
   it("calls onLine for each newline-terminated chunk", async () => {
     const factory: StreamFactory = async () => makeStream(["a\nb\n", "c\n"]);

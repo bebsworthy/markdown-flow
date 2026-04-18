@@ -21,6 +21,7 @@ import type {
 } from "../../src/engine/types.js";
 import type { StreamFactory } from "../../src/hooks/useSidecarStream.js";
 import type { LogStream } from "../../src/log/types.js";
+import { flush } from "../helpers/flush.js";
 
 const THEME = buildTheme({ color: true, unicode: true });
 
@@ -97,13 +98,6 @@ function trackingFactory(): TrackingFactory {
   };
   return { factory, calls, cancelCount: () => cancelled };
 }
-
-async function flush(n = 5): Promise<void> {
-  for (let i = 0; i < n; i++) {
-    await new Promise<void>((r) => setImmediate(r));
-  }
-}
-
 function renderView(props: {
   readonly runId: string;
   readonly events: ReadonlyArray<EngineEvent>;
