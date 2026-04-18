@@ -24,6 +24,7 @@ const FORBIDDEN = [
 ];
 
 const files = [
+  "../../src/primitives/compute-window.ts",
   "../../src/state/reducer.ts",
   "../../src/state/types.ts",
   // Engine adapter + reducer — same no-React rule, but node:path is allowed

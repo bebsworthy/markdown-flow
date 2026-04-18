@@ -8,9 +8,7 @@ How to build TUI components in this codebase. Read this before writing new views
 ThemeProvider (context.tsx)
   └─ AppShell (frame chrome, mode tabs)
        ├─ SplitPane / Panel (layout)
-       │    ├─ DataTable<T> (tabular data with cursor + windowing)
-       │    ├─ ScrollView<T> (list with virtual scroll)
-       │    └─ Cell (fixed-width text cell)
+       │    └─ DataTable<T> (tabular data with cursor + windowing)
        ├─ Modal (overlay dialog)
        └─ TextInput (single-line input field)
 ```
@@ -139,46 +137,6 @@ import { TextInput } from "../primitives/TextInput.js";
 - Handles Backspace, Ctrl+U (clear), Return (submit), Escape (cancel) internally.
 - `isActive={false}` disables all input handling (pass this when the input shouldn't capture keys).
 - Shows a blinking cursor character (default `█`) at the end of the value.
-
-### ScrollView\<T\>
-
-Virtual-scrolling list for non-tabular data.
-
-```tsx
-import { ScrollView } from "../primitives/ScrollView.js";
-
-<ScrollView
-  items={entries}
-  renderItem={(item, i) => <Text key={item.id}>{item.label}</Text>}
-  keyExtractor={(item) => item.id}
-  cursorIndex={cursor}
-  height={20}
-  scrollIndicator
-/>
-```
-
-**Key details:**
-
-- Reserves `headerRows` and `footerRows` from available height.
-- When `scrollIndicator={true}`, shows `↑`, `↓`, or `↑↓` at the bottom when content overflows.
-
-### Cell
-
-Fixed-width text cell with alignment and truncation.
-
-```tsx
-import { Cell } from "../primitives/Cell.js";
-
-<Cell width={12} align="right" bold color="green">
-  {formattedValue}
-</Cell>
-```
-
-**Key details:**
-
-- Always `flexShrink={0}, flexGrow={0}` — it holds its width.
-- Truncation default is `"end"` (also supports `"start"` and `"middle"`).
-- Accepts all Ink `<Text>` styling props (color, bold, dim, inverse, etc.).
 
 ---
 

@@ -23,7 +23,7 @@ React + Ink app. Pure logic lives outside components and is unit-tested in isola
 
 | Directory | What |
 |---|---|
-| `src/primitives/` | Yoga-first building blocks: DataTable, SplitPane, Panel, Modal, TextInput, ScrollView, Cell |
+| `src/primitives/` | Yoga-first building blocks: DataTable, SplitPane, Panel, Modal, TextInput |
 | `src/theme/` | Color tokens, glyphs, frame chars, capabilities detection. `context.tsx` provides `useTheme()` |
 | `src/components/` | Ink components — app shell, tables, modals, keybar |
 | `src/state/` | Top-level app reducer + types |
