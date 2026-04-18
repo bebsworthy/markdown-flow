@@ -128,8 +128,9 @@ describe.skipIf(process.platform === "win32")(
       await session.waitForRegex(/\[ RUNS \]/, DEFAULT_READY_MS);
       await session.waitForText("2 shown", DEFAULT_READY_MS);
 
-      // Move to second row (run-err)
+      // Move to second row (run-err); wait for detail pane to reflect selection
       session.write("j");
+      await session.waitForText("selected: run-err", DEFAULT_READY_MS);
       // Press Enter
       session.write("\r");
       await session.waitForRegex(/\[ RUN \]/, DEFAULT_READY_MS);
