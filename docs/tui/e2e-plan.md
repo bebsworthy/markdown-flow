@@ -226,7 +226,7 @@ each status.
 | T0903 | Mode pill `[APPROVAL]` / `[RESUME]` / `[COMMAND]` / `[HELP]` renders in reverse video only during the matching overlay. | features.md §5.6 rule 8 | [ ] |
 | T0904 | Toggle labels flip between states (`Follow ↔ Unfollow`, `Wrap ↔ NoWrap`) when the feature flips. | features.md §5.6 rule 6 | [ ] |
 | T0905 | Destructive actions (`X Cancel`, `D Deny`) render in the theme's destructive color. | features.md §5.6 rule 4 | [ ] |
-| T0906 | A terminal resize event (SIGWINCH) re-computes tiers live; the keybar switches from "full" to "short" mid-session without a restart. | features.md §6.2 | [ ] |
+| T0906 | A terminal resize event (SIGWINCH) re-computes tiers live; the keybar switches from "full" to "short" mid-session without a restart. | features.md §6.2 | [x] |
 | T0907 | Hide-don't-grey: bindings whose `when(ctx)` is false never appear, regardless of tier. | features.md §5.6 rule 5 | [x] |
 | T0908 | Shared-modifier extraction: `Ctrl + <n|p|t>` renders as a single group, not three `Ctrl +` repeats. | features.md §5.6 | [ ] |
 
@@ -400,7 +400,7 @@ Update this table after each test lands.
 | 7 Approval | 10 | 0 |
 | 8 Resume wizard | 11 | 0 |
 | 9 Palette & help | 13 | 5 |
-| 10 Keybar tiers | 9 | 1 |
+| 10 Keybar tiers | 9 | 2 |
 | 11 Run entry (P9-T1) | 16 | 6 |
 | 12 Cancel (P9-T2) | 6 | 0 |
 | 13 Pending (P9-T3) | 5 | 0 |
@@ -412,7 +412,7 @@ Update this table after each test lands.
 | 19 Engine integration | 6 | 0 |
 | 20 Registry | 4 | 0 |
 | 21 Exit discipline | 3 | 0 |
-| **Total** | **180** | **44** |
+| **Total** | **180** | **45** |
 
 ---
 
