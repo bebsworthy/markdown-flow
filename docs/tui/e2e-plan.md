@@ -115,7 +115,7 @@ scripts — deterministic and fast.
 | T0301 | Default sort is "attention" — active (`▶`/`⏸`) first by `started` desc, then terminal (`✗`/`✓`) by `ended` desc. | features.md §3.2; mockups.md §1 | [x] |
 | T0302 | `s` cycles sort columns (`started`, `ended`, `duration`, `workflow`, `status`); the header indicator moves and rows reorder. | features.md §3.2 | [x] |
 | T0303 | Archive default hides terminal runs older than 24 h (ok) / 7 d (failed); footer reads `N shown · M archived`. | features.md §3.2 | [x] |
-| T0304 | `a` toggles archive visibility; table size grows/shrinks accordingly. | features.md §3.2 | [ ] |
+| T0304 | `a` toggles archive visibility; table size grows/shrinks accordingly. | features.md §3.2 | [x] |
 | T0305 | `/` opens the filter input; typing `status:running` narrows the table to running rows. | features.md §3.2 | [ ] |
 | T0306 | Filter supports `workflow:<name>`, `since:<duration>`, free-text id prefix. | features.md §3.2 | [ ] |
 | T0307 | `n` / `N` jumps to next / previous filter match (P9-T6 scope). | features.md §3.2 | [ ] |
@@ -394,7 +394,7 @@ Update this table after each test lands.
 | 1 Launch & lifecycle | 13 | 13 |
 | 2 Workflow browser | 11 | 11 |
 | 3 Add modal | 11 | 11 |
-| 4 Runs table | 15 | 4 |
+| 4 Runs table | 15 | 5 |
 | 5 Step table | 10 | 0 |
 | 6 Tabbed pane | 17 | 0 |
 | 7 Approval | 10 | 0 |
@@ -412,7 +412,7 @@ Update this table after each test lands.
 | 19 Engine integration | 6 | 0 |
 | 20 Registry | 4 | 0 |
 | 21 Exit discipline | 3 | 0 |
-| **Total** | **180** | **37** |
+| **Total** | **180** | **38** |
 
 ---
 
