@@ -1,6 +1,8 @@
 import { render } from "ink";
+import { createRunManager } from "markflow";
 import { App } from "./app.js";
 import { parseRegistryFlags } from "./cli-args.js";
+import { toRunsTableRow } from "./runs/derive.js";
 
 if (!process.stdout.isTTY) {
   console.error(
@@ -18,6 +20,17 @@ try {
   process.exit(1);
 }
 
+const initialRunRows = await (async () => {
+  if (!parsed.runsDir) return undefined;
+  try {
+    const infos = await createRunManager(parsed.runsDir).listRuns();
+    const now = Date.now();
+    return infos.map((info) => toRunsTableRow(info, now));
+  } catch {
+    return undefined;
+  }
+})();
+
 let quitViaQ = false;
 
 const { unmount, waitUntilExit } = render(
@@ -29,6 +42,7 @@ const { unmount, waitUntilExit } = render(
     registryConfig={parsed.config}
     initialLaunchArgs={parsed.rest}
     runsDir={parsed.runsDir}
+    initialRunRows={initialRunRows}
   />,
 );
 

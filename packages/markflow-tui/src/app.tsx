@@ -698,10 +698,6 @@ export function App({
 
   const persist = registryConfig?.persist ?? true;
 
-  // Runs-table feed — wired to an empty array for this task. The live
-  // adapter subscription lands in P6-T0 (plan §11.4). Tests may seed
-  // the feed via the `initialRunRows` prop.
-  // TODO(P6-T0): thread `runs.watch()` output through here.
   const runRows = useMemo<ReadonlyArray<RunsTableRow>>(
     () => initialRunRows ?? [],
     [initialRunRows],

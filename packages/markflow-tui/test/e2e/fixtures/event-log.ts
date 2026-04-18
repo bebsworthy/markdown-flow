@@ -78,13 +78,17 @@ export async function writeEventLog(
 
   // meta.json — the TUI's fast-path cache. `RunManager.getRun` projects
   // from events, but `listRuns` uses meta.json. Emit a minimal one.
-  const meta = {
+  const status = terminalStatusFrom(spec.events);
+  const meta: Record<string, unknown> = {
     id: spec.runId,
     workflowName: spec.workflowName,
     sourceFile: spec.sourceFile,
     startedAt: new Date(baseMs).toISOString(),
-    status: terminalStatusFrom(spec.events),
+    status,
   };
+  if (status !== "running") {
+    meta.completedAt = new Date(baseMs + all.length * 1000).toISOString();
+  }
   await writeFile(
     path.join(runDir, "meta.json"),
     JSON.stringify(meta, null, 2),
