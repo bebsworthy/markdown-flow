@@ -529,9 +529,8 @@ export function App({
   //   3. mode = viewing.*   → dispatch MODE_CLOSE_RUN.
   //   4. otherwise          → no-op.
   //
-  // `q` retains its legacy scaffold behaviour (app-quit) in every non-overlay
-  // context. Rebinding `q` to "Back" inside RUN mode is a Phase-6 follow-up
-  // (see plan §6.2).
+  // `q` in viewing.* dispatches MODE_CLOSE_RUN (back to runs list).
+  // In browsing.* it quits the app.
 
   // ---- Auto-open approval overlay (P7-T1) ------------------------------
   // When viewing the active run and a gate opens, pop the modal. Does not
@@ -690,6 +689,10 @@ export function App({
       return;
     }
     if (input === "q") {
+      if (state.mode.kind === "viewing") {
+        dispatch({ type: "MODE_CLOSE_RUN" });
+        return;
+      }
       onQuit();
     }
   });
@@ -1051,7 +1054,7 @@ export function App({
 
   return (
     <ThemeProvider>
-      <Box width={frameWidth}>
+      <Box width={frameWidth} flexDirection="column" height={stdout?.rows} overflow="hidden">
       {narrowLevel !== null ? (
         <AppShell
           width={stdout?.columns}

@@ -327,7 +327,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 **Acceptance criteria.** Matches mockups.md §4 (running) and §6 (terminal) layouts under identical widths.
 
-### [ ] P6-T2 — Detail tab content
+### [x] P6-T2 — Detail tab content
 
 **Reference.** features.md §3.4; mockups.md §1, §4, §6 bottom pane.
 
@@ -337,7 +337,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 **Acceptance criteria.** Rendering matches the detail panes in mockups §1/§4/§6.
 
-### [ ] P6-T3 — Log tab (streaming, follow, pause, ANSI)
+### [x] P6-T3 — Log tab (streaming, follow, pause, ANSI)
 
 **Reference.** features.md §3.5; mockups.md §8, §9.
 
@@ -349,7 +349,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 **Acceptance criteria.** Following a live stream updates within 100ms of an event append; paused mode freezes output.
 
-### [ ] P6-T4 — Graph tab + Events tab
+### [x] P6-T4 — Graph tab + Events tab
 
 **Reference.** mockups.md §1 tab group; features.md §3.3 (indented DAG).
 
@@ -363,7 +363,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 ## Phase 7 — Overlays
 
-### [ ] P7-T1 — Approval modal
+### [x] P7-T1 — Approval modal
 
 **Reference.** features.md §3.6, §3.7; mockups.md §5.
 
@@ -375,7 +375,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 **Acceptance criteria.** Matches mockups.md §5 exactly. No `e Edit inputs` button (removed earlier).
 
-### [ ] P7-T2 — Resume wizard
+### [x] P7-T2 — Resume wizard
 
 **Reference.** features.md §3.8; mockups.md §7.
 
@@ -387,7 +387,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 **Acceptance criteria.** Matches mockups.md §7 layout.
 
-### [ ] P7-T3 — Command palette + help overlay
+### [x] P7-T3 — Command palette + help overlay
 
 **Reference.** features.md §3.10; mockups.md §10 (palette) and §11 (help).
 
@@ -401,7 +401,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 ## Phase 8 — Responsive tiers + monochrome
 
-### [ ] P8-T1 — Medium tier (~90 cols)
+### [x] P8-T1 — Medium tier (~90 cols)
 
 **Reference.** features.md §5.3; mockups.md §12.
 
@@ -412,7 +412,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 **Acceptance criteria.** At width=90, render matches mockups.md §12 ± 1 column.
 
-### [ ] P8-T2 — Narrow tier (<60 cols) + monochrome / ASCII fallback
+### [x] P8-T2 — Narrow tier (<60 cols) + monochrome / ASCII fallback
 
 **Reference.** features.md §5.4; mockups.md §13 (narrow), §14 (monochrome).
 
@@ -425,9 +425,144 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 ---
 
-## Phase 9 — E2E and visual regression
+## Phase 9 — Run lifecycle and missing MVP surfaces
 
-### [ ] P9-T1 — node-pty integration harness + canonical user journeys
+These tasks close the gap between `features.md` and the shipped TUI. Without them, the app cannot start a fresh run, cancel a live run, or surface cross-run approval state — and Phase 15's E2E journeys can only verify registry side-effects.
+
+### [x] P9-T1 — Run entry point (r key, :run palette, input prompt)
+
+**Reference.** features.md §3.1 ("Press `r` → start a run"), §3.10 (`:run <workflow>`), §5.7 walkthrough (input form when required inputs missing), §6.3 mode FSM (no new overlay needed — inputs reuse a short-lived modal).
+
+**Scope.**
+- Wire `r` in both the workflow-browser list (`packages/markflow-tui/src/components/workflow-browser.tsx:156` — currently a stub with `TODO P5`) and the runs table. From browser: starts a fresh run. From runs table: only when selection has no active run (hide-don't-grey).
+- Wire `:run [workflow]` in the palette — replace the `{ kind: "unavailable", message: "run command not yet wired" }` stub in `packages/markflow-tui/src/app.tsx:1007-1009`.
+- New bridge `packages/markflow-tui/src/engine/run.ts`, same envelope as `engine/decide.ts` + `engine/resume.ts`: uses only `parseWorkflow`, `createRunManager`, `executeWorkflow` from the public API. Returns a typed result union (`ok | locked | invalidInputs | error`).
+- If the workflow declares required inputs, open an input-prompt modal (new `src/components/input-prompt-modal.tsx`). Optional inputs get placeholder values; required ones block submit. Reuse `InputRow` primitives from P7-T2 resume-wizard where sensible.
+- On successful run start, transition to `mode.kind === "viewing"` with the new runId — the existing event pipeline (P3-T2 adapter + P1-T3 tail) takes over from there.
+
+**Out of scope.** Cancel (P9-T2). Batch/fan-out rendering (already covered by P6). Retry-budget visuals (P9-T4).
+
+**Acceptance criteria.**
+- From a fresh `markflow-tui`, a user can register a workflow and start a run without leaving the TUI.
+- `:run <workflow>` matches the browser-`r` behavior.
+- Workflow with required inputs shows the modal; submit is blocked until required fields are non-empty; `Esc` cancels cleanly with no orphan run directory.
+- `RunLockedError` surfaces in-modal, modal stays open (mirrors P7-T1).
+- No engine package changes.
+
+**Validation.** `npm run lint -w packages/markflow-tui` and `npm test -w packages/markflow-tui -- --run` green.
+
+---
+
+### [ ] P9-T2 — Cancel live run (X key + confirmCancel overlay)
+
+**Reference.** features.md §3.8 ("Cancel an active run: `X` with strong-confirmation modal"), §5.5 run-list mode, §6.3 mode FSM (the `confirmCancel` overlay variant is already declared in `packages/markflow-tui/src/state/types.ts:69` but never constructed).
+
+**Scope.**
+- Wire `X` in runs table (when row has an active run) and in viewing mode's keybar. Hide-don't-grey.
+- Implement the `confirmCancel` overlay as a dedicated modal component — explicit `idle → confirming → committing → done` FSM (same pattern as P7-T1 approval).
+- New bridge `packages/markflow-tui/src/engine/cancel.ts`. Holds an `AbortController` per live run the TUI is driving; aborts on user confirmation.
+- For runs **not** driven by this TUI process, the cancel path is documented as unsupported (features.md §7 open question) — the modal surfaces a "this run was started by another process" error and closes. No cross-process signaling.
+- Keybar mode pill `[CANCEL]` while the modal is open (reverse video, features.md §5.6 rule 8).
+
+**Out of scope.** Pending-approvals surfaces (P9-T3). Cross-process cancel — deliberately deferred.
+
+**Acceptance criteria.**
+- Pressing `X` on an active, TUI-driven run opens the modal; confirm → the run terminates with `workflow:error` (reason: cancelled); cancel-the-cancel returns to the prior pane.
+- `X` on a non-TUI-driven live run shows the "other process" error and closes cleanly.
+- Double-submit guarded by the FSM (mirrors P7-T1).
+- No engine package changes.
+
+**Validation.** Same as P9-T1.
+
+---
+
+### [ ] P9-T3 — Pending-approvals surface (status badge + :pending screen)
+
+**Reference.** features.md §3.7 ("Persistent indicator in the status bar: `⏸ 3 waiting`" and "Global view (`:pending` or `P`): table across all runs").
+
+**Scope.**
+- **Status-bar badge.** Compute `pendingApprovalsCount` across all runs (not just `activeRun`) by consuming `RunManager.watch()` (P1-T4). Surface it at the app-level keybar / status strip so it's visible in browsing mode. Hide when zero.
+- **`:pending` / `P` screen.** New `src/pending/` pure projection + component. Columns mirror the existing `markflow pending` CLI command: runId, workflow, step, prompt, waitingSince. `Enter` opens the run in viewing mode with the approval modal already open.
+- Wire `P` as a global keybinding (features.md §5.5 global, added row).
+- `:pending` palette entry already dispatches `MODE_SHOW_RUNS` (`palette/exec.ts:88-90`) — repoint it at the new screen.
+
+**Out of scope.** Authoring new events; this is a read-only projection.
+
+**Acceptance criteria.**
+- Badge updates within one debounce window (50 ms) of a `meta.json` flip to `suspended`, without polling.
+- `:pending` and `P` both open the same screen.
+- `Enter` on a row transitions into `viewing` mode with the approval modal auto-opened (reuses P7-T1 auto-open logic).
+
+**Validation.** Same as P9-T1.
+
+---
+
+### [ ] P9-T4 — Edge-level retry-budget bar in graph tab
+
+**Reference.** features.md §3.9 ("Edge-level retry budget rendered as a small bar near the edge label").
+
+**Scope.**
+- Project `EngineSnapshot.retryBudgets` (keyed by `"nodeId:label"`) into per-edge render data in the graph-tab tree.
+- Render a compact bar (e.g. `[██░ 2/3]`) next to the edge label for any edge whose budget has `count > 0 || max > 0`. Hide otherwise (hide-don't-grey).
+- Red highlight + "exhaustion handler" link for edges where `retry:exhausted` has fired. Link targets the handler node.
+- Pure projection in `src/steps/edge-retry.ts` (or similar) — rendered by `graph-panel` / step-table.
+
+**Out of scope.** Step-level retry countdown — already shipped in P6-T1.
+
+**Acceptance criteria.**
+- For a workflow with `fail max:3`, the bar renders 0/3 → 1/3 → 2/3 → 3/3 across attempts.
+- On `retry:exhausted`, the edge turns red and a keyboard affordance jumps cursor to the exhaustion handler.
+- Narrow tier (<60 cols): bar collapses to `[N/M]` without the pips.
+
+**Validation.** Same as P9-T1.
+
+---
+
+### [ ] P9-T5 — `<Static>` rendering for completed step rows
+
+**Reference.** features.md §6.2 ("Completed row becomes immutable (pushed into `<Static>`)"), Ink 3 release notes.
+
+**Scope.**
+- Refactor step-table rendering so rows whose token is terminal (`complete` / `skipped` / `failed` with no pending retry) are pushed into an Ink `<Static>` block instead of the reactive tree.
+- Active / pending / retrying rows stay reactive.
+- Preserve current visual layout 1:1 — this is a perf refactor, not a redesign.
+- Add a perf test: 500-step terminal run should render in O(active-rows) time per event, not O(total-rows).
+
+**Out of scope.** Graph-tab rendering — can use `<Static>` separately in a follow-up.
+
+**Acceptance criteria.**
+- Visual output at 120 / 90 / 52 cols is unchanged against existing mockups / component snapshots.
+- Perf test in `test/steps/static-perf.test.tsx` or similar asserts render-per-event time scales with active-row count.
+
+**Validation.** Same as P9-T1.
+
+---
+
+### [ ] P9-T6 — Navigation ergonomics (Tab cycling, n/N match jump)
+
+**Reference.** features.md §5.5 global (`tab` / `shift-tab` cycle focus), §5.5 lists (`n` / `N` next/prev match).
+
+**Scope.**
+- App-level `Tab` / `Shift-Tab` pane cycling. Precedent: the resume wizard already handles this locally (`resume-wizard-modal.tsx:79-81`). Generalize so viewing panes (`graph`, `detail`, `log`, `events`) and browsing panes (workflows, runs) cycle via Tab, in addition to the existing `1/2/3/4` direct-jump bindings.
+- `n` / `N` cycle through filter matches in runs table and log pane (jump selection to next/previous match); today the filter bar only routes printable chars + `Backspace` / `Ctrl-U` / `Enter` / `Esc`.
+- Updates to keybar fixtures + help overlay to list the new bindings (help overlay is derived from fixtures per P7-T3, so this is automatic once the bindings exist).
+
+**Out of scope.** Any new fuzzy-match semantics — reuse existing filter logic.
+
+**Acceptance criteria.**
+- Tab/Shift-Tab cycle produces the same focus ordering as the existing `1/2/3/4` in viewing mode.
+- `n` / `N` wrap at ends; no-match case is a no-op with a dim status hint ("no matches").
+- Help overlay (`?`) lists the new bindings in their correct categories.
+
+**Validation.** Same as P9-T1.
+
+---
+
+## Phase 15 — E2E and visual regression
+
+Depends on Phase 9 — journeys and tapes only become meaningful once the run-entry, cancel, and pending-approvals surfaces land.
+
+### [ ] P15-T1 — node-pty integration harness + canonical user journeys
 
 **Reference.** testing.md §Recommended stack layer 3 (node-pty integration) and §Anti-patterns.
 
@@ -441,7 +576,7 @@ The TUI cannot start consuming `markflow` until these are exported. Land them in
 
 **Acceptance criteria.** All three journeys pass on macOS and Linux. No hard-coded sleeps; use readiness predicates.
 
-### [ ] P9-T2 — VHS visual regression suite
+### [ ] P15-T2 — VHS visual regression suite
 
 **Reference.** testing.md §Recommended stack layer 5 (VHS); features.md §6.6.
 

@@ -123,10 +123,10 @@ export const GRAPH_KEYBAR: ReadonlyArray<Binding> = [
   },
   {
     keys: ["q"],
-    label: "Quit",
+    label: "Back",
     when: () => true,
     action: () => {
-      /* owned by app.tsx global quit. */
+      /* owned by app.tsx: MODE_CLOSE_RUN in viewing mode. */
     },
   },
 ];

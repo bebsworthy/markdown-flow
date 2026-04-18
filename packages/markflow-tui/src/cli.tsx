@@ -33,6 +33,14 @@ const initialRunRows = await (async () => {
 
 let quitViaQ = false;
 
+// Enter alternate screen buffer so the TUI owns the full terminal
+// and doesn't pollute scrollback. Restored on exit.
+// Skipped under MARKFLOW_TEST — xterm headless can't read the alt buffer.
+const ALT_SCREEN_ON = "\x1b[?1049h";
+const ALT_SCREEN_OFF = "\x1b[?1049l";
+const useAltScreen = !process.env.MARKFLOW_TEST;
+if (useAltScreen) process.stdout.write(ALT_SCREEN_ON);
+
 const { unmount, waitUntilExit } = render(
   <App
     onQuit={() => {
@@ -47,8 +55,12 @@ const { unmount, waitUntilExit } = render(
 );
 
 waitUntilExit().then(
-  () => process.exit(quitViaQ ? 0 : 130),
+  () => {
+    if (useAltScreen) process.stdout.write(ALT_SCREEN_OFF);
+    process.exit(quitViaQ ? 0 : 130);
+  },
   (err) => {
+    if (useAltScreen) process.stdout.write(ALT_SCREEN_OFF);
     console.error(err);
     process.exit(1);
   },

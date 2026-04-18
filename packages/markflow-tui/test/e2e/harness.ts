@@ -130,7 +130,7 @@ export async function spawnTui(opts: SpawnOpts = {}): Promise<TuiSession> {
     cols,
     rows,
     allowProposedApi: true,
-    scrollback: 1_000,
+    scrollback: 0,
   });
 
   const child = pty.spawn("node", args, {
@@ -158,8 +158,7 @@ export async function spawnTui(opts: SpawnOpts = {}): Promise<TuiSession> {
   const readScreen = (): string => {
     const buf = term.buffer.active;
     const lines: string[] = [];
-    const len = buf.length;
-    for (let y = 0; y < len; y += 1) {
+    for (let y = 0; y < rows; y += 1) {
       const line = buf.getLine(y);
       lines.push(line ? line.translateToString(true) : "");
     }
