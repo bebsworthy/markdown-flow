@@ -119,7 +119,7 @@ scripts — deterministic and fast.
 | T0305 | `/` opens the filter input; typing `status:running` narrows the table to running rows. | features.md §3.2 | [x] |
 | T0306 | Filter supports `workflow:<name>`, `since:<duration>`, free-text id prefix. | features.md §3.2 | [x] |
 | T0307 | `n` / `N` jumps to next / previous filter match (P9-T6 scope). | features.md §3.2 | [ ] |
-| T0308 | `g`/`G` jump to top/bottom respect the current filter view. | features.md §5.5 | [ ] |
+| T0308 | `g`/`G` jump to top/bottom respect the current filter view. | features.md §5.5 | [x] |
 | T0309 | Cursor follow-selection: moving the cursor updates the bottom tabbed pane live (wide tier). | mockups.md §1 | [ ] |
 | T0310 | Status badge glyphs match the table in §1 (`▶`, `⏸`, `✗`, `✓`, `○`) with paired color. | features.md §5.10 | [ ] |
 | T0311 | `r Resume (N)` keybar count reflects the number of suspended rows; vanishes when N=0 (hide-don't-grey). | mockups.md §1, §3 | [ ] |
@@ -394,7 +394,7 @@ Update this table after each test lands.
 | 1 Launch & lifecycle | 13 | 13 |
 | 2 Workflow browser | 11 | 11 |
 | 3 Add modal | 11 | 11 |
-| 4 Runs table | 15 | 7 |
+| 4 Runs table | 15 | 8 |
 | 5 Step table | 10 | 0 |
 | 6 Tabbed pane | 17 | 0 |
 | 7 Approval | 10 | 0 |
