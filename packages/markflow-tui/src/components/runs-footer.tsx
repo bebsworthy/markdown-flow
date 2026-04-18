@@ -21,6 +21,7 @@ export interface RunsFooterProps {
   readonly shown: number;
   readonly archived: number;
   readonly archiveShown: boolean;
+  readonly sortKey: string;
   readonly width: number;
 }
 
@@ -43,11 +44,13 @@ function RunsFooterImpl({
   shown,
   archived,
   archiveShown,
+  sortKey,
   width,
 }: RunsFooterProps): React.ReactElement {
   const theme = useTheme();
   const narrow = width <= NARROW_TIER_MAX;
   const label = archiveShown ? "a Hide archived" : "a Show all";
+  const sortLabel = `sort: ${sortKey} \u2193`;
 
   if (narrow) {
     return (
@@ -56,7 +59,7 @@ function RunsFooterImpl({
           color={theme.colors.dim.color}
           dimColor={theme.colors.dim.dim === true}
         >
-          {`${formatCount(shown)} · ${formatCount(archived)} · ${label}`}
+          {`${sortLabel} · ${formatCount(shown)} · ${formatCount(archived)} · ${label}`}
         </Text>
       </Box>
     );
@@ -68,7 +71,7 @@ function RunsFooterImpl({
         color={theme.colors.dim.color}
         dimColor={theme.colors.dim.dim === true}
       >
-        {`${formatCount(shown)} shown · ${formatCount(archived)} archived · ${label}`}
+        {`${sortLabel} · ${formatCount(shown)} shown · ${formatCount(archived)} archived · ${label}`}
       </Text>
     </Box>
   );

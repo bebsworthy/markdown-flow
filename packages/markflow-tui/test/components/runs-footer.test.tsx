@@ -13,6 +13,7 @@ function renderFooter(props: {
   shown: number;
   archived: number;
   archiveShown?: boolean;
+  sortKey?: string;
   width?: number;
 }) {
   const rendered = render(
@@ -21,6 +22,7 @@ function renderFooter(props: {
         shown={props.shown}
         archived={props.archived}
         archiveShown={props.archiveShown ?? false}
+        sortKey={props.sortKey ?? "attention"}
         width={props.width ?? 140}
       />
     </ThemeProvider>,

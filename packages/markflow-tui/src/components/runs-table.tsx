@@ -363,6 +363,7 @@ function RunsTableImpl({
         shown={archiveShown.length}
         archived={archivedRows.length}
         archiveShown={runsArchive.shown}
+        sortKey={sort.key}
         width={width}
       />
     </Box>
