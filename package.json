@@ -15,6 +15,7 @@
     "test": "npm run test --workspaces --if-present",
     "test:watch": "npm run test:watch --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "dev": "npm run dev -w packages/markflow"
+    "dev": "npm run dev -w packages/markflow",
+    "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper 2>/dev/null || true"
   }
 }

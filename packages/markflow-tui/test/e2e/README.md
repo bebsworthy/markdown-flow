@@ -66,6 +66,19 @@ Both can be combined. Neither is wired to CI — they're local-only.
 - Every `HarnessTimeoutError` carries the final canonicalised frame for
   post-mortem.
 
+## node-pty spawn-helper permission fix
+
+npm doesn't always preserve the executable bit on `node-pty`'s prebuilt
+`spawn-helper` binary, causing `posix_spawnp failed` on macOS. The root
+`package.json` has a `postinstall` script that runs
+`chmod +x node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper`.
+
+If you hit `posix_spawnp failed` after a fresh install, run:
+
+```bash
+chmod +x node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper
+```
+
 ## Platform support
 
 - macOS + Linux only. Windows journeys early-return via
