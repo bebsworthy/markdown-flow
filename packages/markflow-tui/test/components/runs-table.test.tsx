@@ -122,7 +122,7 @@ function renderTable(props: {
         width={props.width ?? 140}
         height={props.height ?? 12}
         nowMs={props.nowMs ?? NOW}
-        dispatch={dispatch}
+        dispatch={dispatch as unknown as (action: any) => void}
         inputDisabled={props.inputDisabled}
         applyFilterImpl={props.applyFilterImpl}
       />

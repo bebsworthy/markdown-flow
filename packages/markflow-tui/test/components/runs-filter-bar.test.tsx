@@ -35,7 +35,7 @@ function renderBar(props: {
     <ThemeProvider>
       <RunsFilterBar
         filter={props.filter ?? emptyFilter()}
-        dispatch={dispatch}
+        dispatch={dispatch as unknown as (action: any) => void}
         width={props.width ?? 140}
         inputDisabled={props.inputDisabled}
       />
