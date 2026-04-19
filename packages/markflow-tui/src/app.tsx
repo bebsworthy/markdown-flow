@@ -92,6 +92,7 @@ import { composeViewingTabRow, type ViewingTabKey } from "./components/viewing-p
 import { reducer, initialAppState } from "./state/reducer.js";
 import { initialEngineState } from "./engine/reducer.js";
 import type { EngineState } from "./engine/types.js";
+import { useEngineAdapter } from "./hooks/useEngineAdapter.js";
 import {
   addEntry,
   loadRegistry,
@@ -203,9 +204,18 @@ export function App({
   runWorkflow: runWorkflowProp,
   runRegistryLookup,
 }: AppProps): React.ReactElement {
-  const effectiveEngineState: EngineState = engineState ?? initialEngineState;
   const [state, dispatch] = useReducer(reducer, initialAppState);
   const { columns, rows } = useWindowSize();
+
+  const viewingRunsDir = state.mode.kind === "viewing" ? state.mode.runsDir : undefined;
+  const viewingRunId = state.mode.kind === "viewing" ? state.mode.runId : undefined;
+  const liveEngineState = useEngineAdapter({
+    runsDir: viewingRunsDir,
+    runId: viewingRunId,
+  });
+  const effectiveEngineState: EngineState = engineState ?? (
+    liveEngineState.activeRun ? liveEngineState : initialEngineState
+  );
 
   // ---- Pending approvals derivation (P7-T1) -----------------------------
   // Recompute on every render — the activeRun.events ring is capped and

@@ -16,7 +16,7 @@ import {
 import type { EngineState } from "../engine/types.js";
 
 export interface UseEngineAdapterOptions {
-  readonly runsDir: string;
+  readonly runsDir?: string;
   readonly runId?: string;
   readonly fromSeq?: number;
 }
@@ -40,9 +40,11 @@ export function useEngineAdapter(
   const [state, dispatch] = useReducer(engineReducer, initialEngineState);
 
   useEffect(() => {
+    if (!opts.runsDir) return;
+    const runsDir = opts.runsDir;
     const controller = new AbortController();
     const adapter = createEngineAdapter({
-      runsDir: opts.runsDir,
+      runsDir,
       runId: opts.runId,
       fromSeq: opts.fromSeq,
       signal: controller.signal,
