@@ -3,6 +3,7 @@ import { createRunManager } from "markflow";
 import { App } from "./app.js";
 import { parseRegistryFlags } from "./cli-args.js";
 import { toRunsTableRow } from "./runs/derive.js";
+import { listWorkspaceRunsDirs } from "./workspace.js";
 
 if (!process.stdout.isTTY) {
   console.error(
@@ -23,14 +24,26 @@ try {
 const runsDir = process.env.MARKFLOW_RUNS_DIR ?? null;
 
 const initialRunRows = await (async () => {
-  if (!runsDir) return undefined;
-  try {
-    const infos = await createRunManager(runsDir).listRuns();
-    const now = Date.now();
-    return infos.map((info) => toRunsTableRow(info, now));
-  } catch {
-    return undefined;
+  const now = Date.now();
+  const rows: Array<ReturnType<typeof toRunsTableRow> & { runsDir: string }> = [];
+
+  if (runsDir) {
+    try {
+      const infos = await createRunManager(runsDir).listRuns();
+      for (const info of infos) rows.push({ ...toRunsTableRow(info, now), runsDir });
+    } catch { /* ignore */ }
   }
+
+  const wsDirs = await listWorkspaceRunsDirs(process.cwd());
+  for (const wsRunsDir of wsDirs) {
+    if (wsRunsDir === runsDir) continue;
+    try {
+      const infos = await createRunManager(wsRunsDir).listRuns();
+      for (const info of infos) rows.push({ ...toRunsTableRow(info, now), runsDir: wsRunsDir });
+    } catch { /* ignore */ }
+  }
+
+  return rows.length > 0 ? rows : undefined;
 })();
 
 let quitViaQ = false;

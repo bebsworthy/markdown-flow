@@ -82,6 +82,72 @@ export function pickTier(width: number, categoryCount: number): Tier {
 }
 
 // ---------------------------------------------------------------------------
+// measureBarWidth — content-aware tier measurement
+// ---------------------------------------------------------------------------
+
+const BASE_SEP: Readonly<Record<Tier, number>> = { full: 2, short: 1, keys: 1 };
+
+/**
+ * Measures the rendered width (in columns) of a set of bindings at a
+ * given tier. Does NOT include mode pill or prefix — callers account for
+ * those separately.
+ */
+export function measureBindingsWidth(
+  bindings: ReadonlyArray<Binding>,
+  tier: Tier,
+): number {
+  const base = BASE_SEP[tier];
+  let w = 0;
+  for (let i = 0; i < bindings.length; i++) {
+    const prev = i > 0 ? bindings[i - 1]! : null;
+    const cur = bindings[i]!;
+    if (prev !== null) {
+      const prevCat = prev.category ?? null;
+      const curCat = cur.category ?? null;
+      const isCategoryTransition = tier !== "keys" && prevCat !== curCat;
+      const overrideSep = cur.sepBefore?.[tier];
+      if (isCategoryTransition) {
+        w += overrideSep !== undefined ? overrideSep : 3;
+        if (tier === "full" && curCat !== null) {
+          w += curCat.length + 2;
+        }
+      } else {
+        const extra = resolveGapAfter(prev, tier);
+        w += overrideSep !== undefined ? overrideSep : base + extra;
+        if (tier === "keys" && cur.narrowSeparator) {
+          w += cur.narrowSeparator.length;
+        }
+      }
+    }
+    w += renderableLabel(cur, tier).length;
+  }
+  return w;
+}
+
+/**
+ * Content-aware tier selection. Tries "full" first, then "short", then
+ * "keys", picking the widest tier whose rendered bindings fit within
+ * `width`. Falls back to `pickTier` heuristic bands only when called
+ * with 0 bindings (nothing to measure).
+ */
+export function pickBestTier(
+  width: number,
+  bindings: ReadonlyArray<Binding>,
+  ctx: AppContext,
+): Tier {
+  const filtered = filterBindings(bindings, ctx);
+  const sorted = sortByOrder(filtered);
+  if (sorted.length === 0) return pickTier(width, 0);
+  for (const candidate of ["full", "short"] as const) {
+    const visible = sorted.filter(
+      (b) => !b.hideOnTier?.includes(candidate),
+    );
+    if (measureBindingsWidth(visible, candidate) <= width) return candidate;
+  }
+  return "keys";
+}
+
+// ---------------------------------------------------------------------------
 // filterBindings
 // ---------------------------------------------------------------------------
 
@@ -171,6 +237,7 @@ export function groupByCategory(
 export function renderableLabel(b: Binding, tier: Tier): string {
   const keys = formatKeys(b.keys);
   if (tier === "keys") return keys;
+  if (b.hideLabelOn && b.hideLabelOn.includes(tier)) return keys;
   if (tier === "short") {
     if (b.shortLabel !== undefined && b.shortLabel.length > 0) {
       return `${keys} ${b.shortLabel}`;

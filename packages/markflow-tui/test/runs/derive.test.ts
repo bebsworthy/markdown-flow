@@ -85,13 +85,17 @@ describe("runStatusToLabel", () => {
 // ---------------------------------------------------------------------------
 
 describe("formatShortId", () => {
-  it("returns the first 6 chars for longer ids", () => {
-    expect(formatShortId("abcdef1234")).toBe("abcdef");
+  it("extracts HH:MM:SS from timestamp-style ids", () => {
+    expect(formatShortId("2026-04-19T10-18-20-290Z")).toBe("10:18:20");
   });
 
-  it("passes through ids 6 chars or shorter unchanged", () => {
+  it("falls back to first 8 chars for non-timestamp ids", () => {
+    expect(formatShortId("abcdefghij")).toBe("abcdefgh");
+  });
+
+  it("passes through short ids unchanged", () => {
     expect(formatShortId("abc")).toBe("abc");
-    expect(formatShortId("abcdef")).toBe("abcdef");
+    expect(formatShortId("abcdefgh")).toBe("abcdefgh");
   });
 });
 
@@ -130,16 +134,22 @@ describe("formatElapsed", () => {
     expect(formatElapsed(59_000)).toBe("59s");
   });
 
-  it("< 1h → 'M:SS'", () => {
-    expect(formatElapsed(60_000)).toBe("1:00");
-    expect(formatElapsed(75_000)).toBe("1:15");
-    expect(formatElapsed(3_599_000)).toBe("59:59");
+  it("< 1h → 'NmSSs'", () => {
+    expect(formatElapsed(60_000)).toBe("1m00s");
+    expect(formatElapsed(75_000)).toBe("1m15s");
+    expect(formatElapsed(3_599_000)).toBe("59m59s");
   });
 
-  it(">= 1h → 'HhMm'", () => {
-    expect(formatElapsed(3_600_000)).toBe("1h0m");
-    expect(formatElapsed(3_660_000)).toBe("1h1m");
-    expect(formatElapsed(7_260_000)).toBe("2h1m");
+  it("< 24h → 'NhMm'", () => {
+    expect(formatElapsed(3_600_000)).toBe("1h00m");
+    expect(formatElapsed(3_660_000)).toBe("1h01m");
+    expect(formatElapsed(7_260_000)).toBe("2h01m");
+  });
+
+  it(">= 24h → 'Nd Hh'", () => {
+    expect(formatElapsed(86_400_000)).toBe("1d 0h");
+    expect(formatElapsed(90_000_000)).toBe("1d 1h");
+    expect(formatElapsed(172_800_000 + 7_200_000)).toBe("2d 2h");
   });
 
   it("negative / NaN → em-dash", () => {
@@ -319,15 +329,16 @@ describe("toRunsTableRow", () => {
       NOW,
     );
     expect(r.id).toBe("abcdef1234");
-    expect(r.idShort).toBe("abcdef");
+    expect(r.idShort).toBe("abcdef12");
     expect(r.workflow).toBe("deploy");
     expect(r.statusCell.role).toBe("running");
     expect(r.statusLabel.endsWith("running")).toBe(true);
     expect(r.step).toBe("build");
     expect(r.elapsedMs).toBe(5 * 60_000);
-    expect(r.elapsed).toBe("5:00");
+    expect(r.elapsed).toBe("5m00s");
+    expect(r.ageMs).toBe(5 * 60_000);
+    expect(r.age).toBe("5m00s");
     expect(r.note).toBe("");
-    // `info` is the raw record, so sort primitives can read completedAt etc.
     expect(r.info.id).toBe("abcdef1234");
   });
 

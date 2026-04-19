@@ -46,7 +46,15 @@ export const RUNS_KEYBAR: ReadonlyArray<Binding> = [
   },
   {
     keys: ["a"],
-    label: "Approve",
+    label: "Show all",
+    toggleLabel: (state) => {
+      const archiveShown =
+        typeof state === "object" &&
+        state !== null &&
+        "archiveShown" in state &&
+        (state as { archiveShown: boolean }).archiveShown;
+      return archiveShown ? "Hide archived" : "Show all";
+    },
     when: () => true,
     action: () => {
       /* owned by runs-table.tsx useInput. */

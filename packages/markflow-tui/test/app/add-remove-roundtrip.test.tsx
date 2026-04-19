@@ -73,7 +73,7 @@ describe("App — add/remove roundtrip", () => {
     await new Promise<void>((r) => setTimeout(r, 80));
     const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
     const frame = stripAnsi(lastFrame() ?? "");
-    expect(frame).toContain("./alpha.md");
+    expect(frame).toContain("alpha.md");
     // File still has exactly one entry.
     const got = readRegistry(listPath)!;
     expect(got.map((e) => e.source)).toEqual(["./alpha.md"]);

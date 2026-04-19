@@ -19,7 +19,7 @@
 // All suppressed while the filter bar is open (the bar owns keys then)
 // or while `inputDisabled` is set.
 
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { Box, Text, useInput } from "ink";
 import { useTheme } from "../theme/context.js";
 import type {
@@ -150,18 +150,31 @@ function RunsTableImpl({
       : 0;
 
   // ---------------------------------------------------------------------
-  // Cursor reconciliation
+  // Cursor reconciliation — only when the row identity set changes.
+  // All volatile values read via refs so the effect only fires on
+  // rowIdKey transitions, not on every nowMs / cursor render.
   // ---------------------------------------------------------------------
+  const cursorRef = useRef(cursorIndex);
+  cursorRef.current = cursorIndex;
+  const selectedRunIdRef = useRef(selectedRunId);
+  selectedRunIdRef.current = selectedRunId;
+  const sortedRowsRef = useRef(sortedRows);
+  sortedRowsRef.current = sortedRows;
+
+  const rowIdKey = useMemo(
+    () => sortedRows.map((r) => r.id).join("\0"),
+    [sortedRows],
+  );
   useEffect(() => {
     const next = reconcileCursorAfterRowsChange(
-      cursorIndex,
-      selectedRunId,
-      sortedRows,
+      cursorRef.current,
+      selectedRunIdRef.current,
+      sortedRowsRef.current,
     );
-    if (next !== cursorIndex) {
+    if (next !== cursorRef.current) {
       dispatch({ type: "RUNS_CURSOR_JUMP", index: next });
     }
-  }, [sortedRows, cursorIndex, selectedRunId, dispatch]);
+  }, [rowIdKey, dispatch]);
 
   // ---------------------------------------------------------------------
   // Derived selection
@@ -203,11 +216,11 @@ function RunsTableImpl({
       }
 
       if (key.upArrow || input === "k") {
-        dispatch({ type: "RUNS_CURSOR_MOVE", delta: -1 });
+        dispatch({ type: "RUNS_CURSOR_MOVE", delta: -1, rowCount: sortedRows.length });
         return;
       }
       if (key.downArrow || input === "j") {
-        dispatch({ type: "RUNS_CURSOR_MOVE", delta: +1 });
+        dispatch({ type: "RUNS_CURSOR_MOVE", delta: +1, rowCount: sortedRows.length });
         return;
       }
       if (key.pageUp) {
@@ -245,9 +258,11 @@ function RunsTableImpl({
       }
 
       if (key.return) {
-        const id = sortedRows[clampedCursor]?.id;
-        if (id !== undefined && id.length > 0 && runsDirProp) {
-          dispatch({ type: "MODE_OPEN_RUN", runId: id, runsDir: runsDirProp });
+        const row = sortedRows[clampedCursor];
+        const id = row?.id;
+        const effectiveRunsDir = row?.runsDir ?? runsDirProp;
+        if (id !== undefined && id.length > 0 && effectiveRunsDir) {
+          dispatch({ type: "MODE_OPEN_RUN", runId: id, runsDir: effectiveRunsDir });
         }
         return;
       }

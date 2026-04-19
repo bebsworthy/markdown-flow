@@ -2,17 +2,14 @@
 //
 // Orchestrator for the workflow browser pane. Owns cursor state, resolves
 // registry entries (via `resolveEntries` or an injected resolver for
-// tests), and composes the left list + right preview panes inside a split
-// <Box flexDirection="row">.
+// tests), and renders the workflow list at full width. The preview pane
+// is rendered separately by App in the bottom slot.
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useInput } from "ink";
-import { SplitPane } from "../primitives/SplitPane.js";
 import { WorkflowList } from "./workflow-list.js";
-import { WorkflowPreview } from "./workflow-preview.js";
 import { WorkflowBrowserEmpty } from "./workflow-browser-empty.js";
 import {
-  composeListRows,
   formatListFooter,
   formatListTitle,
 } from "../browser/list-layout.js";
@@ -63,11 +60,26 @@ export interface WorkflowBrowserProps {
    * here in addition to the overlay-owned handler.
    */
   readonly inputDisabled?: boolean;
+  /**
+   * Reports whether the currently-selected entry is runnable
+   * (valid, with a workflow and absolutePath). Fires on cursor
+   * movement and after resolution completes.
+   */
+  readonly onSelectionValidityChange?: (valid: boolean) => void;
+  /**
+   * Reports the currently-selected resolved entry (or null) so App can
+   * render the preview in the bottom pane.
+   */
+  readonly onSelectedEntryChange?: (entry: ResolvedEntry | null) => void;
+  /**
+   * Callback fired when the user presses `c` to copy the selected
+   * entry's path to clipboard. App handles the actual clipboard write.
+   */
+  readonly onCopyPath?: (path: string) => void;
 }
 
 const DEFAULT_WIDTH = 140;
 const DEFAULT_HEIGHT = 20;
-const LEFT_RATIO = 0.55;
 
 function WorkflowBrowserImpl({
   registryState,
@@ -81,12 +93,12 @@ function WorkflowBrowserImpl({
   onRemoveEntry,
   onStartRun,
   inputDisabled,
+  onSelectionValidityChange,
+  onSelectedEntryChange,
+  onCopyPath,
 }: WorkflowBrowserProps): React.ReactElement {
   const paneWidth = width ?? DEFAULT_WIDTH;
   const paneHeight = height ?? DEFAULT_HEIGHT;
-
-  const leftWidth = Math.max(20, Math.floor(paneWidth * LEFT_RATIO) - 1);
-  const rightWidth = Math.max(20, paneWidth - leftWidth - 1);
 
   const sortedEntries = useMemo<ReadonlyArray<RegistryEntry>>(
     () => sortByAddedAt(registryState.entries),
@@ -133,6 +145,23 @@ function WorkflowBrowserImpl({
     return resolved.findIndex((r) => r.id === selectedWorkflowId);
   }, [resolved, selectedWorkflowId]);
 
+  useEffect(() => {
+    if (!onSelectionValidityChange) return;
+    const curr = selectedIndex < 0 ? 0 : selectedIndex;
+    const row = resolved[curr];
+    const valid = Boolean(
+      row && row.status === "valid" && row.workflow && row.absolutePath !== null,
+    );
+    onSelectionValidityChange(valid);
+  }, [selectedIndex, resolved, onSelectionValidityChange]);
+
+  useEffect(() => {
+    if (!onSelectedEntryChange) return;
+    const curr = selectedIndex < 0 ? 0 : selectedIndex;
+    const entry = resolved[curr] ?? null;
+    onSelectedEntryChange(entry);
+  }, [selectedIndex, resolved, onSelectedEntryChange]);
+
   useInput((input, key) => {
     if (inputDisabled) return;
     // `a` opens the add modal even when the registry is empty — that's the
@@ -168,11 +197,6 @@ function WorkflowBrowserImpl({
       dispatch({ type: "SELECT_WORKFLOW", workflowId: id });
       return;
     }
-    if (key.return) {
-      const id = resolved[curr]?.id ?? null;
-      dispatch({ type: "SELECT_WORKFLOW", workflowId: id });
-      return;
-    }
     if (input === "d") {
       const row = resolved[curr];
       if (row && onRemoveEntry) onRemoveEntry(row.entry.source);
@@ -191,8 +215,13 @@ function WorkflowBrowserImpl({
       }
       return;
     }
-    // 🟡 TODO future — edit in $EDITOR
-    if (input === "e") return;
+    if (input === "c") {
+      const row = resolved[curr];
+      if (row && row.absolutePath && onCopyPath) {
+        onCopyPath(row.absolutePath);
+      }
+      return;
+    }
   });
 
   // Empty-state branch: no entries registered.
@@ -207,36 +236,19 @@ function WorkflowBrowserImpl({
 
   const cwd = resolverBaseDir ?? process.cwd();
   const title = formatListTitle(registryConfig.path, cwd);
-  const rows = composeListRows(resolved, selectedIndex, leftWidth);
   const footer = formatListFooter(resolved);
-  const selectedResolved =
-    selectedIndex >= 0 && selectedIndex < resolved.length
-      ? resolved[selectedIndex]!
-      : null;
+  const cursor = selectedIndex < 0 ? 0 : selectedIndex;
 
   return (
-    <SplitPane
-      direction="row"
-      ratio={LEFT_RATIO}
-      divider
+    <WorkflowList
+      title={title}
+      entries={resolved}
+      selectedIndex={cursor}
+      footer={footer}
       width={paneWidth}
       height={paneHeight}
-      minFirst={20}
-      minSecond={20}
-    >
-      <WorkflowList
-        title={title}
-        rows={rows}
-        footer={footer}
-        width={leftWidth}
-        height={paneHeight}
-      />
-      <WorkflowPreview
-        resolved={selectedResolved}
-        width={rightWidth}
-        height={paneHeight}
-      />
-    </SplitPane>
+      now={Date.now()}
+    />
   );
 }
 

@@ -187,7 +187,7 @@ export function reducer(state: AppState, action: Action): AppState {
     case "RUNS_ARCHIVE_TOGGLE":
       return toggleRunsArchive(state);
     case "RUNS_CURSOR_MOVE":
-      return moveRunsCursor(state, action.delta);
+      return moveRunsCursor(state, action.delta, action.rowCount);
     case "RUNS_CURSOR_JUMP":
       return jumpRunsCursor(state, action.index);
     case "RUNS_CURSOR_HOME":
@@ -379,10 +379,11 @@ function isBrowsingRuns(state: AppState): boolean {
   return state.mode.kind === "browsing" && state.mode.pane === "runs";
 }
 
-function moveRunsCursor(state: AppState, delta: number): AppState {
+function moveRunsCursor(state: AppState, delta: number, rowCount: number): AppState {
   if (!isBrowsingRuns(state)) return state;
   if (delta === 0) return state;
-  const next = Math.max(0, state.runsCursor + Math.trunc(delta));
+  const max = rowCount > 0 ? rowCount - 1 : 0;
+  const next = Math.max(0, Math.min(max, state.runsCursor + Math.trunc(delta)));
   return next === state.runsCursor ? state : { ...state, runsCursor: next };
 }
 

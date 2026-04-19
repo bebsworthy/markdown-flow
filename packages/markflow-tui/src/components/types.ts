@@ -78,6 +78,12 @@ export interface AppContext {
    * to `false` when omitted.
    */
   readonly runResumable?: boolean;
+  /**
+   * True when the selected workflow browser entry is valid and runnable.
+   * Used by `r Run` binding's `when(ctx)` predicate (hide-don't-grey).
+   * Defaults to `false` when omitted.
+   */
+  readonly selectedEntryValid?: boolean;
   /** True while the currently-focused run is live (status === "running").
    *  Used by `:cancel` command availability (P7-T3). */
   readonly runActive?: boolean;

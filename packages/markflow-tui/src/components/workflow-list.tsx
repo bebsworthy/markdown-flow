@@ -1,28 +1,29 @@
-// src/components/workflow-list.tsx
-//
-// The left pane of the workflow browser. Pure rendering — no useInput.
-// All layout decisions come from `src/browser/list-layout.ts`; this file
-// just wraps each `ListRow` in styled <Text> tags.
-
-import React from "react";
+import React, { useMemo } from "react";
 import { Box, Text } from "ink";
 import { useTheme } from "../theme/context.js";
-import type { ListRow } from "../browser/list-layout.js";
+import { DataTable, type ColumnDef } from "../primitives/DataTable.js";
+import {
+  formatSourceBadge,
+  formatStatusFlag,
+  type StatusFlag,
+} from "../browser/preview-layout.js";
+import { pickBadgeColumnWidth } from "../browser/list-layout.js";
+import type { ResolvedEntry } from "../browser/types.js";
 
 export interface WorkflowListProps {
   readonly title: string;
-  readonly rows: ReadonlyArray<ListRow>;
+  readonly entries: ReadonlyArray<ResolvedEntry>;
+  readonly selectedIndex: number;
   readonly footer: string;
   readonly width: number;
   readonly height: number;
+  readonly now?: number;
 }
 
 function toneColor(
-  tone: ListRow["flagTone"],
+  tone: StatusFlag["tone"],
   theme: ReturnType<typeof useTheme>,
 ): { color?: string; dim?: boolean } {
-  // Tone → theme-color mapping per plan §5.
-  // good → complete (green); bad → danger (red); neutral → dim.
   switch (tone) {
     case "good":
       return {
@@ -43,18 +44,65 @@ function toneColor(
   }
 }
 
+const MIN_FLAG_WIDTH = 7;
+
 function WorkflowListImpl({
   title,
-  rows,
+  entries,
+  selectedIndex,
   footer,
   width,
   height,
+  now,
 }: WorkflowListProps): React.ReactElement {
   const theme = useTheme();
   const separator = theme.frame.h.repeat(Math.max(0, width));
 
+  const badgeCol = useMemo(() => pickBadgeColumnWidth(entries), [entries]);
+
+  const columns = useMemo<ReadonlyArray<ColumnDef<ResolvedEntry>>>(
+    () => [
+      {
+        id: "title",
+        header: "TITLE",
+        grow: true,
+        render: (e: ResolvedEntry) => e.title,
+      },
+      {
+        id: "badge",
+        header: "TYPE",
+        width: badgeCol,
+        render: (e: ResolvedEntry) => formatSourceBadge(e),
+      },
+      {
+        id: "flag",
+        header: "STATUS",
+        width: MIN_FLAG_WIDTH,
+        renderCell: (e: ResolvedEntry) => {
+          const flag = formatStatusFlag(e, now);
+          const tc = toneColor(flag.tone, theme);
+          return (
+            <Text
+              color={tc.color}
+              dimColor={tc.dim === true}
+              wrap="truncate-end"
+            >
+              {flag.text}
+            </Text>
+          );
+        },
+        render: (e: ResolvedEntry) => formatStatusFlag(e, now).text,
+      },
+    ],
+    [badgeCol, now, theme],
+  );
+
+  // title + separator + footer marginTop + footer text
+  const chromeRows = 4;
+  const dataHeight = Math.max(1, height - chromeRows);
+
   return (
-    <Box flexDirection="column" width={width} height={height}>
+    <Box flexDirection="column" height={height}>
       <Text bold>{title}</Text>
       <Text
         color={theme.colors.dim.color}
@@ -63,19 +111,16 @@ function WorkflowListImpl({
         {separator}
       </Text>
 
-      {rows.map((row) => {
-        const toneSpec = toneColor(row.flagTone, theme);
-        return (
-          <Box key={row.id} flexDirection="row">
-            <Text bold={row.isSelected}>{row.cursorGlyph}</Text>
-            <Text bold={row.isSelected}>{row.sourceText}</Text>
-            <Text>{row.badgeText}</Text>
-            <Text color={toneSpec.color} dimColor={toneSpec.dim === true}>
-              {row.flagText}
-            </Text>
-          </Box>
-        );
-      })}
+      <DataTable<ResolvedEntry>
+        columns={columns}
+        rows={entries}
+        rowKey={(e) => e.id}
+        cursorIndex={selectedIndex}
+        showHeader={false}
+        cursorGlyph="▶"
+        cursorGutter={2}
+        height={dataHeight}
+      />
 
       <Box marginTop={1}>
         <Text
@@ -89,5 +134,4 @@ function WorkflowListImpl({
   );
 }
 
-// React.memo removed: React 19.2 + useEffectEvent bug with SimpleMemoComponent fibers (stale useInput state).
 export const WorkflowList = WorkflowListImpl;

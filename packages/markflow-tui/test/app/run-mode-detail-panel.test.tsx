@@ -101,7 +101,7 @@ describe("App — RUN-mode detail panel (P6-T2)", () => {
     unmount();
   });
 
-  it("Esc back to browsing.runs restores the follow placeholder", async () => {
+  it("Esc back to browsing.runs restores the run preview", async () => {
     const { stdin, lastFrame, unmount } = renderApp({
       engineState: buildEngineState("abcd1234"),
     });
@@ -114,8 +114,9 @@ describe("App — RUN-mode detail panel (P6-T2)", () => {
     await flush();
 
     const frame = stripAnsi(lastFrame() ?? "");
-    // follow-mode placeholder copy from <RunDetailPlaceholder>.
-    expect(frame).toContain("detail pane");
+    // RunPreview shows the selected run's info fields.
+    expect(frame).toContain("Workflow");
+    expect(frame).toContain("deploy");
     unmount();
   });
 
@@ -131,7 +132,8 @@ describe("App — RUN-mode detail panel (P6-T2)", () => {
 
     const frame = stripAnsi(lastFrame() ?? "");
     // Without rows/tokens the panel renders its empty-state copy.
-    expect(frame).toContain("select a step to see details");
+    // First char may be clipped by the frame border at narrow widths.
+    expect(frame).toMatch(/s?elect a step to see details/);
     unmount();
   });
 

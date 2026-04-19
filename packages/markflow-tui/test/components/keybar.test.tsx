@@ -148,7 +148,7 @@ describe("Keybar — rule coverage (features.md §5.6)", () => {
     expect(frame).toContain("VIEW");
   });
 
-  it("R2: three-category fixture at width 120 drops to short tier (ambiguity 3 default)", () => {
+  it("R2: three-category fixture at width 120 renders full tier with category headers", () => {
     const alwaysTrue = () => true;
     const noop = () => {};
     // VIEW is class 1 (toggle); RUN & LOGS are class 0 (local). Stable
@@ -160,9 +160,8 @@ describe("Keybar — rule coverage (features.md §5.6)", () => {
     ];
     const out = renderWithTheme({ bindings, ctx: browsingCtx, width: 120 });
     const frame = stripAnsi(out.lastFrame() ?? "");
-    // Short tier produces keys-only. Groups separated by 3 spaces.
-    // Order: locals (a, c) first, then VIEW (b).
-    expect(frame).toBe("a   c   b");
+    // Full tier with category headers. Order: locals (a, c) first, then VIEW (b).
+    expect(frame).toBe("a A   LOGS  c C   VIEW  b B");
   });
 
   // R3 — ordering: locals → toggles (VIEW) → globals.
@@ -277,8 +276,9 @@ describe("Keybar — rule coverage (features.md §5.6)", () => {
       isFollowing: true,
       toggleState: { isFollowing: true },
     };
+    // Width=5 forces short/keys tier (single binding "f Unfollow" is 10 chars).
     const shortFrame = stripAnsi(
-      renderWithTheme({ bindings: [follow], ctx: onCtx, width: 80 }).lastFrame() ?? "",
+      renderWithTheme({ bindings: [follow], ctx: onCtx, width: 5 }).lastFrame() ?? "",
     );
     expect(shortFrame).not.toContain("Unfollow");
     expect(shortFrame).not.toContain("Follow");
@@ -294,23 +294,22 @@ describe("Keybar — rule coverage (features.md §5.6)", () => {
     });
     const frame = stripAnsi(out.lastFrame() ?? "");
     expect(frame).toContain("Select");
-    expect(frame).toContain("Open");
-    expect(frame).toContain("Edit in $EDITOR");
+    expect(frame).toContain("Copy Path");
   });
 
-  it("R7: width 80 produces short-tier output (no labels where shortLabel absent)", () => {
+  it("R7: width 80 shows full labels when content fits", () => {
     const out = renderWithTheme({
       bindings: workflowsBindings,
       ctx: browsingCtx,
       width: 80,
     });
     const frame = stripAnsi(out.lastFrame() ?? "");
-    expect(frame).not.toContain("Select");
-    expect(frame).not.toContain("Open");
+    expect(frame).toContain("Select");
+    expect(frame).toContain("Copy Path");
     expect(frame).toContain("\u2191\u2193"); // arrow glyph for Up/Down
   });
 
-  it("R7: width 40 produces keys-only output", () => {
+  it("R7: width 40 drops to short tier (no full labels)", () => {
     const out = renderWithTheme({
       bindings: workflowsBindings,
       ctx: browsingCtx,
@@ -321,20 +320,29 @@ describe("Keybar — rule coverage (features.md §5.6)", () => {
     expect(frame).not.toContain("Select");
     expect(frame).not.toContain("Help");
     expect(frame).not.toContain("Quit");
-    // `q` is filtered out in narrow tier; `?` remains.
+    expect(frame).toContain("c Copy"); // shortLabel
     expect(frame).toContain("?");
-    expect(frame).not.toContain("q");
+    expect(frame).toContain("q");
   });
 
-  it("R7: <60 tier appends '? for labels' right-aligned by default (P8-T2)", () => {
+  it("R7: keys tier appends '? for labels' right-aligned by default (P8-T2)", () => {
+    const alwaysTrue = () => true;
+    const noop = () => {};
+    // Bindings whose short-tier width exceeds 30 but keys tier fits.
+    const bindings: Binding[] = [
+      { keys: ["a"], label: "Alpha", shortLabel: "Do-Alpha", when: alwaysTrue, action: noop },
+      { keys: ["b"], label: "Beta", shortLabel: "Do-Beta", when: alwaysTrue, action: noop },
+      { keys: ["c"], label: "Gamma", shortLabel: "Do-Gamma", when: alwaysTrue, action: noop },
+      { keys: ["d"], label: "Delta", shortLabel: "Do-Delta", when: alwaysTrue, action: noop },
+      { keys: ["?"], label: "Help", when: alwaysTrue, action: noop },
+    ];
     const out = renderWithTheme({
-      bindings: workflowsBindings,
+      bindings,
       ctx: browsingCtx,
-      width: 52,
+      width: 30,
     });
     const frame = stripAnsi(out.lastFrame() ?? "");
     expect(frame).toContain("? for labels");
-    // Should NOT include the legacy "press ? for labels" copy.
     expect(frame).not.toContain("press ? for labels");
   });
 

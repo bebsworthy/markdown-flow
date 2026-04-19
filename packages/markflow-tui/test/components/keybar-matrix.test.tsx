@@ -64,30 +64,35 @@ interface Row {
   readonly skipReason?: string;
 }
 
+// With content-aware tier selection (pickBestTier), the keybar picks the
+// widest tier whose rendered bindings fit within the available width. At
+// width=80 all rows' full-tier bindings fit, so `medium` matches `wide`.
+// At width=40 most rows drop to short tier; FIND and HELP stay full because
+// their bindings are compact enough.
 const ROWS: ReadonlyArray<Row> = [
   {
     mode: "WORKFLOWS",
     bindings: workflowsBindings,
     ctx: browsingCtx,
-    wide: "\u2191\u2193 Select  \u23CE Open  r Run  e Edit in $EDITOR     ? Help   q Quit",
-    medium: "\u2191\u2193 \u23CE r e    ? q",
-    narrow: "\u2191\u2193 \u23CE r e ?",
+    wide: "\u2191\u2193 Select  r Run  a Add  d Remove  c Copy Path  z Fold  ? Help     q Quit",
+    medium: "\u2191\u2193 Select  r Run  a Add  d Remove  c Copy Path  z Fold  ? Help     q Quit",
+    narrow: "\u2191\u2193 r a d c Copy z ?    q",
   },
   {
     mode: "RUNS",
     bindings: runsBindings,
     ctx: runsCtx,
     wide: "\u2191\u2193 Select  \u23CE Open  r Resume  a Approve   s Status  / Search     ? q",
-    medium: "\u2191\u2193 \u23CE r a  s /   ? q",
-    narrow: "\u2191\u2193 \u23CE r a ?",
+    medium: "\u2191\u2193 Select  \u23CE Open  r Resume  a Approve   s Status  / Search     ? q",
+    narrow: "\u2191\u2193 \u23CE r a  s /   ? q",
   },
   {
     mode: "RUN (graph)",
     bindings: runGraphBindings,
     ctx: runGraphCtx,
     wide: "\u2191\u2193 Step  \u23CE Logs  a Approve  R Re-run  X Cancel   VIEW  m  f  /    ? q",
-    medium: "\u2191\u2193 \u23CE a R X   m f /    ? q",
-    narrow: "\u2191\u2193 \u23CE R X  | f /  | ? q",
+    medium: "\u2191\u2193 Step  \u23CE Logs  a Approve  R Re-run  X Cancel   VIEW  m  f  /    ? q",
+    narrow: "\u2191\u2193 \u23CE a R X   m f /    ? q",
   },
   {
     // Matrix row tests the §15 mockup strings assuming the caller passes
@@ -100,8 +105,8 @@ const ROWS: ReadonlyArray<Row> = [
     ctx: { ...logFollowCtx, mode: { kind: "browsing", pane: "workflows" } },
     prefix: { full: "LOG \u00b7 following", short: "LOG follow" },
     wide: "LOG \u00b7 following   w Wrap  t Timestamps  1/2/3 streams  / Search    Esc",
-    medium: "LOG follow  w t 1/2/3 /   Esc",
-    narrow: "w t /   Esc",
+    medium: "LOG \u00b7 following   w Wrap  t Timestamps  1/2/3 streams  / Search    Esc",
+    narrow: "LOG follow  w t 1/2/3 /   Esc",
   },
   {
     mode: "LOG (paused)",
@@ -109,8 +114,8 @@ const ROWS: ReadonlyArray<Row> = [
     ctx: { ...logPausedCtx, mode: { kind: "browsing", pane: "workflows" } },
     prefix: { full: "LOG \u00b7 paused", short: "LOG paused" },
     wide: "LOG \u00b7 paused   F Resume  G Head  g Top  w Wrap  / Search    Esc",
-    medium: "LOG paused  F G g w /   Esc",
-    narrow: "F G g w /  Esc",
+    medium: "LOG \u00b7 paused   F Resume  G Head  g Top  w Wrap  / Search    Esc",
+    narrow: "LOG paused  F G g w /   Esc",
   },
   {
     mode: "APPROVAL",
@@ -118,8 +123,8 @@ const ROWS: ReadonlyArray<Row> = [
     ctx: approvalCtx,
     modePill: "APPROVAL",
     wide: "[APPROVAL]  \u23CE Decide  s Suspend-for-later    Esc Cancel  ?",
-    medium: "[APPROVAL] \u23CE s   Esc ?",
-    narrow: "\u23CE s   Esc",
+    medium: "[APPROVAL]  \u23CE Decide  s Suspend-for-later    Esc Cancel  ?",
+    narrow: "[APPROVAL] \u23CE s   Esc ?",
   },
   {
     mode: "RESUME",
@@ -127,8 +132,8 @@ const ROWS: ReadonlyArray<Row> = [
     ctx: resumeCtx,
     modePill: "RESUME",
     wide: "[RESUME]  \u23CE Resume  Space Toggle  Tab Next  p Preview    Esc    ?",
-    medium: "[RESUME] \u23CE Space Tab p   Esc ?",
-    narrow: "\u23CE Space Tab p  Esc",
+    medium: "[RESUME]  \u23CE Resume  Space Toggle  Tab Next  p Preview    Esc    ?",
+    narrow: "[RESUME] \u23CE Space Tab p   Esc ?",
   },
   {
     mode: "COMMAND",
@@ -138,8 +143,8 @@ const ROWS: ReadonlyArray<Row> = [
     modePillTiers: ["full"],
     modePillGap: { full: 3 },
     wide: "[COMMAND]   \u23CE Run  \u2191\u2193 Select  Tab Complete    Esc Cancel",
-    medium: "\u23CE \u2191\u2193 Tab   Esc",
-    narrow: "\u23CE \u2191\u2193 Tab  Esc",
+    medium: "[COMMAND]   \u23CE Run  \u2191\u2193 Select  Tab Complete    Esc Cancel",
+    narrow: "\u23CE \u2191\u2193 Tab   Esc",
   },
   {
     mode: "FIND",
@@ -149,8 +154,8 @@ const ROWS: ReadonlyArray<Row> = [
     modePillTiers: ["full"],
     modePillGap: { full: 3 },
     wide: "[FIND]   \u23CE Open  \u2191\u2193 Select    Esc Cancel",
-    medium: "\u23CE \u2191\u2193   Esc",
-    narrow: "\u23CE \u2191\u2193  Esc",
+    medium: "[FIND]   \u23CE Open  \u2191\u2193 Select    Esc Cancel",
+    narrow: "[FIND]   \u23CE Open  \u2191\u2193 Select    Esc Cancel",
   },
   {
     mode: "HELP",
@@ -160,8 +165,8 @@ const ROWS: ReadonlyArray<Row> = [
     modePillTiers: ["full"],
     modePillGap: { full: 3 },
     wide: "[HELP]   \u2191\u2193 Navigate   / Search   Esc Close",
-    medium: "\u2191\u2193 / Esc",
-    narrow: "\u2191\u2193 / Esc",
+    medium: "[HELP]   \u2191\u2193 Navigate   / Search   Esc Close",
+    narrow: "[HELP]   \u2191\u2193 Navigate   / Search   Esc Close",
   },
 ];
 
@@ -171,7 +176,7 @@ describe.each(ROWS)("keybar matrix — $mode", (row) => {
   const testNarrow = row.skipNarrow ? it.skip : it;
 
   testWide(
-    `width \u2265100 \u2192 full tier${row.skipWide ? " (TODO: P3-T4 plan §11 — " + row.skipReason + ")" : ""}`,
+    `width 120${row.skipWide ? " (TODO: P3-T4 plan §11 — " + row.skipReason + ")" : ""}`,
     () => {
       const out = renderKeybar({
         bindings: row.bindings,
@@ -188,7 +193,7 @@ describe.each(ROWS)("keybar matrix — $mode", (row) => {
   );
 
   testMedium(
-    `width 80 \u2192 short tier${row.skipMedium ? " (TODO: P3-T4 plan §11 — " + row.skipReason + ")" : ""}`,
+    `width 80${row.skipMedium ? " (TODO: P3-T4 plan §11 — " + row.skipReason + ")" : ""}`,
     () => {
       const out = renderKeybar({
         bindings: row.bindings,
@@ -205,7 +210,7 @@ describe.each(ROWS)("keybar matrix — $mode", (row) => {
   );
 
   testNarrow(
-    `width 40 \u2192 keys tier${row.skipNarrow ? " (TODO: P3-T4 plan §11 — " + row.skipReason + ")" : ""}`,
+    `width 40${row.skipNarrow ? " (TODO: P3-T4 plan §11 — " + row.skipReason + ")" : ""}`,
     () => {
       const out = renderKeybar({
         bindings: row.bindings,
@@ -237,7 +242,7 @@ const NINETY_COL_ROWS: ReadonlyArray<Row> = ROWS.filter((r) =>
 describe.each(NINETY_COL_ROWS)(
   "P8-T1 keybar at width=90 — $mode",
   (row) => {
-    it("short-tier render matches mockups §15 verbatim (ANSI-stripped, right-trimmed)", () => {
+    it("full-tier render fits within 90 cols (ANSI-stripped, right-trimmed)", () => {
       const out = renderKeybar({
         bindings: row.bindings,
         ctx: row.ctx,
@@ -249,7 +254,7 @@ describe.each(NINETY_COL_ROWS)(
         prefixGap: row.prefixGap,
       });
       const actual = stripAnsi(out.lastFrame() ?? "").replace(/\s+$/g, "");
-      expect(actual).toBe(row.medium);
+      expect(actual).toBe(row.wide);
       expect(actual.length).toBeLessThanOrEqual(90);
     });
   },

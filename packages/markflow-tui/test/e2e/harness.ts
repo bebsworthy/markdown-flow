@@ -59,6 +59,16 @@ export interface TuiSession {
     minSeq: number,
     timeoutMs?: number,
   ): Promise<ReadonlyArray<Record<string, unknown>>>;
+  /**
+   * Like `waitForEventLog` but takes an explicit `events.jsonl` path
+   * instead of computing it from `scratch.runsDir`. Useful when runs
+   * are created in per-workflow workspace directories.
+   */
+  waitForEventLogAt(
+    eventsPath: string,
+    minSeq: number,
+    timeoutMs?: number,
+  ): Promise<ReadonlyArray<Record<string, unknown>>>;
   waitForExit(timeoutMs?: number): Promise<{ exitCode: number | null }>;
   resize(cols: number, rows: number): void;
   kill(): Promise<void>;
@@ -244,6 +254,38 @@ export async function spawnTui(opts: SpawnOpts = {}): Promise<TuiSession> {
     );
   };
 
+  const waitForEventLogAt = async (
+    eventsPath: string,
+    minSeq: number,
+    timeoutMs: number = DEFAULT_WAIT_MS,
+  ): Promise<ReadonlyArray<Record<string, unknown>>> => {
+    const deadline = Date.now() + timeoutMs;
+    let lastEvents: ReadonlyArray<Record<string, unknown>> = [];
+    while (Date.now() < deadline) {
+      try {
+        const raw = await readFile(eventsPath, "utf8");
+        const lines = raw.split("\n").filter((l) => l.length > 0);
+        lastEvents = lines.map(
+          (l) => JSON.parse(l) as Record<string, unknown>,
+        );
+        if (lastEvents.length >= minSeq) return lastEvents;
+      } catch {
+        // file doesn't exist yet — keep polling
+      }
+      if (exited && exitCode !== 0) {
+        throw new HarnessTimeoutError(
+          `TUI exited with code ${exitCode ?? "null"} before event log reached seq ${minSeq}`,
+          snapshot(),
+        );
+      }
+      await sleep(POLL_INTERVAL_MS);
+    }
+    throw new HarnessTimeoutError(
+      `event log did not reach seq ${minSeq} within ${timeoutMs}ms (saw ${lastEvents.length})`,
+      snapshot(),
+    );
+  };
+
   const waitForExit = async (
     timeoutMs: number = DEFAULT_WAIT_MS,
   ): Promise<{ exitCode: number | null }> => {
@@ -304,6 +346,7 @@ export async function spawnTui(opts: SpawnOpts = {}): Promise<TuiSession> {
     snapshotContains,
     waitForRegex,
     waitForEventLog,
+    waitForEventLogAt,
     waitForExit,
     resize: (c: number, r: number) => {
       child.resize(c, r);

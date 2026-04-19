@@ -68,6 +68,7 @@ describe.skipIf(process.platform === "win32")(
         runId: "run001",
         workflowName: "Deploy",
         sourceFile: wfPath,
+        startedAt: new Date().toISOString(),
         events: [{ type: "workflow:complete" }],
       });
 

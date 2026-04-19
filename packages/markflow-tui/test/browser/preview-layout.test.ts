@@ -87,6 +87,7 @@ function makeResolved(overrides: Partial<ResolvedEntry> = {}): ResolvedEntry {
     diagnostics: [],
     lastRun: null,
     errorReason: null,
+    rawContent: null,
     ...overrides,
   };
 }

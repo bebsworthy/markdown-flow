@@ -1,8 +1,6 @@
 // src/components/keybar-fixtures/workflows.ts
 //
-// Keybar fixture for the non-empty workflow browser (P3-T4). Mirrors
-// mockups.md §2 line 71 / §15 row WORKFLOWS:
-//   ↑↓ Select  ⏎ Open  r Run  e Edit in $EDITOR     ? Help   q Quit
+// Keybar fixture for the non-empty workflow browser.
 //
 // PURITY NOTE: data-only. No react/ink/node:*. Listed in purity.test.ts.
 
@@ -18,17 +16,9 @@ export const WORKFLOWS_KEYBAR: ReadonlyArray<Binding> = [
     },
   },
   {
-    keys: ["Enter"],
-    label: "Open",
-    when: () => true,
-    action: () => {
-      /* owned by workflow-browser.tsx useInput. */
-    },
-  },
-  {
     keys: ["r"],
     label: "Run",
-    when: () => true,
+    when: (ctx) => ctx.selectedEntryValid !== false,
     action: () => {
       /* owned by app.tsx. */
     },
@@ -50,12 +40,20 @@ export const WORKFLOWS_KEYBAR: ReadonlyArray<Binding> = [
     },
   },
   {
-    keys: ["e"],
-    label: "Edit in $EDITOR",
-    shortLabel: "Edit",
+    keys: ["c"],
+    label: "Copy Path",
+    shortLabel: "Copy",
+    when: (ctx) => ctx.selectedEntryValid !== false,
+    action: () => {
+      /* owned by workflow-browser.tsx useInput. */
+    },
+  },
+  {
+    keys: ["z"],
+    label: "Fold",
     when: () => true,
     action: () => {
-      /* owned by app.tsx. */
+      /* owned by app.tsx global useInput. */
     },
   },
   {

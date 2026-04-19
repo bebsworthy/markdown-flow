@@ -59,6 +59,7 @@ function makeResolved(
     diagnostics: [],
     lastRun: null,
     errorReason: null,
+    rawContent: null,
   };
 }
 
@@ -85,6 +86,8 @@ function makeRunRow(overrides: Partial<RunInfo> & Pick<RunInfo, "id">): RunsTabl
     step: "",
     elapsed: "",
     elapsedMs: 0,
+    age: "",
+    ageMs: 0,
     started: info.startedAt,
     note: "",
     info,

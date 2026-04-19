@@ -190,8 +190,9 @@ export function deriveStepElapsedMs(
  * Format an elapsed-ms value as a compact duration.
  *   0              → "—"
  *   < 60s          → "Ns"
- *   < 1h           → "M:SS"
- *   >= 1h          → "HhMm"
+ *   < 1h           → "NmSSs"
+ *   < 24h          → "NhMm"
+ *   >= 24h         → "Nd Hh"
  * Negative or NaN → "—".
  */
 export function formatStepElapsed(ms: number): string {
@@ -201,11 +202,16 @@ export function formatStepElapsed(ms: number): string {
   if (totalSeconds < 3600) {
     const m = Math.floor(totalSeconds / 60);
     const s = totalSeconds % 60;
-    return `${m}:${s.toString().padStart(2, "0")}`;
+    return `${m}m${s.toString().padStart(2, "0")}s`;
   }
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  return `${h}h${m}m`;
+  if (totalSeconds < 86400) {
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    return `${h}h${m.toString().padStart(2, "0")}m`;
+  }
+  const d = Math.floor(totalSeconds / 86400);
+  const h = Math.floor((totalSeconds % 86400) / 3600);
+  return `${d}d ${h}h`;
 }
 
 // ---------------------------------------------------------------------------

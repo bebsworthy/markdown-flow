@@ -52,14 +52,28 @@ describe.skipIf(process.platform === "win32")(
       // Should transition to RUN/viewing mode
       await session.waitForRegex(/\[ RUN \]/, DEFAULT_RUN_MS);
 
-      // Verify a run was created on disk
-      const entries = await readdir(session.scratch.runsDir);
-      const runDirs = entries.filter((e) => !e.startsWith("."));
+      // Verify a run was created in the per-workflow workspace (not MARKFLOW_RUNS_DIR)
+      const wsRoot = path.join(
+        session.scratch.workspaceDir,
+        ".markflow-tui",
+        "workspaces",
+      );
+      const slugs = await readdir(wsRoot);
+      expect(slugs.length).toBeGreaterThanOrEqual(1);
+      const wsRunsDir = path.join(wsRoot, slugs[0]!, "runs");
+      const runDirs = (await readdir(wsRunsDir)).filter(
+        (e) => !e.startsWith("."),
+      );
       expect(runDirs.length).toBeGreaterThanOrEqual(1);
 
-      // Verify event log has run:start
+      // Verify event log has run:start with inputs
       const runId = runDirs[0]!;
-      const events = await session.waitForEventLog(runId, 1, DEFAULT_RUN_MS);
+      const eventsPath = path.join(wsRunsDir, runId, "events.jsonl");
+      const events = await session.waitForEventLogAt(
+        eventsPath,
+        1,
+        DEFAULT_RUN_MS,
+      );
       const runStart = events.find(
         (e) => (e as { type?: string }).type === "run:start",
       );

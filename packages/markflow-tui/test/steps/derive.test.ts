@@ -178,7 +178,7 @@ describe("deriveStepElapsedMs / formatStepElapsed", () => {
       result: result({ started_at: "2026-04-17T11:59:00Z" }),
     });
     expect(deriveStepElapsedMs(t, NOW)).toBe(60_000);
-    expect(formatStepElapsed(60_000)).toBe("1:00");
+    expect(formatStepElapsed(60_000)).toBe("1m00s");
   });
 
   it("pending token returns 0 and formatter returns em-dash", () => {
@@ -201,12 +201,12 @@ describe("deriveStepElapsedMs / formatStepElapsed", () => {
     expect(formatStepElapsed(59_000)).toBe("59s");
   });
 
-  it("minutes → 'M:SS'", () => {
-    expect(formatStepElapsed(2 * 60_000 + 14_000)).toBe("2:14");
+  it("minutes → 'NmSSs'", () => {
+    expect(formatStepElapsed(2 * 60_000 + 14_000)).toBe("2m14s");
   });
 
-  it("hours → 'HhMm'", () => {
-    expect(formatStepElapsed(3_720_000)).toBe("1h2m");
+  it("hours → 'NhMm'", () => {
+    expect(formatStepElapsed(3_720_000)).toBe("1h02m");
   });
 });
 

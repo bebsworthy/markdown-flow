@@ -211,7 +211,7 @@ export type Action =
   | { readonly type: "RUNS_ARCHIVE_TOGGLE" }
   // Runs-table cursor / selection actions (P5-T3). See
   // docs/tui/plans/P5-T3.md §2.4 for payload rationale.
-  | { readonly type: "RUNS_CURSOR_MOVE"; readonly delta: number }
+  | { readonly type: "RUNS_CURSOR_MOVE"; readonly delta: number; readonly rowCount: number }
   | { readonly type: "RUNS_CURSOR_JUMP"; readonly index: number }
   | { readonly type: "RUNS_CURSOR_HOME" }
   | { readonly type: "RUNS_CURSOR_END"; readonly rowCount: number }

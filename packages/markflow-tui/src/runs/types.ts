@@ -87,9 +87,12 @@ export interface RunsTableRow {
   readonly step: string;
   readonly elapsed: string;
   readonly elapsedMs: number;
+  readonly age: string;
+  readonly ageMs: number;
   readonly started: string;
   readonly note: string;
   readonly info: RunInfo;
+  readonly runsDir?: string;
 }
 
 // ---------------------------------------------------------------------------

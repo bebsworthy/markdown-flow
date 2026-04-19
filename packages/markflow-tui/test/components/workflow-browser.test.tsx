@@ -34,6 +34,7 @@ function makeResolved(overrides: Partial<ResolvedEntry> = {}): ResolvedEntry {
     diagnostics: [],
     lastRun: null,
     errorReason: null,
+    rawContent: null,
     ...overrides,
   };
 }
@@ -127,7 +128,7 @@ describe("WorkflowBrowser", () => {
     expect(frame).not.toContain("No workflows registered yet.");
   });
 
-  it("renders both list and preview panes after resolution completes", async () => {
+  it("renders list with workflow title after resolution completes", async () => {
     const entries = makeEntries(["./a.md"]);
     const resolved = [
       makeResolved({ entry: entries[0]!, id: entries[0]!.source }),
@@ -148,8 +149,7 @@ describe("WorkflowBrowser", () => {
     );
     await flush();
     const frame = stripAnsi(lastFrame() ?? "");
-    expect(frame).toContain("./a.md");
-    expect(frame).toContain("# demo");
+    expect(frame).toContain("demo");
   });
 
   it("'↓' moves the cursor and dispatches SELECT_WORKFLOW", async () => {
@@ -205,34 +205,6 @@ describe("WorkflowBrowser", () => {
     stdin.write("\x1b[A"); // up arrow
     await flush();
     // Dispatch should still fire, but with the same workflowId (index 0).
-    expect(dispatch).toHaveBeenCalledWith({
-      type: "SELECT_WORKFLOW",
-      workflowId: entries[0]!.source,
-    });
-  });
-
-  it("'Enter' dispatches SELECT_WORKFLOW with current row id", async () => {
-    const entries = makeEntries(["./a.md"]);
-    const resolved = [
-      makeResolved({ entry: entries[0]!, id: entries[0]!.source }),
-    ];
-    const dispatch = vi.fn();
-    const { stdin } = render(
-      <ThemeProvider>
-        <WorkflowBrowser
-          registryState={makeRegistry(entries)}
-          registryConfig={config}
-          selectedWorkflowId={entries[0]!.source}
-          dispatch={dispatch}
-          width={100}
-          height={15}
-          resolver={staticResolver(resolved)}
-        />
-      </ThemeProvider>,
-    );
-    await flush();
-    stdin.write("\r");
-    await flush();
     expect(dispatch).toHaveBeenCalledWith({
       type: "SELECT_WORKFLOW",
       workflowId: entries[0]!.source,
@@ -407,7 +379,7 @@ describe("WorkflowBrowser", () => {
     await flush();
     expect(resolver).toHaveBeenCalledTimes(1);
     const frame = stripAnsi(lastFrame() ?? "");
-    expect(frame).toContain("./missing.md");
-    expect(frame).toContain("./absent.md");
+    // List rows now show titles instead of source paths.
+    expect(frame).toContain("demo");
   });
 });

@@ -156,6 +156,7 @@ export function composeListRows(
   entries: ReadonlyArray<ResolvedEntry>,
   selectedIndex: number,
   paneWidth: number,
+  now?: number,
 ): ReadonlyArray<ListRow> {
   if (entries.length === 0) return [];
   const badgeCol = pickBadgeColumnWidth(entries);
@@ -172,12 +173,12 @@ export function composeListRows(
     const e = entries[i]!;
     const isSelected = i === selectedIndex;
     const cursorGlyph = isSelected ? CURSOR_ACTIVE : CURSOR_INACTIVE;
-    const rawSource = e.entry.source;
+    const rawSource = e.title;
     const sourceDisplay = truncateSource(rawSource, sourceBudget);
     const sourceText = sourceDisplay.padEnd(sourceBudget);
     const badgeRaw = formatSourceBadge(e);
     const badgeText = badgeRaw.padEnd(badgeCol);
-    const flag = formatStatusFlag(e);
+    const flag = formatStatusFlag(e, now);
     const flagText = flag.text.length > flagBudget
       ? flag.text.slice(0, Math.max(0, flagBudget))
       : flag.text;

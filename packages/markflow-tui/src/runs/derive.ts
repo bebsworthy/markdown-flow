@@ -88,10 +88,18 @@ export function runStatusToLabel(status: RunStatus): string {
 // Formatters
 // ---------------------------------------------------------------------------
 
-/** First 6 chars of the run id. Shorter ids pass through unchanged. */
+/**
+ * Extract a short, differentiable portion of a run id. Run ids are ISO
+ * timestamps with colons/dots replaced by dashes (e.g.
+ * `2026-04-19T10-18-20-290Z`). The date prefix is identical for same-day
+ * runs, so we extract the `HH:MM:SS` time portion instead. Falls back to
+ * the first 8 chars for non-timestamp ids.
+ */
 export function formatShortId(id: string): string {
-  if (id.length <= 6) return id;
-  return id.slice(0, 6);
+  const m = id.match(/T(\d{2})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}:${m[2]}:${m[3]}`;
+  if (id.length <= 8) return id;
+  return id.slice(0, 8);
 }
 
 /**
@@ -112,8 +120,9 @@ export function formatStartedHMS(iso: string): string {
 /**
  * Format an elapsed-ms value as a compact duration.
  *   < 60s          → "Ns"
- *   < 1h           → "M:SS"
- *   >= 1h          → "HhMm"
+ *   < 1h           → "NmSSs"
+ *   < 24h          → "NhMm"
+ *   >= 24h         → "Nd Hh"
  * Negative or NaN → "—".
  */
 export function formatElapsed(ms: number): string {
@@ -123,11 +132,16 @@ export function formatElapsed(ms: number): string {
   if (totalSeconds < 3600) {
     const m = Math.floor(totalSeconds / 60);
     const s = totalSeconds % 60;
-    return `${m}:${s.toString().padStart(2, "0")}`;
+    return `${m}m${s.toString().padStart(2, "0")}s`;
   }
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  return `${h}h${m}m`;
+  if (totalSeconds < 86400) {
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    return `${h}h${m.toString().padStart(2, "0")}m`;
+  }
+  const d = Math.floor(totalSeconds / 86400);
+  const h = Math.floor((totalSeconds % 86400) / 3600);
+  return `${d}d ${h}h`;
 }
 
 /**
@@ -265,9 +279,17 @@ export function toStatusCell(status: RunStatus): StatusCell {
  * callers can freeze time for tests and a future ticker can re-derive
  * rows on a cadence without us reading `Date.now()` here.
  */
+export function deriveAgeMs(info: RunInfo, nowMs: number): number {
+  const start = Date.parse(info.startedAt);
+  if (!Number.isFinite(start)) return 0;
+  const diff = nowMs - start;
+  return diff < 0 ? 0 : diff;
+}
+
 export function toRunsTableRow(info: RunInfo, nowMs: number): RunsTableRow {
   const statusCell = toStatusCell(info.status);
   const elapsedMs = deriveElapsedMs(info, nowMs);
+  const ageMs = deriveAgeMs(info, nowMs);
   return {
     id: info.id,
     idShort: formatShortId(info.id),
@@ -277,6 +299,8 @@ export function toRunsTableRow(info: RunInfo, nowMs: number): RunsTableRow {
     step: deriveStepLabel(info),
     elapsed: formatElapsed(elapsedMs),
     elapsedMs,
+    age: formatElapsed(ageMs),
+    ageMs,
     started: formatStartedHMS(info.startedAt),
     note: deriveNote(info),
     info,

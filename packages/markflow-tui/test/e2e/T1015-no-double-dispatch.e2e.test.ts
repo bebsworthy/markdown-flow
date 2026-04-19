@@ -10,6 +10,7 @@ import { afterEach, describe, expect, test } from "vitest";
 
 import {
   DEFAULT_READY_MS,
+  DEFAULT_WAIT_MS,
   spawnTui,
   type TuiSession,
 } from "./harness.js";
@@ -37,19 +38,17 @@ describe.skipIf(process.platform === "win32")(
       session.pressEnter();
       await session.waitForText("Hello Pipeline", DEFAULT_READY_MS);
 
-      // Open palette
+      // Open palette and wait for the input cursor to confirm mount
       session.write(":");
-      await session.waitForText(":", DEFAULT_READY_MS);
+      await session.waitForText("\u2588", DEFAULT_WAIT_MS);
 
       // Type "run" — the 'r' should NOT trigger the browser's run binding
       session.write("run");
-      await session.waitForText("run", DEFAULT_READY_MS);
+      await session.waitForText(":run", DEFAULT_WAIT_MS);
 
       const snap = session.snapshot();
       // Should still have the palette open, not have started a run
       expect(snap).not.toMatch(/\[ RUN \]/);
-      // Palette input should contain "run"
-      expect(snap).toContain(":run");
     });
   },
 );

@@ -35,7 +35,7 @@ describe.skipIf(process.platform === "win32")(
       await session.waitForText("1 entry", DEFAULT_READY_MS);
 
       session.write(":");
-      await session.waitForText("COMMAND", DEFAULT_READY_MS);
+      await session.waitForText("COMMAND", DEFAULT_WAIT_MS);
 
       session.write("quit");
       session.pressEnter();

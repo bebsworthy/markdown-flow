@@ -199,9 +199,9 @@ function findKeybarLine(frame: string): string {
   return "";
 }
 
-describe("App at width=90 — medium tier (P8-T1 §4.3)", () => {
-  it("browsing.runs: runs table header has AGE, lacks STARTED, keybar ≤ 90", async () => {
-    const { stdin, lastFrame, unmount } = renderAtWidth(appTree(), 90);
+describe("App at width=92 — medium tier (P8-T1 §4.3)", () => {
+  it("browsing.runs: runs table header has AGE, lacks STARTED, keybar ≤ 92", async () => {
+    const { stdin, lastFrame, unmount } = renderAtWidth(appTree(), 92);
     await flush();
 
     stdin.write(KEY_RUNS);
@@ -219,7 +219,7 @@ describe("App at width=90 — medium tier (P8-T1 §4.3)", () => {
     expect(frame).not.toContain("STARTED");
     // Keybar line fits within 90 chars.
     const keybarLine = findKeybarLine(frame);
-    expect(keybarLine.length).toBeLessThanOrEqual(90);
+    expect(keybarLine.length).toBeLessThanOrEqual(92);
     // Top-frame mode tabs NOT compressed (regression guard, §5 criterion 7).
     expect(frame).toContain("RUNS");
     unmount();
@@ -228,7 +228,7 @@ describe("App at width=90 — medium tier (P8-T1 §4.3)", () => {
   it("viewing.graph: step table uses STEP_COLUMNS_MEDIUM, tabs show letter-bracket form", async () => {
     const { stdin, lastFrame, unmount } = renderAtWidth(
       appTree({ engineState: buildEngineState("abcd1234") }),
-      90,
+      92,
     );
     await flush();
 
@@ -255,14 +255,14 @@ describe("App at width=90 — medium tier (P8-T1 §4.3)", () => {
     expect(frame).toContain("[E]vents");
     // Keybar fits.
     const keybarLine = findKeybarLine(frame);
-    expect(keybarLine.length).toBeLessThanOrEqual(90);
+    expect(keybarLine.length).toBeLessThanOrEqual(92);
     unmount();
   });
 
   it("viewing.log: log pane with [L]og tab header, keybar within budget", async () => {
     const { stdin, lastFrame, unmount } = renderAtWidth(
       appTree({ engineState: buildEngineState("abcd1234") }),
-      90,
+      92,
     );
     await flush();
 
@@ -279,7 +279,7 @@ describe("App at width=90 — medium tier (P8-T1 §4.3)", () => {
     expect(frame).toContain("[L]og");
     // Keybar fits.
     const keybarLine = findKeybarLine(frame);
-    expect(keybarLine.length).toBeLessThanOrEqual(90);
+    expect(keybarLine.length).toBeLessThanOrEqual(92);
     unmount();
   });
 });

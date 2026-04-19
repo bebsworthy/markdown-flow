@@ -14,6 +14,7 @@
 //   - one-shot launch-arg ingestion once the registry has loaded
 //   - restricted empty-state keybar under AppShell's `keybar` slot
 
+import { execSync } from "node:child_process";
 import React, {
   useEffect,
   useMemo,
@@ -27,6 +28,7 @@ import { ThemeProvider } from "./theme/context.js";
 import { AppShell } from "./components/app-shell.js";
 import { ModeTabs } from "./components/mode-tabs.js";
 import { WorkflowBrowser } from "./components/workflow-browser.js";
+import { WorkflowPreview } from "./components/workflow-preview.js";
 import { AddWorkflowModal } from "./components/add-workflow-modal.js";
 import { Keybar } from "./components/keybar.js";
 import { APPROVAL_KEYBAR } from "./components/keybar-fixtures/approval.js";
@@ -70,7 +72,7 @@ import type {
   ResumeSubmitResult,
 } from "./resume/types.js";
 import { RunsTable } from "./components/runs-table.js";
-import { RunDetailPlaceholder } from "./components/run-detail-placeholder.js";
+import { RunPreview } from "./components/run-preview.js";
 import { StepTableView } from "./components/step-table-view.js";
 import { GraphPanelView } from "./components/graph-panel-view.js";
 import { ViewingBottomSlot } from "./components/viewing-panes.js";
@@ -91,7 +93,6 @@ import {
 import { buildRetryHints } from "./steps/retry.js";
 import { composeViewingTabRow, type ViewingTabKey } from "./components/viewing-pane-tabs-layout.js";
 import { reducer, initialAppState } from "./state/reducer.js";
-import { initialEngineState } from "./engine/reducer.js";
 import type { EngineState } from "./engine/types.js";
 import { useEngineAdapter } from "./hooks/useEngineAdapter.js";
 import {
@@ -214,9 +215,7 @@ export function App({
     runsDir: viewingRunsDir,
     runId: viewingRunId,
   });
-  const effectiveEngineState: EngineState = engineState ?? (
-    liveEngineState.activeRun ? liveEngineState : initialEngineState
-  );
+  const effectiveEngineState: EngineState = engineState ?? liveEngineState;
 
   // ---- Pending approvals derivation (P7-T1) -----------------------------
   // Recompute on every render — the activeRun.events ring is capped and
@@ -273,6 +272,9 @@ export function App({
   });
   const [registryPath, setRegistryPath] = useState<string | null>(null);
   const [registryLoaded, setRegistryLoaded] = useState<boolean>(false);
+  const [selectedEntryValid, setSelectedEntryValid] = useState(false);
+  const [selectedResolvedEntry, setSelectedResolvedEntry] = useState<ResolvedEntry | null>(null);
+  const [codeBlocksCollapsed, setCodeBlocksCollapsed] = useState(true);
 
   // Refs so async callbacks never capture stale state.
   const registryPathRef = useRef<string | null>(null);
@@ -408,7 +410,7 @@ export function App({
           startedAt: new Date().toISOString(),
           steps: [],
         };
-        setSessionRuns((prev) => [...prev, toRunsTableRow(info, Date.now())]);
+        setSessionRuns((prev) => [...prev, { ...toRunsTableRow(info, Date.now()), runsDir: args.runsDir }]);
         dispatch({ type: "OVERLAY_CLOSE" });
         dispatch({ type: "MODE_OPEN_RUN", runId, runsDir: args.runsDir });
       },
@@ -704,6 +706,11 @@ export function App({
         return;
       }
     }
+    // `z` toggles code block folding in the workflow preview.
+    if (input === "z" && state.mode.kind === "browsing" && state.mode.pane === "workflows") {
+      setCodeBlocksCollapsed((prev) => !prev);
+      return;
+    }
     // `:` opens command palette (P7-T3).
     if (input === ":") {
       dispatch({
@@ -739,11 +746,6 @@ export function App({
     const novel = sessionRuns.filter((r) => !baseIds.has(r.id));
     return [...base, ...novel];
   }, [initialRunRows, sessionRuns]);
-  const rowsById = useMemo<ReadonlySet<string>>(() => {
-    const s = new Set<string>();
-    for (const r of runRows) s.add(r.id);
-    return s;
-  }, [runRows]);
   const suspendedRunsCount = useMemo<number>(() => {
     let n = 0;
     for (const r of runRows) {
@@ -754,12 +756,9 @@ export function App({
 
   const shellWidth = columns;
   const shellHeight = rows;
-  // `innerWidth` is the content budget handed to panes. Use `shellWidth`
-  // directly so tier pickers (docs/tui/plans/P8-T1.md §3.2 — "At width=90
-  // → runs=medium") see the full terminal width. The AppShell box chrome
-  // is drawn around the content; Ink's flexbox clips any excess in the
-  // grow column.
-  const innerWidth = shellWidth;
+  // AppShell draws ║ borders on left and right (2 columns). Content panes
+  // must fit within the remaining space to avoid overflow.
+  const innerWidth = Math.max(0, shellWidth - 2);
   const { topRows: topSlotRows, bottomRows: bottomSlotRows } =
     pickFrameSlots(shellHeight);
   const nowMs = Date.now();
@@ -776,15 +775,32 @@ export function App({
         }}
         selectedWorkflowId={state.selectedWorkflowId}
         dispatch={dispatch}
-        width={columns}
+        width={innerWidth}
         onRemoveEntry={(source) => {
           void onRemoveEntry(source);
         }}
         onStartRun={startRunFromEntry}
         inputDisabled={state.overlay !== null}
+        onSelectionValidityChange={setSelectedEntryValid}
+        onSelectedEntryChange={setSelectedResolvedEntry}
+        onCopyPath={(p) => {
+          try {
+            const cmd = process.platform === "darwin" ? "pbcopy" : "xclip -selection clipboard";
+            execSync(cmd, { input: p, stdio: ["pipe", "ignore", "ignore"] });
+          } catch {
+            /* clipboard write failed silently */
+          }
+        }}
       />
     );
-    bottomSlot = <Text> </Text>;
+    bottomSlot = (
+      <WorkflowPreview
+        resolved={selectedResolvedEntry}
+        width={innerWidth}
+        height={bottomSlotRows}
+        codeBlocksCollapsed={codeBlocksCollapsed}
+      />
+    );
   } else if (state.mode.kind === "browsing" && state.mode.pane === "runs") {
     topSlot = (
       <RunsTable
@@ -803,15 +819,16 @@ export function App({
         runsDir={runsDir}
       />
     );
+    const selectedRow =
+      state.selectedRunId !== null
+        ? runRows.find((r) => r.id === state.selectedRunId) ?? null
+        : null;
     bottomSlot = (
-      <RunDetailPlaceholder
-        mode="follow"
-        selectedRunId={state.selectedRunId}
-        runExists={
-          state.selectedRunId !== null && rowsById.has(state.selectedRunId)
-        }
+      <RunPreview
+        row={selectedRow}
         width={innerWidth}
         height={bottomSlotRows}
+        nowMs={nowMs}
       />
     );
   } else if (state.mode.kind === "viewing") {
@@ -893,6 +910,7 @@ export function App({
         pendingApprovalsCount,
         suspendedRunsCount,
         runResumable,
+        selectedEntryValid,
       }}
       width={columns}
       modePill="APPROVAL"
@@ -910,6 +928,7 @@ export function App({
         pendingApprovalsCount,
         suspendedRunsCount,
         runResumable,
+        selectedEntryValid,
       }}
       width={columns}
       modePill="RESUME"
@@ -927,6 +946,7 @@ export function App({
         pendingApprovalsCount,
         suspendedRunsCount,
         runResumable,
+        selectedEntryValid,
       }}
       width={columns}
       modePill="COMMAND"
@@ -946,6 +966,7 @@ export function App({
         pendingApprovalsCount,
         suspendedRunsCount,
         runResumable,
+        selectedEntryValid,
       }}
       width={columns}
       modePill="HELP"
@@ -965,6 +986,7 @@ export function App({
         pendingApprovalsCount,
         suspendedRunsCount,
         runResumable,
+        selectedEntryValid,
       }}
       width={columns}
       modePill={currentSelection.modePill ?? undefined}
@@ -1129,7 +1151,8 @@ export function App({
           <ApprovalModal
             approval={pendingForActiveRun}
             onDecide={async (choice) => {
-              if (!runsDir) {
+              const activeRunsDir = state.mode.kind === "viewing" ? state.mode.runsDir : runsDir;
+              if (!activeRunsDir) {
                 return {
                   kind: "error",
                   message: "runsDir is not configured",
@@ -1139,7 +1162,7 @@ export function App({
                 dispatch({ type: "APPROVAL_SUBMIT" });
               }
               return decide({
-                runsDir,
+                runsDir: activeRunsDir,
                 runId: pendingForActiveRun.runId,
                 nodeId: pendingForActiveRun.nodeId,
                 choice,
@@ -1176,7 +1199,8 @@ export function App({
               dispatch({ type: "RESUME_WIZARD_SET_INPUT", key, value })
             }
             onConfirm={async () => {
-              if (!runsDir) {
+              const activeRunsDir = state.mode.kind === "viewing" ? state.mode.runsDir : runsDir;
+              if (!activeRunsDir) {
                 return {
                   kind: "error",
                   message: "runsDir is not configured",
@@ -1188,7 +1212,7 @@ export function App({
               }
               dispatch({ type: "RESUME_WIZARD_SUBMIT_START" });
               const result = await resume({
-                runsDir,
+                runsDir: activeRunsDir,
                 runId: ov.runId,
                 rerunNodes: Array.from(ov.rerun),
                 inputOverrides: ov.inputs,
@@ -1215,6 +1239,7 @@ export function App({
               pendingApprovalsCount,
               suspendedRunsCount,
               runResumable,
+              selectedEntryValid,
               runActive: false,
               runsDirReady: runsDir != null,
             }}
@@ -1227,11 +1252,12 @@ export function App({
               pendingApprovalsCount,
               runWorkflow: paletteRunWorkflow,
               resumeRun: async (args): Promise<CommandResult> => {
-                if (!runsDir) {
+                const activeRunsDir = state.mode.kind === "viewing" ? state.mode.runsDir : runsDir;
+                if (!activeRunsDir) {
                   return { kind: "error", message: "runsDir not configured" };
                 }
                 const r = await resume({
-                  runsDir,
+                  runsDir: activeRunsDir,
                   runId: args.runId,
                   rerunNodes: Array.from(args.rerunNodes),
                   inputOverrides: args.inputOverrides,
@@ -1297,6 +1323,7 @@ export function App({
               pendingApprovalsCount,
               suspendedRunsCount,
               runResumable,
+              selectedEntryValid,
             }}
             bindings={prevFixtureRef.current?.bindings ?? []}
             modeLabel={prevFixtureRef.current?.modeLabel ?? ""}

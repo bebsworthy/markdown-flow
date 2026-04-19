@@ -1,32 +1,77 @@
 // src/components/workflow-preview.tsx
 //
-// The right pane of the workflow browser. Pure rendering — no useInput.
-// Uses formatters from `src/browser/preview-layout.ts` for all strings.
+// Bottom-pane preview of the selected workflow. Renders the raw markdown
+// content with collapsible fenced code blocks.
 
 import React from "react";
 import { Box, Text } from "ink";
 import { useTheme } from "../theme/context.js";
-import {
-  countSteps,
-  formatDiagnostics,
-  formatFlowSummary,
-  formatInputsSummary,
-  formatStepCountLine,
-} from "../browser/preview-layout.js";
 import type { ResolvedEntry } from "../browser/types.js";
 
 export interface WorkflowPreviewProps {
   readonly resolved: ResolvedEntry | null;
   readonly width: number;
   readonly height: number;
+  readonly codeBlocksCollapsed: boolean;
 }
 
-const MAX_DIAGNOSTIC_LINES = 5;
+interface MarkdownSection {
+  readonly kind: "text" | "code";
+  readonly lines: ReadonlyArray<string>;
+  readonly lang?: string;
+}
+
+function parseMarkdownSections(raw: string): ReadonlyArray<MarkdownSection> {
+  const lines = raw.split("\n");
+  const sections: MarkdownSection[] = [];
+  let current: string[] = [];
+  let inCode = false;
+  let codeLang = "";
+
+  for (const line of lines) {
+    if (!inCode && /^```/.test(line)) {
+      if (current.length > 0) {
+        sections.push({ kind: "text", lines: current });
+        current = [];
+      }
+      inCode = true;
+      codeLang = line.replace(/^```\s*/, "").trim();
+      current = [];
+    } else if (inCode && /^```\s*$/.test(line)) {
+      sections.push({ kind: "code", lines: current, lang: codeLang });
+      current = [];
+      inCode = false;
+      codeLang = "";
+    } else {
+      current.push(line);
+    }
+  }
+  if (current.length > 0) {
+    sections.push({ kind: inCode ? "code" : "text", lines: current, lang: inCode ? codeLang : undefined });
+  }
+  return sections;
+}
+
+function renderTextLine(
+  line: string,
+): React.ReactElement {
+  if (/^#{1,3}\s/.test(line)) {
+    return <Text bold>{line}</Text>;
+  }
+  if (/^-\s/.test(line)) {
+    return <Text>{line}</Text>;
+  }
+  if (line.trim() === "") {
+    return <Text> </Text>;
+  }
+  return <Text>{line}</Text>;
+}
 
 function WorkflowPreviewImpl({
   resolved,
   width,
   height,
+  codeBlocksCollapsed,
 }: WorkflowPreviewProps): React.ReactElement {
   const theme = useTheme();
 
@@ -57,101 +102,108 @@ function WorkflowPreviewImpl({
     );
   }
 
-  if (resolved.status === "parse-error") {
-    const glyphs = {
-      error: theme.glyphs.fail,
-      warning: theme.capabilities.unicode ? "⚠" : "[warn]",
-    };
-    const diagLines = formatDiagnostics(resolved.diagnostics, glyphs);
-    const shown = diagLines.slice(0, MAX_DIAGNOSTIC_LINES);
-    const extra = diagLines.length - shown.length;
+  const sourcePath = resolved.absolutePath ?? resolved.entry.source;
+  const rawContent = resolved.rawContent;
 
+  if (!rawContent) {
     return (
       <Box flexDirection="column" width={width} height={height}>
         <Text
-          color={theme.colors.danger.color}
-          dimColor={theme.colors.danger.dim === true}
+          color={theme.colors.dim.color}
+          dimColor={theme.colors.dim.dim === true}
         >
-          {theme.glyphs.fail} parse
+          {sourcePath}
         </Text>
-        <Text>{resolved.entry.source}</Text>
-        {resolved.workflow ? (
-          <Box marginTop={1} flexDirection="column">
-            <Text bold>{`# ${resolved.workflow.name}`}</Text>
-          </Box>
-        ) : null}
-        {shown.length > 0 ? (
-          <Box marginTop={1} flexDirection="column">
-            {shown.map((line, idx) => (
-              <Text key={idx}>{line}</Text>
-            ))}
-            {extra > 0 ? (
-              <Text
-                color={theme.colors.dim.color}
-                dimColor={theme.colors.dim.dim === true}
-              >
-                {`+${extra} more`}
-              </Text>
-            ) : null}
-          </Box>
-        ) : null}
+        <Text
+          color={theme.colors.dim.color}
+          dimColor={theme.colors.dim.dim === true}
+        >
+          (no content)
+        </Text>
       </Box>
     );
   }
 
-  // status === "valid"
-  const workflow = resolved.workflow!;
-  const inputsLines = formatInputsSummary(workflow.inputs);
-  const flowLines = formatFlowSummary(workflow);
-  const counts = countSteps(workflow);
-  const countLine = formatStepCountLine(counts);
-  const diagGlyphs = {
-    error: theme.glyphs.fail,
-    warning: theme.capabilities.unicode ? "⚠" : "[warn]",
-  };
-  const diagLines = formatDiagnostics(resolved.diagnostics, diagGlyphs);
+  const sections = parseMarkdownSections(rawContent);
+  const elements: React.ReactElement[] = [];
+  let lineCount = 0;
+  const maxLines = Math.max(0, height - 1);
+
+  // Source path header (dim)
+  elements.push(
+    <Text
+      key="path"
+      color={theme.colors.dim.color}
+      dimColor={theme.colors.dim.dim === true}
+    >
+      {sourcePath}
+    </Text>,
+  );
+  lineCount += 1;
+
+  for (let si = 0; si < sections.length && lineCount < maxLines; si++) {
+    const section = sections[si]!;
+    if (section.kind === "text") {
+      for (let li = 0; li < section.lines.length && lineCount < maxLines; li++) {
+        const line = section.lines[li]!;
+        elements.push(
+          <React.Fragment key={`t-${si}-${li}`}>
+            {renderTextLine(line)}
+          </React.Fragment>,
+        );
+        lineCount += 1;
+      }
+    } else {
+      // Code block
+      const langTag = section.lang ? `\`\`\`${section.lang}` : "```";
+      if (codeBlocksCollapsed) {
+        const foldGlyph = theme.capabilities.unicode ? "\u25B8" : ">";
+        elements.push(
+          <Text
+            key={`c-${si}`}
+            color={theme.colors.dim.color}
+            dimColor={theme.colors.dim.dim === true}
+          >
+            {foldGlyph} {langTag} ({section.lines.length} {section.lines.length === 1 ? "line" : "lines"})
+          </Text>,
+        );
+        lineCount += 1;
+      } else {
+        elements.push(
+          <Text
+            key={`co-${si}`}
+            color={theme.colors.dim.color}
+            dimColor={theme.colors.dim.dim === true}
+          >
+            {langTag}
+          </Text>,
+        );
+        lineCount += 1;
+        for (let li = 0; li < section.lines.length && lineCount < maxLines; li++) {
+          elements.push(
+            <Text key={`cl-${si}-${li}`}>  {section.lines[li]}</Text>,
+          );
+          lineCount += 1;
+        }
+        if (lineCount < maxLines) {
+          elements.push(
+            <Text
+              key={`cc-${si}`}
+              color={theme.colors.dim.color}
+              dimColor={theme.colors.dim.dim === true}
+            >
+              ```
+            </Text>,
+          );
+          lineCount += 1;
+        }
+      }
+    }
+  }
 
   return (
-    <Box flexDirection="column" width={width} height={height}>
-      <Text bold>{`# ${workflow.name}`}</Text>
-      {workflow.description ? (
-        <Box marginTop={1}>
-          <Text>{workflow.description}</Text>
-        </Box>
-      ) : null}
-
-      {inputsLines.length > 0 ? (
-        <Box marginTop={1} flexDirection="column">
-          {inputsLines.map((line, idx) => (
-            <Text key={`in-${idx}`}>{line}</Text>
-          ))}
-        </Box>
-      ) : null}
-
-      {flowLines.length > 0 ? (
-        <Box marginTop={1} flexDirection="column">
-          {flowLines.map((line, idx) => (
-            <Text key={`fl-${idx}`}>{line}</Text>
-          ))}
-        </Box>
-      ) : null}
-
-      <Box marginTop={1}>
-        <Text>{countLine}</Text>
-      </Box>
-
-      <Box marginTop={1} flexDirection="column">
-        {diagLines.length === 0 ? (
-          <Text
-            color={theme.colors.complete.color}
-            dimColor={theme.colors.complete.dim === true}
-          >
-            {`diagnostics: ${theme.glyphs.ok} validated`}
-          </Text>
-        ) : (
-          diagLines.map((line, idx) => <Text key={`dg-${idx}`}>{line}</Text>)
-        )}
-      </Box>
+    <Box flexDirection="column" width={width} height={height} overflow="hidden">
+      {elements}
     </Box>
   );
 }

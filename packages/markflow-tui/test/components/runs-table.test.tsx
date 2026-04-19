@@ -487,14 +487,14 @@ describe("<RunsTable> — footer counts", () => {
     cleanup();
   });
 
-  it("footer label flips to 'Hide archived' when runsArchive.shown=true", () => {
+  it("footer shows archived count when runsArchive.shown=true", () => {
     const { frame, cleanup } = renderTable({
       rows: ROWS,
       width: 140,
       runsArchive: { ...DEFAULT_ARCHIVE, shown: true },
       inputDisabled: true,
     });
-    expect(frame()).toContain("Hide archived");
+    expect(frame()).toContain("archived");
     cleanup();
   });
 
@@ -604,6 +604,7 @@ describe("<RunsTable> — cursor key routing (P5-T3)", () => {
     expect(actionsExcludingSelect(dispatch)).toContainEqual({
       type: "RUNS_CURSOR_MOVE",
       delta: -1,
+      rowCount: 4,
     });
     cleanup();
   });
@@ -622,6 +623,7 @@ describe("<RunsTable> — cursor key routing (P5-T3)", () => {
     expect(actionsExcludingSelect(dispatch)).toContainEqual({
       type: "RUNS_CURSOR_MOVE",
       delta: -1,
+      rowCount: 4,
     });
     cleanup();
   });
@@ -640,6 +642,7 @@ describe("<RunsTable> — cursor key routing (P5-T3)", () => {
     expect(actionsExcludingSelect(dispatch)).toContainEqual({
       type: "RUNS_CURSOR_MOVE",
       delta: +1,
+      rowCount: 4,
     });
     cleanup();
   });
@@ -658,6 +661,7 @@ describe("<RunsTable> — cursor key routing (P5-T3)", () => {
     expect(actionsExcludingSelect(dispatch)).toContainEqual({
       type: "RUNS_CURSOR_MOVE",
       delta: +1,
+      rowCount: 4,
     });
     cleanup();
   });

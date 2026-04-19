@@ -319,9 +319,9 @@ describe("aggregateBatchRow", () => {
       EMPTY_RETRY_HINTS,
       NOW,
     );
-    // NOW - start = 60000 ms → "1:00".
+    // NOW - start = 60000 ms → "1m00s".
     expect(row.elapsedMs).toBe(60_000);
-    expect(row.elapsed).toBe("1:00");
+    expect(row.elapsed).toBe("1m00s");
   });
 
   it("done batch uses max completed_at - earliest started_at", () => {

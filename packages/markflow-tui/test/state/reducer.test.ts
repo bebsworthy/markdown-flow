@@ -576,30 +576,40 @@ describe("RUNS_CURSOR_MOVE", () => {
     const s = reducer(browsingRuns({ runsCursor: 2 }), {
       type: "RUNS_CURSOR_MOVE",
       delta: 1,
+      rowCount: 10,
     });
     expect(s.runsCursor).toBe(3);
   });
   it("does not go negative at cursor=0", () => {
-    const s = reducer(browsingRuns(), { type: "RUNS_CURSOR_MOVE", delta: -1 });
+    const s = reducer(browsingRuns(), { type: "RUNS_CURSOR_MOVE", delta: -1, rowCount: 5 });
     expect(s.runsCursor).toBe(0);
     // Referentially stable — no state change.
     expect(s).toBe(initialAppState === browsingRuns() ? initialAppState : s); // sanity no-op
+  });
+  it("clamps at rowCount - 1", () => {
+    const s = reducer(browsingRuns({ runsCursor: 3 }), {
+      type: "RUNS_CURSOR_MOVE",
+      delta: 5,
+      rowCount: 4,
+    });
+    expect(s.runsCursor).toBe(3);
   });
   it("is a no-op in browsing.workflows", () => {
     const s = reducer(initialAppState, {
       type: "RUNS_CURSOR_MOVE",
       delta: 5,
+      rowCount: 10,
     });
     expect(s).toBe(initialAppState);
   });
   it("delta=0 returns identical state reference", () => {
     const base = browsingRuns({ runsCursor: 3 });
-    const s = reducer(base, { type: "RUNS_CURSOR_MOVE", delta: 0 });
+    const s = reducer(base, { type: "RUNS_CURSOR_MOVE", delta: 0, rowCount: 10 });
     expect(s).toBe(base);
   });
   it("is a no-op in viewing.*", () => {
     const base = viewingState("r1");
-    const s = reducer(base, { type: "RUNS_CURSOR_MOVE", delta: 1 });
+    const s = reducer(base, { type: "RUNS_CURSOR_MOVE", delta: 1, rowCount: 10 });
     expect(s).toBe(base);
   });
 });

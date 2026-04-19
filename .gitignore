@@ -40,3 +40,4 @@ npm-debug.log*
 .idea/
 *.swp
 .markflow-tui.json
+.markflow-tui/

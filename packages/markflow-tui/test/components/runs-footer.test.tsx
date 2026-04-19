@@ -12,7 +12,6 @@ const stripAnsi = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
 function renderFooter(props: {
   shown: number;
   archived: number;
-  archiveShown?: boolean;
   sortKey?: string;
   width?: number;
 }) {
@@ -21,7 +20,6 @@ function renderFooter(props: {
       <RunsFooter
         shown={props.shown}
         archived={props.archived}
-        archiveShown={props.archiveShown ?? false}
         sortKey={props.sortKey ?? "attention"}
         width={props.width ?? 140}
       />
@@ -34,22 +32,19 @@ function renderFooter(props: {
 }
 
 describe("<RunsFooter> — wide tier", () => {
-  it("renders `N shown · M archived · a Show all` when archiveShown=false", () => {
+  it("renders `N shown · M archived` counts", () => {
     const { frame, cleanup } = renderFooter({ shown: 5, archived: 9_995 });
     const f = frame();
     expect(f).toContain("5 shown");
     expect(f).toContain("9 995 archived");
-    expect(f).toContain("a Show all");
     cleanup();
   });
 
-  it("label flips to `a Hide archived` when archiveShown=true", () => {
-    const { frame, cleanup } = renderFooter({
-      shown: 10_000,
-      archived: 9_995,
-      archiveShown: true,
-    });
-    expect(frame()).toContain("a Hide archived");
+  it("does not render shortcut hints (owned by keybar)", () => {
+    const { frame, cleanup } = renderFooter({ shown: 5, archived: 3 });
+    const f = frame();
+    expect(f).not.toContain("a Show");
+    expect(f).not.toContain("a Hide");
     cleanup();
   });
 
@@ -68,34 +63,22 @@ describe("<RunsFooter> — wide tier", () => {
   it("thousands use a space separator (accepting either narrow or normal)", () => {
     const { frame, cleanup } = renderFooter({ shown: 1234, archived: 0 });
     const f = frame();
-    // Accept either `1 234` (plain space) or `1\u202F234` (narrow no-break)
     expect(f).toMatch(/1[\s\u202F]234/);
     cleanup();
   });
 });
 
 describe("<RunsFooter> — narrow tier", () => {
-  it("condenses to `N · M · a Show all` below 90 cols", () => {
+  it("condenses labels below 90 cols", () => {
     const { frame, cleanup } = renderFooter({
       shown: 3,
       archived: 7,
       width: 80,
     });
     const f = frame();
-    expect(f).toContain("a Show all");
+    expect(f).toContain("3");
+    expect(f).toContain("7 archived");
     expect(f).not.toContain("shown");
-    expect(f).not.toContain("archived");
-    cleanup();
-  });
-
-  it("narrow tier honours archiveShown label flip", () => {
-    const { frame, cleanup } = renderFooter({
-      shown: 3,
-      archived: 7,
-      archiveShown: true,
-      width: 80,
-    });
-    expect(frame()).toContain("a Hide archived");
     cleanup();
   });
 });

@@ -41,9 +41,9 @@ describe("runs columns — medium tier (width=90)", () => {
     expect(elapsed!.header).toBe("AGE");
   });
 
-  it("NOTE column has grow: true", () => {
-    const noteCol = COLUMNS_100.find((c) => c.id === "note");
-    expect(noteCol?.grow).toBe(true);
+  it("WORKFLOW column has grow: true", () => {
+    const wfCol = COLUMNS_100.find((c) => c.id === "workflow");
+    expect(wfCol?.grow).toBe(true);
   });
 
   it("COLUMNS_100 contains exactly the ordered id set [id, workflow, status, step, elapsed, note]", () => {

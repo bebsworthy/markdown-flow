@@ -14,7 +14,7 @@
 // CWD where the TUI was launched.
 
 import { createHash } from "node:crypto";
-import { access, mkdir } from "node:fs/promises";
+import { access, mkdir, readdir } from "node:fs/promises";
 import { basename, join, resolve as resolvePath } from "node:path";
 import type { EntrySourceKind } from "./browser/types.js";
 
@@ -85,4 +85,27 @@ export async function resolveEntryWorkspace(args: {
   const runsDir = join(workspaceDir, "runs");
   await mkdir(runsDir, { recursive: true });
   return { workspaceDir, runsDir };
+}
+
+/**
+ * Discover all `runs/` directories across workspaces under
+ * `<baseDir>/.markflow-tui/workspaces/`. Returns absolute paths.
+ */
+export async function listWorkspaceRunsDirs(
+  baseDir: string,
+): Promise<string[]> {
+  const root = resolvePath(baseDir, WORKSPACES_SUBDIR);
+  let entries;
+  try {
+    entries = await readdir(root, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const dirs: string[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const runsDir = join(root, entry.name, "runs");
+    if (await exists(runsDir)) dirs.push(runsDir);
+  }
+  return dirs;
 }

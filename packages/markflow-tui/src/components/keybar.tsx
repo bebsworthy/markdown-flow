@@ -32,11 +32,10 @@ import { Box, Text } from "ink";
 import { useTheme } from "../theme/context.js";
 import type { Binding, AppContext } from "./types.js";
 import {
-  pickTier,
+  pickBestTier,
   filterBindings,
   sortByOrder,
   formatKeys,
-  countCategories,
   resolveGapAfter,
   type Tier,
 } from "./keybar-layout.js";
@@ -176,7 +175,7 @@ function bindingSegments(b: Binding, tier: Tier): ColoredSegment[] {
   return segs;
 }
 
-const BASE_SEP: Record<Tier, number> = { full: 2, short: 1, keys: 1 };
+const BASE_SEP: Readonly<Record<Tier, number>> = { full: 2, short: 1, keys: 1 };
 
 function spaces(n: number): string {
   return n > 0 ? " ".repeat(n) : "";
@@ -210,8 +209,7 @@ function KeybarImpl({
   const segments = useMemo<ColoredSegment[]>(() => {
     const filtered = filterBindings(effectiveBindings, ctx);
     const sorted = sortByOrder(filtered);
-    const catCount = countCategories(sorted);
-    const tier = pickTier(width, catCount);
+    const tier = pickBestTier(width, effectiveBindings, ctx);
 
     // Tier-level binding filter: `hideOnTier` lets a fixture encode the
     // narrow-tier drops from mockups.md §15 (e.g. WORKFLOWS `q`; APPROVAL
@@ -291,10 +289,7 @@ function KeybarImpl({
     return out;
   }, [effectiveBindings, ctx, width, modePill, modePillTiers, effectivePrefix, modePillGap, prefixGap]);
 
-  const currentTier = pickTier(
-    width,
-    countCategories(filterBindings(effectiveBindings, ctx)),
-  );
+  const currentTier = pickBestTier(width, effectiveBindings, ctx);
   // Measured row length (post ANSI-stripped, but our segments carry only
   // plain text — the ANSI wrappers Ink applies at render time aren't in
   // this sum, which is what we want for pure text accounting).

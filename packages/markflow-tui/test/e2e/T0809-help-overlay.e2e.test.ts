@@ -9,6 +9,7 @@ import { afterEach, describe, expect, test } from "vitest";
 
 import {
   DEFAULT_READY_MS,
+  DEFAULT_WAIT_MS,
   spawnTui,
   type TuiSession,
 } from "./harness.js";
@@ -35,12 +36,11 @@ describe.skipIf(process.platform === "win32")(
 
       session.write("?");
 
-      await session.waitForRegex(/HELP|Help|help/i, DEFAULT_READY_MS);
+      // Wait for the help overlay's keybar hint — unique to the overlay
+      await session.waitForText("Esc Close", DEFAULT_WAIT_MS);
 
       const snap = session.snapshot();
-      expect(snap).toContain("HELP");
-      // Keybar shows the help-mode key hints
-      expect(snap).toMatch(/Esc Close/);
+      expect(snap).toMatch(/HELP.*mode/);
     });
   },
 );

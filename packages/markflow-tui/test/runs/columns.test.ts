@@ -44,10 +44,10 @@ describe("COLUMNS_140", () => {
     ]);
   });
 
-  it("exactly one column has grow: true (the 'note' column)", () => {
+  it("exactly one column has grow: true (the 'workflow' column)", () => {
     const growCols = COLUMNS_140.filter((c) => c.grow === true);
     expect(growCols).toHaveLength(1);
-    expect(growCols[0]!.id).toBe("note");
+    expect(growCols[0]!.id).toBe("workflow");
   });
 
   it("fixed-width columns sum to the expected total", () => {
@@ -55,7 +55,8 @@ describe("COLUMNS_140", () => {
       (sum, c) => sum + c.width,
       0,
     );
-    expect(fixed).toBe(8 + 14 + 12 + 14 + 10 + 10);
+    // ID:10 + STATUS:12 + STEP:14 + ELAPSED:10 + STARTED:10 + NOTE:20
+    expect(fixed).toBe(10 + 12 + 14 + 10 + 10 + 20);
   });
 });
 
@@ -94,7 +95,7 @@ describe("column projections", () => {
 
   it("id column projects the short id", () => {
     const col = COLUMNS_140.find((c) => c.id === "id")!;
-    expect(col.projectText(r)).toBe("abcd12");
+    expect(col.projectText(r)).toBe("abcd1234");
   });
 
   it("workflow column projects the workflow name", () => {
@@ -112,8 +113,8 @@ describe("column projections", () => {
     expect(cell.glyphKey).toBe("running");
   });
 
-  it("note column has grow: true", () => {
-    const noteCol = COLUMNS_140.find((c) => c.id === "note")!;
-    expect(noteCol.grow).toBe(true);
+  it("workflow column has grow: true", () => {
+    const wfCol = COLUMNS_140.find((c) => c.id === "workflow")!;
+    expect(wfCol.grow).toBe(true);
   });
 });

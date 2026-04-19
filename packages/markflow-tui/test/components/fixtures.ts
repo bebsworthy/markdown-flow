@@ -121,35 +121,35 @@ const alwaysTrue = (): boolean => true;
 const noop = (): void => {};
 
 // --- WORKFLOWS --------------------------------------------------------------
-// Wide:   `↑↓ Select  ⏎ Open  r Run  e Edit in $EDITOR     ? Help   q Quit`
-// Medium: `↑↓ ⏎ r e    ? q`
-// Narrow: `↑↓ ⏎ r e ?`
+// Matches src/components/keybar-fixtures/workflows.ts WORKFLOWS_KEYBAR.
+// Full:  `↑↓ Select  r Run  a Add  d Remove  c Copy Path  z Fold  ? Help     q Quit`
+// Short: `↑↓ r a d c Copy z ?    q`
+// Keys:  `↑↓ r a d c z ?    q`
 export const workflowsBindings: ReadonlyArray<Binding> = Object.freeze([
   { keys: ["Up", "Down"], label: "Select", when: alwaysTrue, action: noop },
-  { keys: ["Enter"], label: "Open", when: alwaysTrue, action: noop },
   { keys: ["r"], label: "Run", when: alwaysTrue, action: noop },
+  { keys: ["a"], label: "Add", when: alwaysTrue, action: noop },
+  { keys: ["d"], label: "Remove", when: alwaysTrue, action: noop },
   {
-    keys: ["e"],
-    label: "Edit in $EDITOR",
+    keys: ["c"],
+    label: "Copy Path",
+    shortLabel: "Copy",
     when: alwaysTrue,
     action: noop,
-    // Pre-globals gap: full 5sp (2 base + 3), short 4sp (1 + 3).
-    gapAfter: { full: 3, short: 3 },
   },
+  { keys: ["z"], label: "Fold", when: alwaysTrue, action: noop },
   {
     keys: ["?"],
     label: "Help",
+    gapAfter: 3,
     when: alwaysTrue,
     action: noop,
-    // `? Help   q Quit` (3sp) in full. Medium/narrow use single space.
-    gapAfter: { full: 1 },
   },
   {
     keys: ["q"],
     label: "Quit",
     when: alwaysTrue,
     action: noop,
-    hideOnTier: ["keys"],
   },
 ]);
 

@@ -27,6 +27,7 @@ import type {
   ResolverOptions,
 } from "./types.js";
 import type { RegistryEntry } from "../registry/types.js";
+import { fileSlug, pickFileWorkspaceDir } from "../workspace.js";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -56,6 +57,7 @@ export async function resolveEntry(
       diagnostics: [],
       lastRun: null,
       errorReason: reason,
+      rawContent: null,
     };
   }
 
@@ -82,6 +84,7 @@ export async function resolveEntry(
       ],
       lastRun: null,
       errorReason: "not a file",
+      rawContent: null,
     };
   }
 
@@ -105,10 +108,11 @@ export async function resolveEntry(
       ],
       lastRun: null,
       errorReason: "not a .md",
+      rawContent: null,
     };
   }
 
-  return resolveMarkdownFile(entry, absolutePath);
+  return resolveMarkdownFile(entry, absolutePath, opts);
 }
 
 export async function resolveEntries(
@@ -151,9 +155,18 @@ function classifyStatError(err: unknown): string {
   return errorMessage(err);
 }
 
+async function readRawContent(filePath: string): Promise<string | null> {
+  try {
+    return await readFile(filePath, "utf8");
+  } catch {
+    return null;
+  }
+}
+
 async function resolveMarkdownFile(
   entry: RegistryEntry,
   absolutePath: string,
+  opts: ResolverOptions,
 ): Promise<ResolvedEntry> {
   const id = formatEntryId(entry);
   let workflow: WorkflowDefinition;
@@ -171,11 +184,22 @@ async function resolveMarkdownFile(
       diagnostics: [synthesizeParseDiagnostic(err, absolutePath)],
       lastRun: null,
       errorReason: errorMessage(err),
+      rawContent: await readRawContent(absolutePath),
     };
   }
 
   const diagnostics = validateWorkflow(workflow);
   const hasErrors = diagnostics.some((d) => d.severity === "error");
+
+  // File-kind entries store runs in a per-workflow workspace under
+  // <baseDir>/.markflow-tui/workspaces/<slug>/runs/.
+  let lastRun: LastRunInfo | null = null;
+  if (opts.readLastRun !== false) {
+    const slug = fileSlug(absolutePath);
+    const wsDir = pickFileWorkspaceDir(opts.baseDir, slug);
+    lastRun = await readLastRun(wsDir);
+  }
+
   return {
     entry,
     id,
@@ -185,9 +209,9 @@ async function resolveMarkdownFile(
     title: workflow.name || basename(absolutePath),
     workflow,
     diagnostics,
-    // File-kind entries have no dedicated run directory — see plan §11 Q4.
-    lastRun: null,
+    lastRun,
     errorReason: hasErrors ? "validation errors" : null,
+    rawContent: await readRawContent(absolutePath),
   };
 }
 
@@ -252,6 +276,7 @@ async function resolveWorkspace(
       ],
       lastRun: null,
       errorReason: configReadError ?? "no workflow",
+      rawContent: null,
     };
   }
 
@@ -271,6 +296,7 @@ async function resolveWorkspace(
       diagnostics: [synthesizeParseDiagnostic(err, workflowFilePath)],
       lastRun: null,
       errorReason: errorMessage(err),
+      rawContent: await readRawContent(workflowFilePath),
     };
   }
 
@@ -290,12 +316,13 @@ async function resolveWorkspace(
     diagnostics,
     lastRun,
     errorReason: hasErrors ? "validation errors" : null,
+    rawContent: await readRawContent(workflowFilePath),
   };
 }
 
 async function readLastRun(workspaceDir: string): Promise<LastRunInfo | null> {
   try {
-    const runs: RunInfo[] = await createRunManager(workspaceDir).listRuns();
+    const runs: RunInfo[] = await createRunManager(join(workspaceDir, "runs")).listRuns();
     if (runs.length === 0) return null;
     let best: RunInfo = runs[0]!;
     for (const r of runs) {

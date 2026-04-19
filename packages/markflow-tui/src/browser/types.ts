@@ -72,6 +72,8 @@ export interface ResolvedEntry {
   readonly lastRun: LastRunInfo | null;
   /** Opaque reason string when `status === "missing"` or `"parse-error"`. */
   readonly errorReason: string | null;
+  /** Raw markdown content of the workflow file, if read successfully. */
+  readonly rawContent: string | null;
 }
 
 /** Options passed to `resolveEntry` / `resolveEntries`. */

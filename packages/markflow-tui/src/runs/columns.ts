@@ -28,7 +28,7 @@ export const MEDIUM_TIER_MIN = 90;
 const COL_ID: RunsTableColumn = Object.freeze({
   id: "id",
   header: "ID",
-  width: 8,
+  width: 10,
   align: "left",
   projectText: (r: RunsTableRow) => r.idShort,
 });
@@ -36,7 +36,8 @@ const COL_ID: RunsTableColumn = Object.freeze({
 const COL_WORKFLOW: RunsTableColumn = Object.freeze({
   id: "workflow",
   header: "WORKFLOW",
-  width: 14,
+  width: 0,
+  grow: true,
   align: "left",
   projectText: (r: RunsTableRow) => r.workflow,
 });
@@ -71,7 +72,7 @@ const COL_AGE: RunsTableColumn = Object.freeze({
   header: "AGE",
   width: 8,
   align: "left",
-  projectText: (r: RunsTableRow) => r.elapsed,
+  projectText: (r: RunsTableRow) => r.age,
 });
 
 const COL_STARTED: RunsTableColumn = Object.freeze({
@@ -85,8 +86,7 @@ const COL_STARTED: RunsTableColumn = Object.freeze({
 const COL_NOTE: RunsTableColumn = Object.freeze({
   id: "note",
   header: "NOTE",
-  width: 0,
-  grow: true,
+  width: 20,
   align: "left",
   projectText: (r: RunsTableRow) => r.note,
 });
