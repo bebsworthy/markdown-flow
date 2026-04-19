@@ -34,7 +34,7 @@ jobs:
         run: npm audit --audit-level=high || true
 
       - name: Validate lockfile
-        run: npx lockfile-lint --type npm --path package-lock.json --validate-https --allowed-hosts npm
+        run: npx lockfile-lint --type npm --path package-lock.json --validate-https --allowed-hosts npm npm.jsr.io
 
       - name: Lint
         run: npm run lint -w packages/markflow

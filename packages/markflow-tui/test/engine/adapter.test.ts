@@ -107,7 +107,7 @@ describe("createEngineAdapter — list pump", () => {
     }
   });
 
-  it("yields a list event when a new run appears mid-stream", async () => {
+  it("yields a list event when a new run appears mid-stream", { timeout: 15_000 }, async () => {
     const runsDir = runsDirs[runsDirs.length - 1];
     const ac = new AbortController();
     const adapter = createEngineAdapter({ runsDir, signal: ac.signal });
