@@ -13,6 +13,7 @@
 // The baseDir is the directory that holds .markflow-tui.json — typically the
 // CWD where the TUI was launched.
 
+import { createHash } from "node:crypto";
 import { access, mkdir } from "node:fs/promises";
 import { basename, join, resolve as resolvePath } from "node:path";
 import type { EntrySourceKind } from "./browser/types.js";
@@ -29,13 +30,18 @@ export async function exists(path: string): Promise<boolean> {
 }
 
 /**
- * Slug-safe stem derived from an absolute file path. Strips `.md`, then
- * replaces everything outside `[A-Za-z0-9_.-]+` with `-`.
+ * Deterministic, collision-free slug for a workflow file path.
+ * Format: `<stem>-<hash8>` where stem is the sanitised basename and
+ * hash8 is the first 8 hex chars of the SHA-256 of the full absolute
+ * path. Two files named `hello.md` in different directories get
+ * distinct slugs (e.g. `hello-a1b2c3d4` vs `hello-e5f6a7b8`).
  */
 export function fileSlug(absolutePath: string): string {
   const stem = basename(absolutePath, ".md");
   const safe = stem.replace(/[^A-Za-z0-9_.-]+/g, "-");
-  return safe.length > 0 ? safe : "workflow";
+  const name = safe.length > 0 ? safe : "workflow";
+  const hash = createHash("sha256").update(absolutePath).digest("hex").slice(0, 8);
+  return `${name}-${hash}`;
 }
 
 /**
