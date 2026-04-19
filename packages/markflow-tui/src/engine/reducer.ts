@@ -92,6 +92,8 @@ export function engineReducer(
         },
       };
     }
+    case "ENGINE_RESET":
+      return initialEngineState;
     case "RUN_TAIL_DETACHED": {
       const active = state.activeRun;
       if (!active || active.runId !== action.runId) return state;

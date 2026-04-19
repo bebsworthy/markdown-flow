@@ -40,6 +40,7 @@ export function useEngineAdapter(
   const [state, dispatch] = useReducer(engineReducer, initialEngineState);
 
   useEffect(() => {
+    dispatch({ type: "ENGINE_RESET" });
     if (!opts.runsDir) return;
     const runsDir = opts.runsDir;
     const controller = new AbortController();

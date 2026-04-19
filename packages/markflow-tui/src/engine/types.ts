@@ -142,4 +142,6 @@ export type EngineAction =
       readonly type: "RUN_TAIL_DETACHED";
       readonly runId: string;
       readonly reason: "terminal" | "swapped" | "aborted";
-    };
+    }
+  // --- Lifecycle ---------------------------------------------------------------
+  | { readonly type: "ENGINE_RESET" };
