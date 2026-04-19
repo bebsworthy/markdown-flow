@@ -39,22 +39,16 @@ export function fileSlug(absolutePath: string): string {
 }
 
 /**
- * Pick a workspace dir under `<baseDir>/.markflow-tui/workspaces/<slug>`.
- * If the slot is free, return it. If occupied, append `-2`, `-3`, etc.
+ * Return the deterministic workspace dir for a file slug:
+ * `<baseDir>/.markflow-tui/workspaces/<slug>`. The same file always
+ * maps to the same workspace so multiple runs accumulate under one
+ * `runs/` directory.
  */
-export async function pickFileWorkspaceDir(
+export function pickFileWorkspaceDir(
   baseDir: string,
   slug: string,
-): Promise<string> {
-  const root = resolvePath(baseDir, WORKSPACES_SUBDIR);
-  const candidate = join(root, slug);
-  if (!(await exists(candidate))) return candidate;
-
-  for (let i = 2; i < 100; i++) {
-    const alt = join(root, `${slug}-${i}`);
-    if (!(await exists(alt))) return alt;
-  }
-  return join(root, `${slug}-${Date.now()}`);
+): string {
+  return join(resolvePath(baseDir, WORKSPACES_SUBDIR), slug);
 }
 
 export interface WorkspaceInfo {
@@ -81,7 +75,7 @@ export async function resolveEntryWorkspace(args: {
   }
 
   const slug = fileSlug(args.absolutePath);
-  const workspaceDir = await pickFileWorkspaceDir(args.baseDir, slug);
+  const workspaceDir = pickFileWorkspaceDir(args.baseDir, slug);
   const runsDir = join(workspaceDir, "runs");
   await mkdir(runsDir, { recursive: true });
   return { workspaceDir, runsDir };
