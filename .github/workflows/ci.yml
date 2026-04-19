@@ -51,6 +51,9 @@ jobs:
       - name: Install dependencies (monorepo, hoisted)
         run: npm ci
 
+      - name: Build engine (workspace dependency)
+        run: npm run build -w packages/markflow
+
       - name: Lint
         run: npm run lint -w packages/markflow-tui
 
