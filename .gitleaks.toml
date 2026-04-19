@@ -1,0 +1,7 @@
+[extend]
+# Use default gitleaks rules
+
+[[rules]]
+id = "markflow-event-log"
+description = "Prevent committing event log files with potential secrets"
+path = '''events\.jsonl$'''

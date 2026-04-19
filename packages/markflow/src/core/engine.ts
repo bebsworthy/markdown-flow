@@ -1,3 +1,4 @@
+import { safeMerge } from "./safe-merge.js";
 import type {
   WorkflowDefinition,
   MarkflowConfig,
@@ -196,14 +197,20 @@ export class WorkflowEngine {
       // Create run directory
       this.runDir = await runManager.createRun(this.def);
 
-      // First record of every run: the log is self-describing from here on.
+      const SECRET_RE = /KEY|TOKEN|SECRET|PASSWORD/i;
+      const safeInputs = Object.fromEntries(
+        Object.entries(this.resolvedInputs).map(([k, v]) =>
+          [k, SECRET_RE.test(k) ? "***" : v]
+        )
+      );
+
       await this.emit({
         type: "run:start",
         v: 1,
         runId: this.runDir.id,
         workflowName: this.def.name,
         sourceFile: this.def.sourceFile,
-        inputs: this.resolvedInputs,
+        inputs: safeInputs,
         configResolved: this.config,
       });
 
@@ -661,7 +668,7 @@ export class WorkflowEngine {
           patch,
         },
         () => {
-          Object.assign(this.globalContext, patch);
+          safeMerge(this.globalContext, patch);
         },
       );
     }

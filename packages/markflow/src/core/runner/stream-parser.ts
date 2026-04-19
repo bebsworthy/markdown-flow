@@ -1,3 +1,5 @@
+import { safeMerge } from "../safe-merge.js";
+
 const SENTINEL_RE = /^(LOCAL|GLOBAL|RESULT):\s*(\{.*\})\s*$/;
 
 export interface ParsedStream {
@@ -41,9 +43,9 @@ export function createStreamParser(): StreamParser {
     const obj = parsed as Record<string, unknown>;
 
     if (kind === "LOCAL") {
-      Object.assign(local, obj);
+      safeMerge(local, obj);
     } else if (kind === "GLOBAL") {
-      Object.assign(global, obj);
+      safeMerge(global, obj);
     } else {
       if ("local" in obj) {
         errors.push(

@@ -14,7 +14,7 @@
 //   - one-shot launch-arg ingestion once the registry has loaded
 //   - restricted empty-state keybar under AppShell's `keybar` slot
 
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import React, {
   useEffect,
   useMemo,
@@ -785,8 +785,11 @@ export function App({
         onSelectedEntryChange={setSelectedResolvedEntry}
         onCopyPath={(p) => {
           try {
-            const cmd = process.platform === "darwin" ? "pbcopy" : "xclip -selection clipboard";
-            execSync(cmd, { input: p, stdio: ["pipe", "ignore", "ignore"] });
+            if (process.platform === "darwin") {
+              execFileSync("pbcopy", [], { input: p, stdio: ["pipe", "ignore", "ignore"] });
+            } else {
+              execFileSync("xclip", ["-selection", "clipboard"], { input: p, stdio: ["pipe", "ignore", "ignore"] });
+            }
           } catch {
             /* clipboard write failed silently */
           }

@@ -41,3 +41,13 @@ npm-debug.log*
 *.swp
 .markflow-tui.json
 .markflow-tui/
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Credential files
+credentials*.json
+serviceAccountKey*.json

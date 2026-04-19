@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { safeMerge } from "./safe-merge.js";
 import {
   InconsistentLogError,
   TruncatedLogError,
@@ -93,7 +94,7 @@ export function replay(events: EngineEvent[]): EngineSnapshot {
       }
 
       case "global:update": {
-        Object.assign(snap.globalContext, evt.patch);
+        safeMerge(snap.globalContext, evt.patch);
         break;
       }
 
