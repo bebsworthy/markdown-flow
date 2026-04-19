@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "devDependencies": {
+    "husky": "^9.1.7",
     "ink": "^7.0.1",
     "react": "^19.2.5"
   },
@@ -16,6 +17,7 @@
     "test:watch": "npm run test:watch --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "dev": "npm run dev -w packages/markflow",
-    "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper 2>/dev/null || true"
+    "postinstall": "chmod +x node_modules/node-pty/prebuilds/darwin-arm64/spawn-helper 2>/dev/null || true",
+    "prepare": "husky"
   }
 }

@@ -189,8 +189,8 @@ echo 'RESULT: {"edge": "next", "summary": "ok"}'
 # item 11 sleeps longest, item 10 shortest → reversed completion order
 case "$ITEM" in
   10) sleep 0.05 ;;
-  11) sleep 0.2 ;;
-  12) sleep 0.1 ;;
+  11) sleep 0.6 ;;
+  12) sleep 0.3 ;;
 esac
 echo "LOCAL: {\\"i\\": $ITEM}"
 echo "RESULT: {\\"edge\\": \\"next\\", \\"summary\\": \\"i-$ITEM\\"}"
