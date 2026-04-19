@@ -99,11 +99,25 @@ export async function materializeRemoteTarget(
     }
     const ct = res.headers.get("content-type") ?? "";
     if (ct && !/text\/(markdown|plain|x-markdown)|application\/(octet-stream|markdown)/i.test(ct)) {
-      process.stderr.write(
-        `Warning: unexpected Content-Type "${ct}" for ${url}\n`,
-      );
+      throw new Error(`Unexpected Content-Type "${ct}" for ${url} — expected markdown`);
     }
-    content = await res.text();
+
+    const MAX_WORKFLOW_BYTES = 1024 * 1024;
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error(`No response body from ${url}`);
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > MAX_WORKFLOW_BYTES) {
+        reader.cancel();
+        throw new Error(`Response from ${url} exceeds 1 MiB limit`);
+      }
+      chunks.push(value);
+    }
+    content = new TextDecoder().decode(Buffer.concat(chunks));
     origin = { type: "url", url, fetchedAt: new Date().toISOString() };
     let urlBase: string;
     try {
@@ -236,6 +250,11 @@ export async function resolveTarget(
       );
     }
     const workflowPath = resolve(absTarget, wsData.workflow);
+    if (!workflowPath.startsWith(absTarget + "/") && workflowPath !== absTarget) {
+      throw new Error(
+        `Path traversal detected: .markflow.json "workflow" field resolves outside the workspace directory`,
+      );
+    }
     return { workflowPath, workspaceDir: absTarget, workspaceExists: true };
   }
 

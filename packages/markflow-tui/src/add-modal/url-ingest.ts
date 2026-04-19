@@ -121,9 +121,29 @@ export async function ingestUrl(
     };
   }
 
+  const ct = res.headers.get("content-type") ?? "";
+  if (ct && !/text\/(markdown|plain|x-markdown)|application\/(octet-stream|markdown)/i.test(ct)) {
+    return { ok: false, reason: `unexpected Content-Type "${ct}" — expected markdown` };
+  }
+
+  const MAX_BYTES = 1024 * 1024;
   let body: string;
   try {
-    body = await res.text();
+    const reader = res.body?.getReader();
+    if (!reader) return { ok: false, reason: "no response body" };
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_BYTES) {
+        reader.cancel();
+        return { ok: false, reason: "response exceeds 1 MiB limit" };
+      }
+      chunks.push(value);
+    }
+    body = new TextDecoder().decode(Buffer.concat(chunks));
   } catch (err) {
     return { ok: false, reason: `failed to read body: ${errorMessage(err)}` };
   }

@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -32,6 +33,9 @@ jobs:
       - name: Audit dependencies
         run: npm audit --audit-level=high || true
 
+      - name: Validate lockfile
+        run: npx lockfile-lint --type npm --path package-lock.json --validate-https --allowed-hosts npm
+
       - name: Lint
         run: npm run lint -w packages/markflow
 
@@ -40,6 +44,15 @@ jobs:
 
       - name: Build
         run: npm run build -w packages/markflow
+
+      - name: Generate SBOM
+        run: npx @cyclonedx/cyclonedx-npm --output-file sbom.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.json
 
   tui:
     name: tui (packages/markflow-tui)
