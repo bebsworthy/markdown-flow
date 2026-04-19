@@ -59,6 +59,8 @@ jobs:
 
       - name: Test
         run: npm test -w packages/markflow-tui -- --run
+        env:
+          MARKFLOW_PERF_MULT: "2"
 
       - name: Build
         run: npm run build -w packages/markflow-tui
