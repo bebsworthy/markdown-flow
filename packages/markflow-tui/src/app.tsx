@@ -55,6 +55,7 @@ import type {
 } from "./runStart/types.js";
 import type { ResolvedEntry } from "./browser/types.js";
 import type { RunInfo, WorkflowDefinition } from "markflow";
+import { toRunsTableRow } from "./runs/derive.js";
 import {
   deriveInputRows,
   deriveRerunNodes,
@@ -390,6 +391,7 @@ export function App({
     readonly sourceFile: string;
     readonly workspaceDir: string;
     readonly runsDir: string;
+    readonly workflowName: string;
     readonly inputs: Readonly<Record<string, string>>;
   }): Promise<RunWorkflowResult> => {
     return startRun({
@@ -398,6 +400,15 @@ export function App({
       sourceFile: args.sourceFile,
       inputs: args.inputs,
       onRunStart: (runId) => {
+        const info: RunInfo = {
+          id: runId,
+          workflowName: args.workflowName,
+          sourceFile: args.sourceFile,
+          status: "running",
+          startedAt: new Date().toISOString(),
+          steps: [],
+        };
+        setSessionRuns((prev) => [...prev, toRunsTableRow(info, Date.now())]);
         dispatch({ type: "OVERLAY_CLOSE" });
         dispatch({ type: "MODE_OPEN_RUN", runId, runsDir: args.runsDir });
       },
@@ -417,6 +428,7 @@ export function App({
         sourceFile: args.sourceFile,
         workspaceDir: args.workspaceDir,
         runsDir: args.runsDir,
+        workflowName: args.workflow.name,
         inputs: {},
       });
       return;
@@ -718,10 +730,15 @@ export function App({
 
   const persist = registryConfig?.persist ?? true;
 
-  const runRows = useMemo<ReadonlyArray<RunsTableRow>>(
-    () => initialRunRows ?? [],
-    [initialRunRows],
-  );
+  const [sessionRuns, setSessionRuns] = useState<RunsTableRow[]>([]);
+
+  const runRows = useMemo<ReadonlyArray<RunsTableRow>>(() => {
+    const base = initialRunRows ?? [];
+    if (sessionRuns.length === 0) return base;
+    const baseIds = new Set(base.map((r) => r.id));
+    const novel = sessionRuns.filter((r) => !baseIds.has(r.id));
+    return [...base, ...novel];
+  }, [initialRunRows, sessionRuns]);
   const rowsById = useMemo<ReadonlySet<string>>(() => {
     const s = new Set<string>();
     for (const r of runRows) s.add(r.id);
@@ -1303,6 +1320,7 @@ export function App({
                 sourceFile: ov.sourceFile,
                 workspaceDir: ov.workspaceDir,
                 runsDir: ov.runsDir,
+                workflowName: ov.workflowName,
                 inputs,
               });
               if (result.kind === "ok") {
