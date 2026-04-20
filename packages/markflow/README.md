@@ -107,6 +107,10 @@ await executeWorkflow(workflow, {
 });
 ```
 
+## Documentation
+
+Full documentation, examples, architecture guides, and the terminal UI are in the [GitHub repository](https://github.com/bebsworthy/markdown-flow).
+
 ## Requirements
 
 - Node.js >= 22

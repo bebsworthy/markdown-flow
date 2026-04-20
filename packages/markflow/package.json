@@ -2,6 +2,13 @@
   "name": "markflow-cli",
   "version": "0.1.0",
   "description": "Workflow engine driven by Markdown + Mermaid flowcharts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bebsworthy/markdown-flow.git",
+    "directory": "packages/markflow"
+  },
+  "homepage": "https://github.com/bebsworthy/markdown-flow#readme",
+  "keywords": ["workflow", "markdown", "mermaid", "cli", "automation", "ai-agent"],
   "type": "module",
   "main": "dist/core/index.js",
   "types": "dist/core/index.d.ts",
