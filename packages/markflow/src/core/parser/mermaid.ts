@@ -1,4 +1,4 @@
-import { parseFlowchart } from "@emily/mermaid-ast";
+import { parseFlowchart } from "mermaid-ast";
 import type { FlowGraph, FlowNode, FlowEdge, EdgeAnnotations } from "../types.js";
 import { ParseError } from "../errors.js";
 

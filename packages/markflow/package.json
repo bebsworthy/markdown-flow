@@ -1,6 +1,6 @@
 {
   "name": "markflow-cli",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "description": "Workflow engine driven by Markdown + Mermaid flowcharts",
   "repository": {
     "type": "git",
@@ -8,7 +8,14 @@
     "directory": "packages/markflow"
   },
   "homepage": "https://github.com/bebsworthy/markdown-flow#readme",
-  "keywords": ["workflow", "markdown", "mermaid", "cli", "automation", "ai-agent"],
+  "keywords": [
+    "workflow",
+    "markdown",
+    "mermaid",
+    "cli",
+    "automation",
+    "ai-agent"
+  ],
   "type": "module",
   "main": "dist/core/index.js",
   "types": "dist/core/index.d.ts",
@@ -33,7 +40,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@emily/mermaid-ast": "npm:@jsr/emily__mermaid-ast@^0.8.2",
+    "mermaid-ast": "^0.8.2",
     "chalk": "^5.3.0",
     "js-yaml": "^4.1.1",
     "liquidjs": "^10.25.6",
