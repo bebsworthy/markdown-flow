@@ -211,13 +211,71 @@ On `run:resumed`, replay reconstructs `batches` from `batch:start` + per-item ev
 ## Complexity Considerations
 
 - **Token tracking:** Dynamic cardinality means the engine can't know in advance how many tokens to expect at a merge node — the `batches` map in the snapshot provides the authoritative expected count.
-- **Partial failure:** What if 3/10 items fail? Need clear semantics.
+- **Partial failure:** What if 3/10 items fail? Need clear semantics. → Resolved via `onItemError` policy.
 - **Nested forEach:** Should `forEach` inside a `forEach` be supported? (Probably not in v1.)
-- **Concurrency limit:** `maxParallel: 5` to avoid overwhelming resources. Scheduling-only — not logged as an event; it affects dispatch order, not state.
+- **Concurrency limit:** Implemented as `maxConcurrency`. See below.
 
-## Open Questions
+## Concurrency Control — `maxConcurrency`
 
-- Should dynamic tokens share GLOBAL state or each get an isolated copy?
-- How are results ordered — by completion time or original index?
-- Should there be a `maxParallel` / concurrency limit?
-- Can forEach be combined with retry (retry individual items)?
+**Status:** IMPLEMENTED
+
+Limits the number of batch item tokens executing concurrently using a sliding window. Configured on the forEach source step:
+
+````markdown
+## produce
+
+```config
+foreach:
+  maxConcurrency: 3
+  onItemError: continue
+```
+````
+
+| Value | Behavior |
+|---|---|
+| `0` or omitted | Unlimited — all items spawn immediately (original behavior) |
+| `1` | Serial execution — items process one at a time, in order |
+| `N` | Sliding window — up to N items in-flight; as one completes, the next spawns |
+
+### Engine mechanics
+
+- At `batch:start`, the engine spawns `min(maxConcurrency, items.length)` tokens initially.
+- `BatchState` tracks `spawned` (watermark of how many tokens have been created) alongside `completed`.
+- In `completeBatchItem()`, after recording an item completion, if `spawned < expected` and the batch is not fail-fast-aborted, the engine spawns the next token from the items array.
+- Result ordering is preserved — `GLOBAL.results` is indexed by original item position regardless of completion order.
+
+### Event model
+
+`batch:start` carries `maxConcurrency` for replay determinism:
+
+```ts
+{
+  type: "batch:start"; v: 2;
+  batchId: string; nodeId: string;
+  items: number;
+  itemContexts: unknown[];
+  onItemError: "fail-fast" | "continue";
+  maxConcurrency: number;  // 0 = unlimited
+}
+```
+
+Replay reconstructs the `spawned` watermark from `token:created` events (tracking `max(itemIndex + 1)` per batch).
+
+### Interaction with other features
+
+- **fail-fast + maxConcurrency:** On first item failure, no further tokens are spawned. The batch completes once all already-spawned tokens finish.
+- **Step-level retry:** Each item's retry budget is independent. A retrying item occupies its concurrency slot until it either succeeds or exhausts retries.
+- **Resume:** On resume, the engine counts in-flight tokens and only spawns enough to fill the window back to `maxConcurrency`.
+
+### Validator rule
+
+| Code | Meaning |
+|---|---|
+| `FOREACH_INVALID_CONCURRENCY` | `maxConcurrency` is not a non-negative integer. |
+
+## Resolved Questions
+
+- ~~Should dynamic tokens share GLOBAL state or each get an isolated copy?~~ → Each item token gets `$ITEM` and `$ITEM_INDEX`; GLOBAL is shared workflow-wide.
+- ~~How are results ordered — by completion time or original index?~~ → By original index (pre-allocated slots).
+- ~~Should there be a `maxParallel` / concurrency limit?~~ → Implemented as `maxConcurrency`.
+- ~~Can forEach be combined with retry (retry individual items)?~~ → Yes, via step-level `retry:` config on the body step.

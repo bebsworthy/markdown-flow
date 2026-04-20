@@ -317,6 +317,21 @@ export function validateWorkflow(
     }
   }
 
+  // 10e. FOREACH_INVALID_CONCURRENCY — maxConcurrency must be a non-negative integer
+  for (const sourceNodeId of forEachSources) {
+    const step = def.steps.get(sourceNodeId);
+    const mc = step?.stepConfig?.foreach?.maxConcurrency;
+    if (mc !== undefined && (!Number.isInteger(mc) || mc < 0)) {
+      diagnostics.push({
+        severity: "error",
+        code: "FOREACH_INVALID_CONCURRENCY",
+        message: `forEach maxConcurrency on "${sourceNodeId}" must be a non-negative integer (got ${mc})`,
+        nodeId: sourceNodeId,
+        source,
+      });
+    }
+  }
+
   // 9. Duplicate input names
   const seenInputs = new Map<string, number>();
   for (let i = 0; i < def.inputs.length; i++) {

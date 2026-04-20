@@ -141,7 +141,27 @@ A -->|fail max:3| B        # retry up to 3 times
 A -->|fail:max| C          # followed when retries exhausted
 ```
 
-Multiple unlabelled edges from a node fan out in parallel. A node with multiple incoming edges waits for all upstreams to complete. Full routing semantics — including step-level retry policies and timeouts — in [`docs/arch/routing-and-retries.md`](docs/arch/routing-and-retries.md).
+Multiple unlabelled edges from a node fan out in parallel. A node with multiple incoming edges waits for all upstreams to complete.
+
+### forEach (Dynamic Task Mapping)
+
+A thick edge declares a forEach fan-out — the engine spawns one token per array item:
+
+```
+A ==>|each: items| B --> C   # B runs once per item; C collects results
+```
+
+Configure concurrency and failure policy on the source step:
+
+```yaml
+foreach:
+  maxConcurrency: 3          # 0 = unlimited (default), 1 = serial
+  onItemError: continue      # or: fail-fast (default)
+```
+
+Body steps receive `$ITEM` (current element) and `$ITEM_INDEX` (position). After all items complete, the collector receives `GLOBAL.results` indexed by original position.
+
+Full routing semantics — including step-level retry policies, forEach, and timeouts — in [`docs/arch/routing-and-retries.md`](docs/arch/routing-and-retries.md).
 
 ## CLI
 
@@ -223,6 +243,29 @@ Defaults can be set at three granularities — inline ` ```config ` block, `.wor
 See [`docs/arch/configuration.md`](docs/arch/configuration.md) for the full schema, precedence rules, and how markflow owns the non-interactive agent invocation prefix.
 
 ## Examples
+
+### Tutorial
+
+A progressive series of self-contained examples — each demonstrates one feature and runs locally without setup:
+
+| # | Example | Feature |
+|---|---------|---------|
+| 01 | [hello-world](docs/examples/tutorial/01-hello-world.md) | Minimal 2-step workflow |
+| 02 | [data-passing](docs/examples/tutorial/02-data-passing.md) | LOCAL, GLOBAL, and STEPS context |
+| 03 | [inputs](docs/examples/tutorial/03-inputs.md) | Declared workflow parameters |
+| 04 | [branching](docs/examples/tutorial/04-branching.md) | Conditional edge routing |
+| 05 | [parallel](docs/examples/tutorial/05-parallel.md) | Fan-out and fan-in |
+| 06 | [foreach-basic](docs/examples/tutorial/06-foreach-basic.md) | forEach batch iteration |
+| 07 | [foreach-concurrency](docs/examples/tutorial/07-foreach-concurrency.md) | maxConcurrency sliding window |
+| 08 | [foreach-serial](docs/examples/tutorial/08-foreach-serial.md) | Sequential loop (maxConcurrency: 1) |
+| 09 | [retry-step](docs/examples/tutorial/09-retry-step.md) | Step-level retry with backoff |
+| 10 | [retry-edge](docs/examples/tutorial/10-retry-edge.md) | Edge-level retry + exhaustion handler |
+| 11 | [timeout](docs/examples/tutorial/11-timeout.md) | Per-step timeouts |
+| 12 | [multi-language](docs/examples/tutorial/12-multi-language.md) | Bash, Python, and JavaScript steps |
+| 13 | [approval](docs/examples/tutorial/13-approval.md) | Human decision nodes |
+| 14 | [complex-pipeline](docs/examples/tutorial/14-complex-pipeline.md) | All features combined |
+
+### Real-World
 
 - [`docs/examples/loop.md`](docs/examples/loop.md) — issue-triage loop demonstrating the **emitter pattern**: one step owns a cached list, keeps its cursor in `LOCAL`, publishes the current item into `GLOBAL`, and self-loops until exhausted. Ports in [JavaScript](docs/examples/loop-js.md) and [Python](docs/examples/loop-py.md) show the protocol is language-agnostic.
 - [`docs/examples/config-block.md`](docs/examples/config-block.md) — small haiku-generator demonstrating the **top-level config block**: a random topic flows from a script step into an agent step (inheriting workflow-level `agent` and `flags`) and back out to a formatter script.

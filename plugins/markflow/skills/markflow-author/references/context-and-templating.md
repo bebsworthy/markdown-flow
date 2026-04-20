@@ -35,6 +35,23 @@ Prefer `GLOBAL` over stuffing things into `RESULT.summary`. Summaries are for hu
 
 Declared workflow inputs are also injected as env vars (e.g., `repo`, `target_branch`).
 
+### RUNDIR vs WORKDIR — which to use
+
+- `$MARKFLOW_WORKDIR` is the per-run working directory (each step's `cwd`). All steps in a run share it.
+- `$MARKFLOW_RUNDIR` is the run's persistent directory (contains `events.jsonl`, `output/`).
+
+**For cross-step file sharing, use `$MARKFLOW_RUNDIR`.** Write a file in one step, read it in a later step:
+
+```bash
+# Step 1: fetch
+curl -fsSL "$API_URL" > "$MARKFLOW_RUNDIR/data.json"
+
+# Step 2: process (reads the file written by fetch)
+jq '.items[]' "$MARKFLOW_RUNDIR/data.json" | while read -r item; do ...
+```
+
+Spelling warning: It's `MARKFLOW_RUNDIR` (one word). `MARKFLOW_RUN_DIR` does not exist and silently resolves to empty.
+
 ## Sentinel protocol (how steps publish)
 
 Steps write these on stdout to communicate back to the engine:

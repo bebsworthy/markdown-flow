@@ -85,11 +85,53 @@ On timeout:
 
 User-initiated aborts (`SIGINT`) take precedence over timeouts — a step aborted while the timeout was also firing is treated as a user abort, not a timeout.
 
+## forEach (dynamic task mapping)
+
+A thick edge (`==>|each: KEY|`) declares a forEach fan-out. The source step emits an array in `LOCAL.KEY`; the engine spawns one token per item through the body chain, then collects results at a downstream collector node.
+
+```mermaid
+flowchart TD
+  produce ==>|each: items| process --> collect
+```
+
+### Concurrency control
+
+By default all item tokens spawn immediately (unlimited parallelism). The `maxConcurrency` config on the source step limits how many run concurrently:
+
+```yaml
+foreach:
+  maxConcurrency: 3      # sliding window of 3
+  onItemError: continue  # or: fail-fast (default)
+```
+
+| `maxConcurrency` | Behavior |
+|---|---|
+| `0` or omitted | Unlimited — all items spawn at once |
+| `1` | Serial — items process one at a time in order |
+| `N` | Sliding window — as one item completes, the next spawns |
+
+### Failure policies
+
+- **fail-fast** (default): first item failure stops spawning new items; collector is skipped; source node routes via `fail` edge.
+- **continue**: all items run regardless; collector receives `GLOBAL.results` with `{ ok, edge, local }` per item.
+
+### Context available to body steps
+
+| Variable | Content |
+|---|---|
+| `$ITEM` | JSON of the current array element |
+| `$ITEM_INDEX` | Zero-based position in the source array |
+| `$GLOBAL` | Shared workflow context |
+
+### Results
+
+After all items complete, `GLOBAL.results` is an array indexed by original position — order is deterministic regardless of completion timing or concurrency.
+
 ## Related events
 
-The engine emits `route`, `retry:increment`, `retry:exhausted`, `step:retry`, and `step:timeout` events at the corresponding transitions. See [`event-sourced-run-log.md`](event-sourced-run-log.md) for the full schema.
+The engine emits `route`, `retry:increment`, `retry:exhausted`, `step:retry`, `step:timeout`, `batch:start`, `batch:item:complete`, and `batch:complete` events at the corresponding transitions. See [`event-sourced-run-log.md`](event-sourced-run-log.md) for the full schema.
 
 ## See also
 
-- [`configuration.md`](configuration.md) — retry policy config reference.
+- [`configuration.md`](configuration.md) — retry policy and forEach config reference.
 - [`event-sourced-run-log.md`](event-sourced-run-log.md) — how routing decisions are recorded.

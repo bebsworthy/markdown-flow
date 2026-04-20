@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -12,6 +12,10 @@ describe("EventLogger", () => {
   beforeEach(async () => {
     tempDir = await mkdtemp(join(tmpdir(), "markflow-evt-"));
     await writeFile(join(tempDir, "events.jsonl"), "", "utf-8");
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
   });
 
   it("stamps monotonic seq and ISO ts on each event", async () => {
@@ -88,6 +92,34 @@ describe("EventLogger", () => {
       .map((l) => (JSON.parse(l) as EngineEvent).seq);
     // b was not persisted; disk holds seq 1 and 3 only.
     expect(onDiskSeqs).toEqual([1, 3]);
+  });
+
+  // Protects against: createEventLoggerFromExisting not continuing seq correctly
+  it("createEventLoggerFromExisting continues seq from the given lastSeq", async () => {
+    const { createEventLoggerFromExisting } = await import(
+      "../../src/core/event-logger.js"
+    );
+    const logger = createEventLoggerFromExisting(tempDir, 100);
+    const a = await logger.append({
+      type: "step:start",
+      nodeId: "a",
+      tokenId: "t1",
+    });
+    const b = await logger.append({
+      type: "step:start",
+      nodeId: "b",
+      tokenId: "t2",
+    });
+    expect(a.seq).toBe(101);
+    expect(b.seq).toBe(102);
+
+    const raw = readFileSync(logger.path, "utf-8");
+    const lines = raw.split("\n").filter(Boolean);
+    expect(lines).toHaveLength(2);
+    const onDiskSeqs = lines.map(
+      (l) => (JSON.parse(l) as EngineEvent).seq,
+    );
+    expect(onDiskSeqs).toEqual([101, 102]);
   });
 
   it("uses injected clock for ts", async () => {

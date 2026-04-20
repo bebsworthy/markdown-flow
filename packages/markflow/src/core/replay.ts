@@ -74,6 +74,13 @@ export function replay(events: EngineEvent[]): EngineSnapshot {
         if (evt.itemIndex != null) tok.itemIndex = evt.itemIndex;
         if (evt.parentTokenId != null) tok.parentTokenId = evt.parentTokenId;
         snap.tokens.set(evt.tokenId, tok);
+        // Track spawned watermark for batch concurrency window.
+        if (evt.batchId != null) {
+          const batch = snap.batches.get(evt.batchId);
+          if (batch && evt.itemIndex != null) {
+            batch.spawned = Math.max(batch.spawned, evt.itemIndex + 1);
+          }
+        }
         break;
       }
 
@@ -173,6 +180,8 @@ export function replay(events: EngineEvent[]): EngineSnapshot {
           succeeded: 0,
           failed: 0,
           onItemError: evt.onItemError,
+          maxConcurrency: (evt as { maxConcurrency?: number }).maxConcurrency ?? 0,
+          spawned: 0,
           itemContexts: [...evt.itemContexts],
           results: new Array(evt.items),
           done: false,

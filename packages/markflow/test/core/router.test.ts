@@ -201,6 +201,61 @@ describe("resolveRoute", () => {
       resolveRoute(graph, "A", result, createRetryState(), DEFAULT_CONFIG),
     ).toThrow("Routing error");
   });
+
+  // Protects against: exhausted budget without a :max handler causing silent misrouting
+  it("throws when retry budget is exhausted and no :max handler exists", () => {
+    const graph: FlowGraph = {
+      nodes: new Map([
+        ["A", { id: "A" }],
+        ["B", { id: "B" }],
+      ]),
+      edges: [
+        {
+          from: "A",
+          to: "B",
+          label: "fail",
+          annotations: { maxRetries: 1 },
+        },
+      ],
+    };
+    const retryState = createRetryState();
+    const failResult = makeResult({ node: "A", edge: "fail" });
+
+    // First call: within budget
+    const d1 = resolveRoute(graph, "A", failResult, retryState, DEFAULT_CONFIG);
+    expect(d1.targets[0].nodeId).toBe("B");
+    incrementRetry(retryState, "A", d1.retryIncrement!.label);
+
+    // Second call: budget exhausted, no handler
+    expect(() =>
+      resolveRoute(graph, "A", failResult, retryState, DEFAULT_CONFIG),
+    ).toThrow(/Retry budget exhausted/);
+  });
+
+  // Protects against: fan-out producing duplicate targets or missing parallel paths
+  it("fan-out follows all unlabelled edges to distinct targets", () => {
+    const graph: FlowGraph = {
+      nodes: new Map([
+        ["A", { id: "A" }],
+        ["B", { id: "B" }],
+        ["C", { id: "C" }],
+      ]),
+      edges: [
+        { from: "A", to: "B", annotations: {} },
+        { from: "A", to: "C", annotations: {} },
+      ],
+    };
+    const result = makeResult({ node: "A" });
+    const decision = resolveRoute(
+      graph,
+      "A",
+      result,
+      createRetryState(),
+      DEFAULT_CONFIG,
+    );
+    expect(decision.targets).toHaveLength(2);
+    expect(decision.targets.map((t) => t.nodeId).sort()).toEqual(["B", "C"]);
+  });
 });
 
 describe("resolveRoute — maxRetriesDefault", () => {

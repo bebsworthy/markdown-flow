@@ -65,9 +65,45 @@ An unknown code language is a parse error.
 
 A step may start with a ` ```config ` block before its body to override workflow defaults for that step. See `routing-and-config.md`.
 
-## Inputs section (optional)
+## `# Inputs` section (optional)
 
-A `# Inputs` section may appear between the description/config block and `# Flow`. It declares named parameters (key, type, optional default) that callers can pass via `--input KEY=VALUE`. Inputs are available to every step as env vars and as bare Liquid variables in agent prompts (e.g., `{{ repo }}`).
+Appears between the description/config block and `# Flow`. Declares named parameters passed via `--input KEY=VALUE`, `--env <file>`, or the workspace `.env`.
+
+### Grammar
+
+Each input is a Markdown list item matching this exact pattern:
+
+```
+- `NAME` (required): description
+- `NAME` (optional): description
+- `NAME` (default: "value"): description
+- `NAME` (default: `value`): description
+```
+
+### Rules
+
+- Name **must** be backtick-wrapped. Convention is `UPPER_SNAKE_CASE` but lowercase is accepted.
+- Exactly three modifier forms: `(required)`, `(optional)`, `(default: <quoted-value>)`.
+- Default values must be quoted with `"..."` or `` `...` ``.
+- Separator between modifier and description is `: ` (colon + space). Not `—`, not `-`.
+- No type annotations — `(string, default: ...)` is invalid.
+
+### Legal vs illegal
+
+| Legal | Illegal | Why |
+|---|---|---|
+| `` - `TAG` (default: `auto`): The tag `` | `` - `tag` (string, default: `auto`) — The tag `` | type prefix + em-dash |
+| `` - `TOKEN` (required): API token `` | `` - TOKEN (required): API token `` | missing backticks |
+| `` - `URL` (default: "https://x"): Endpoint `` | `` - `URL` (default: https://x): Endpoint `` | unquoted default |
+
+### Runtime resolution
+
+Priority (highest first): `--input` flags > `--env <file>` > workspace `.env` > process environment > declared default. Required inputs with no value abort the run.
+
+### In steps
+
+- Script steps: plain env var — `$TAG`, `${TAG}`.
+- Agent steps: flat Liquid variable — `{{ TAG }}`. There is NO `INPUTS` namespace.
 
 ## Validation rules (partial list)
 

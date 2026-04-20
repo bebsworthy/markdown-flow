@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { access, mkdir, mkdtemp, utimes, writeFile } from "node:fs/promises";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { access, mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -38,6 +38,10 @@ describe("run lock", () => {
   beforeEach(async () => {
     runsDir = await mkdtemp(join(tmpdir(), "markflow-lock-"));
     await writeMinimalRun(join(runsDir, runId));
+  });
+
+  afterEach(async () => {
+    await rm(runsDir, { recursive: true, force: true });
   });
 
   it("round-trip: openExistingRun returns release; .lock exists then is gone", async () => {

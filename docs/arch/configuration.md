@@ -99,7 +99,36 @@ api-call -->|fail| error-handler
 
 The legacy self-loop form (`A -->|fail max:3| A` plus `A -->|fail:max| handler`) still works. When both a step-level `retry` policy and an edge-level `fail max:N` are specified on the same node, the step-level `retry` policy wins and the validator emits a warning. See [`routing-and-retries.md`](routing-and-retries.md) for full retry semantics.
 
+## forEach concurrency config
+
+Steps that source a forEach fan-out (thick edge `==>|each: KEY|`) accept a `foreach:` block in their per-step config:
+
+````markdown
+## produce
+
+```config
+foreach:
+  maxConcurrency: 3
+  onItemError: continue
+```
+
+```bash
+# emit the items array
+echo 'LOCAL: {"items": [1, 2, 3, 4, 5]}'
+echo 'RESULT: {"edge": "next", "summary": "produced 5 items"}'
+```
+````
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `maxConcurrency` | non-negative integer | `0` (unlimited) | Max item tokens executing concurrently. `1` = serial. |
+| `onItemError` | `fail-fast` \| `continue` | `fail-fast` | What happens when an item fails. |
+
+When `maxConcurrency` is set, the engine uses a sliding window: it spawns the initial batch of tokens up to the limit, then refills one slot each time an item completes. Result ordering is always by original array index.
+
+See [`routing-and-retries.md`](routing-and-retries.md) for full forEach routing semantics.
+
 ## See also
 
 - [`templating-and-context.md`](templating-and-context.md) — how workflow inputs flow into prompts and scripts.
-- [`routing-and-retries.md`](routing-and-retries.md) — edge resolution, retry budgets, timeout routing.
+- [`routing-and-retries.md`](routing-and-retries.md) — edge resolution, retry budgets, forEach, timeout routing.

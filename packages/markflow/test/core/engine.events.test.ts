@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -16,6 +16,10 @@ describe("engine events.jsonl", () => {
 
   beforeEach(async () => {
     tempRunsDir = await mkdtemp(join(tmpdir(), "markflow-runs-"));
+  });
+
+  afterEach(async () => {
+    await rm(tempRunsDir, { recursive: true, force: true });
   });
 
   function readEventLog(runsDir: string, runId: string): EngineEvent[] {

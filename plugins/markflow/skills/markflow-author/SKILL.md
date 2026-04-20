@@ -20,6 +20,14 @@ Trigger on any of:
 
 If the user is *running* an existing workflow (not authoring one), don't use this skill — direct them to `markflow run`.
 
+## Critical rules (read first)
+
+1. **Input grammar is strict.** Name must be backtick-wrapped: `` - `TAG` (default: `value`): description ``. No type prefixes, no em-dashes. See `references/workflow-anatomy.md`.
+2. **Exactly one start node.** Stadium shape `([...])` marks start in cyclic graphs. Loop targets are NOT start nodes — don't give them stadium shape.
+3. **Loop targets need a labeled back-edge.** All-unlabeled incoming edges = fan-in merge = deadlock on iteration 2. Label at least one back-edge: `apply -->|loop| emit`.
+4. **`MARKFLOW_RUNDIR` not `RUN_DIR`.** One word, no underscore. Silent failure if misspelled.
+5. **Inputs are flat in Liquid.** `{{ city }}` not `{{ INPUTS.city }}`. The INPUTS namespace doesn't exist.
+
 ## The authoring loop
 
 Work through these steps in order. Don't skip the interview — the engine's strictness punishes guessing.
@@ -41,11 +49,13 @@ If the user is vague, propose a draft and iterate — don't over-interrogate.
 Draft the Mermaid flowchart *before* writing step bodies. Getting the topology right up front prevents a rewrite later.
 
 - Use short, lowercase, underscore-separated IDs (`lint`, `run_tests`, `emit_next`). They appear in logs and as `## <id>` headings.
-- **Start nodes**: any node with no incoming edges is a start. If your graph has cycles (loops), the loop target also has an incoming edge, so mark the entry explicitly with stadium shape: `emit([Emit next item])`.
+- **Start nodes**: exactly one start node is allowed. In DAGs the engine auto-detects it (node with no incoming edges). In cyclic graphs, mark the *entry point* with stadium shape `([...])` — the node the workflow begins at. Loop targets are NOT start nodes; don't give them stadium shape.
 - **Fan-out**: multiple unlabeled edges from a node run in parallel. **Fan-in**: a node with multiple incoming edges waits for *all* upstream to complete.
 - **Routing**: use labeled edges (`A -->|pass| B`, `A -->|fail| C`). The step emits `RESULT: {"edge": "pass", ...}` to choose one. Exit code 0 auto-picks a non-`fail` edge; non-zero auto-picks `fail`.
 - **Retries (graph-visible)**: `A -->|fail max:3| fix` plus `A -->|fail:max| abort`. `max:N` without `:max` halts on exhaustion — always pair them. See `references/mermaid-cheatsheet.md`.
 - **Retries (in-place)**: for "try the same step again with backoff", use a step-level `retry:` in its ` ```config ` block instead — the graph stays clean. See `references/routing-and-config.md`.
+- **forEach**: A thick edge `==>|each: KEY|` fans out dynamically — the engine spawns one token per array element. The body chain runs per item and converges at a collector. Configure `maxConcurrency` (0=unlimited, 1=serial, N=sliding window) and `onItemError` in the source step's `foreach:` config block. See `references/routing-and-config.md`.
+- **Loops and fan-in**: A loop target with ALL unlabeled incoming edges is treated as a fan-in merge — it waits for all upstream tokens, causing deadlock on iteration 2. Fix by labeling the back-edge: `process -->|loop| emit`. See `references/mermaid-cheatsheet.md`.
 
 ### 3. Fill in step bodies
 
@@ -117,7 +127,7 @@ RESULT: {"edge": "next", "summary": "picked issue #42"}
 
 Rules that trip people up:
 
-- `RESULT` must be the **last line**; agent steps require it, scripts may omit it (routing then falls back to exit code).
+- `RESULT` must be the **last line** when emitted. Required for agent steps with ≥2 outgoing edges. For steps with a single outgoing edge, the engine routes automatically without it. Emitting RESULT is always valid and adds a log-visible summary.
 - `LOCAL` / `GLOBAL` lines **shallow-merge** (later keys win). Don't nest `"local"` / `"global"` inside `RESULT`.
 - Agent prompts are rendered through **Liquid in strict mode** before being sent — any `{{ GLOBAL.missing }}` hard-fails. If a variable might be absent, use `{{ value | default: "…" }}`.
 
@@ -157,17 +167,23 @@ Load these on demand — don't front-load all of them.
 - `references/workflow-anatomy.md` — full file format spec (sections, ordering, step types, errors). Read when unsure about structure.
 - `references/mermaid-cheatsheet.md` — supported node shapes, edge types, labels, retry annotations, subgraphs. Read when drafting the flow.
 - `references/context-and-templating.md` — env vars, sentinel protocol, Liquid filters, markdown filters. Read when wiring data between steps or writing agent prompts.
-- `references/routing-and-config.md` — top-level config block, per-step config, agents/flags, timeouts, retry policies. Read when adding retries, timeouts, or non-default agents.
+- `references/routing-and-config.md` — top-level config block, per-step config, agents/flags, timeouts, retry policies, forEach config. Read when adding retries, timeouts, forEach, or non-default agents.
+- `references/workspace.md` — workspace initialization, `.env` scaffolding, input resolution priority, secret masking. Read when explaining how workspaces and inputs persist.
 
 ## Examples
 
-Three reference workflows — copy the shape, not the literal content.
+Six reference workflows — copy the shape, not the literal content.
 
 - `examples/01-linear.md` — minimal three-step pipeline with one bash script, one agent step, one render step. Start here.
 - `examples/02-fan-out-fan-in.md` — parallel fan-out across independent steps then a join/fan-in. Uses `STEPS.<id>.summary` to aggregate.
-- `examples/03-loop-with-agent.md` — emitter-pattern loop (back-edge to an `emit` node) driving a classifier agent step, with LOCAL cursor and GLOBAL item publication.
+- `examples/03-sequential-foreach-agent.md` — sequential forEach (`maxConcurrency: 1`) with an agent step using Liquid templating. The recommended pattern for "process a list with an LLM".
 
 Open an example with `Read` when a user's request matches its shape.
+
+- `examples/04-foreach.md` — forEach with `maxConcurrency` sliding window and `onItemError: continue`. Source emits items, body processes with retry, collector aggregates.
+- `examples/05-inputs-and-branching.md` — declared inputs used in bash (`$NAME`) and agent prompts (`{{ NAME }}`), with conditional edge routing.
+- `examples/06-retry-and-timeout.md` — edge-level retry (`fail max:3` + `fail:max` exhaustion handler), per-step timeout, self-edge retry loop.
+
 
 ## House style
 
@@ -176,7 +192,7 @@ These aren't rules, they're what works:
 - Put **why** in the top-of-file description (between H1 and `# Flow`) — the parser ignores it, humans read it. Agent step bodies are *also* documentation.
 - Keep step bodies focused. If a bash step is growing past ~40 lines, consider splitting it or moving logic into a helper script called from the step.
 - Prefer publishing data via `GLOBAL:` over stuffing everything through `RESULT.summary`. `RESULT` is for routing + a one-liner.
-- For list-processing loops, use the emitter pattern (see example 3) — one step owns the collection in `LOCAL`, publishes the current item to `GLOBAL`, loops via a back-edge. Keeps producers and consumers decoupled.
+- For list-processing loops, prefer **forEach with `maxConcurrency: 1`** (see `examples/04-foreach.md`) over the manual emitter pattern. forEach handles cursor tracking, result collection, and error policies automatically — no back-edges or LOCAL cursor gymnastics needed.
 - When a step has 2+ outgoing labeled edges, the engine appends a hint to agent prompts listing the valid edges. You don't need to duplicate it in your prompt.
 - `flags:` in `config` is for *extra* agent args only — never include the non-interactive switch (`-p`, `exec -`); the engine auto-prepends it.
 
@@ -192,4 +208,6 @@ These aren't rules, they're what works:
 - [ ] No Liquid `{{ }}` inside bash/python/js bodies — script bodies are not rendered.
 - [ ] No `local` or `global` keys inside `RESULT` JSON.
 - [ ] `config` block (top-level *or* per-step) only uses documented keys.
+- [ ] forEach thick edges (`==>|each: KEY|`) have a collector node downstream.
+- [ ] Loop targets have at least one labeled back-edge (prevents fan-in deadlock).
 - [ ] Ran `markflow init <file> -w /tmp/...` and got exit 0.

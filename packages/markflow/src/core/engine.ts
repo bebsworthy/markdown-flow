@@ -910,6 +910,10 @@ export class WorkflowEngine {
     for (const [batchId, batch] of this.batches) {
       if (batch.done) continue;
 
+      // If fail-fast already triggered, don't spawn new items — let in-flight drain.
+      const failFastAborted =
+        batch.onItemError === "fail-fast" && batch.failed > 0;
+
       const completedIndices = new Set<number>();
       const liveTokensByIndex = new Map<number, Token>();
       for (const tok of this.tokens.values()) {
@@ -930,6 +934,14 @@ export class WorkflowEngine {
       if (!scope) continue;
       const firstBodyNode = scope.bodyNodes[0];
 
+      // Respect maxConcurrency on resume: only spawn up to the window limit.
+      const inFlight = liveTokensByIndex.size;
+      const spawnLimit =
+        batch.maxConcurrency > 0
+          ? Math.max(0, batch.maxConcurrency - inFlight)
+          : batch.expected;
+      let spawned = 0;
+
       for (let i = 0; i < batch.expected; i++) {
         if (completedIndices.has(i)) continue;
 
@@ -948,17 +960,18 @@ export class WorkflowEngine {
           continue;
         }
 
-        // No live token for this itemIndex — spawn a fresh one at the start
-        // of the forEach chain using the stored item context.
+        // Don't spawn if fail-fast aborted or concurrency window is full.
+        if (failFastAborted || spawned >= spawnLimit) continue;
+
         await this.createBatchToken(
           firstBodyNode,
           batchId,
           i,
-          // parentTokenId is best-effort on resume: original source token may
-          // not be in the snapshot if pruned; fall back to nodeId marker.
           `batch-source:${batch.nodeId}`,
           batch.itemContexts[i],
         );
+        batch.spawned = Math.max(batch.spawned, i + 1);
+        spawned++;
       }
     }
   }
@@ -991,8 +1004,11 @@ export class WorkflowEngine {
     const sourceStep = this.def.steps.get(sourceToken.nodeId);
     const onItemError: import("./types.js").ForEachItemErrorMode =
       sourceStep?.stepConfig?.foreach?.onItemError ?? "fail-fast";
+    const maxConcurrency = sourceStep?.stepConfig?.foreach?.maxConcurrency ?? 0;
 
     const batchId = `batch-${++this.tokenCounter}`;
+    const initialSpawn =
+      maxConcurrency > 0 ? Math.min(maxConcurrency, items.length) : items.length;
 
     await this.emit({
       type: "batch:start",
@@ -1002,6 +1018,7 @@ export class WorkflowEngine {
       items: items.length,
       itemContexts: [...items],
       onItemError,
+      maxConcurrency,
     });
     this.batches.set(batchId, {
       nodeId: sourceToken.nodeId,
@@ -1010,12 +1027,14 @@ export class WorkflowEngine {
       succeeded: 0,
       failed: 0,
       onItemError,
+      maxConcurrency,
+      spawned: initialSpawn,
       itemContexts: [...items],
       results: new Array(items.length),
       done: false,
     });
 
-    for (let i = 0; i < items.length; i++) {
+    for (let i = 0; i < initialSpawn; i++) {
       await this.createBatchToken(
         forEachEdge.to,
         batchId,
@@ -1055,7 +1074,35 @@ export class WorkflowEngine {
       local: token.result?.local,
     };
 
-    if (batch.completed >= batch.expected) {
+    // Sliding window refill: spawn the next pending item if there is capacity.
+    const failFastAborted =
+      batch.onItemError === "fail-fast" && batch.failed > 0;
+    if (
+      !failFastAborted &&
+      batch.maxConcurrency > 0 &&
+      batch.spawned < batch.expected
+    ) {
+      const scope = getForEachScope(this.def.graph, batch.nodeId);
+      if (scope) {
+        const nextIndex = batch.spawned;
+        batch.spawned++;
+        await this.createBatchToken(
+          scope.bodyNodes[0],
+          batchId,
+          nextIndex,
+          token.parentTokenId ?? `batch-source:${batch.nodeId}`,
+          batch.itemContexts[nextIndex],
+        );
+      }
+    }
+
+    // Batch is done when all items completed, or fail-fast triggered and all
+    // spawned items have drained.
+    const batchDone =
+      batch.completed >= batch.expected ||
+      (failFastAborted && batch.completed >= batch.spawned);
+
+    if (batchDone) {
       const hadFailure = batch.failed > 0;
       const status: "ok" | "error" =
         batch.onItemError === "fail-fast" && hadFailure ? "error" : "ok";

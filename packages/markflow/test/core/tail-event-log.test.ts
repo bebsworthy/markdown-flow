@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { mkdtemp, appendFile, writeFile } from "node:fs/promises";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtemp, appendFile, rm, writeFile } from "node:fs/promises";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -48,6 +48,10 @@ describe("tailEventLog", () => {
     runDir = await mkdtemp(join(tmpdir(), "markflow-tail-"));
   });
 
+  afterEach(async () => {
+    await rm(runDir, { recursive: true, force: true });
+  });
+
   it("cold-start: yields pre-existing events in order and terminates on workflow:complete", async () => {
     await writeFile(join(runDir, "events.jsonl"), "", "utf-8");
     for (let i = 1; i <= 5; i++) await writeEvent(runDir, stepStart(i));
@@ -79,7 +83,7 @@ describe("tailEventLog", () => {
     })();
 
     // Give the tail a moment to install its dir-watcher, then write.
-    await sleep(30);
+    await sleep(100);
     await writeFile(join(runDir, "events.jsonl"), "", "utf-8");
     await writeEvent(runDir, stepStart(1));
     await writeEvent(runDir, stepStart(2));
@@ -99,11 +103,11 @@ describe("tailEventLog", () => {
     })();
 
     // Writer appends, one at a time, while consumer awaits.
-    await sleep(30);
+    await sleep(100);
     await writeEvent(runDir, stepStart(1));
-    await sleep(30);
+    await sleep(100);
     await writeEvent(runDir, stepStart(2));
-    await sleep(30);
+    await sleep(100);
     await writeEvent(runDir, workflowComplete(3));
 
     await consumer;
@@ -132,7 +136,7 @@ describe("tailEventLog", () => {
     // Many writes in small bursts.
     for (let i = 1; i <= 20; i++) {
       await writeEvent(runDir, stepStart(i));
-      if (i % 5 === 0) await sleep(15);
+      if (i % 5 === 0) await sleep(50);
     }
     await writeEvent(runDir, workflowComplete(21));
     await consumer;
@@ -203,7 +207,7 @@ describe("tailEventLog", () => {
     expect(received.map((e) => e.seq)).toEqual([1]);
     // Give the finally a tick to close the watcher cleanly — no assert needed,
     // but this validates no unhandled rejection/timer survives the test.
-    await sleep(20);
+    await sleep(50);
   });
 
   it("partial line without newline is buffered until newline arrives", async () => {
@@ -243,9 +247,9 @@ describe("tailEventLog", () => {
       for await (const e of iter) received.push(e);
     })();
 
-    await sleep(30);
+    await sleep(100);
     await writeEvent(runDir, stepStart(1));
-    await sleep(20);
+    await sleep(50);
     await writeEvent(runDir, workflowComplete(2));
     await consumer;
 

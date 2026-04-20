@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -17,6 +17,10 @@ describe("WorkflowEngine", () => {
 
   beforeEach(async () => {
     tempRunsDir = await mkdtemp(join(tmpdir(), "markflow-runs-"));
+  });
+
+  afterEach(async () => {
+    await rm(tempRunsDir, { recursive: true, force: true });
   });
 
   it("executes a linear workflow end-to-end", async () => {

@@ -6,14 +6,18 @@ How steps pick an outgoing edge, how retries work, and what goes in a `config` b
 
 After a step completes the engine looks at:
 
-1. **Explicit `RESULT: {"edge": "label"}` on stdout.** Wins if present and the label matches an outgoing edge. Required for agent steps.
+1. **Explicit `RESULT: {"edge": "label"}` on stdout.** Wins if present and the label matches an outgoing edge.
 2. **Exit code (script steps only).**
    - `0` → pick any non-`fail` edge (if multiple unlabeled ones → fan-out, all run).
    - Non-zero → pick the `fail` edge if one exists; otherwise the workflow halts.
    - `124` → timeout (engine sets this); routes via `fail` if present.
 3. No matching edge → halt with an error.
 
-If a step has exactly one outgoing unlabeled edge, you don't need to emit `RESULT` at all; exit 0 sends the token through.
+### When is `RESULT:` required?
+
+- **Agent steps with ≥2 outgoing edges:** required — the agent must choose an edge.
+- **Agent steps with 1 outgoing edge:** optional — the engine routes automatically. Emitting `RESULT` is still valid (sets a log-visible summary).
+- **Script steps:** always optional — exit code routing works fine. Use `RESULT` when you want explicit edge choice or a summary string.
 
 ## Graph-visible retries (edge-level)
 
@@ -122,6 +126,7 @@ The *first* fenced block under a `##` heading may be ` ```config `. Recognized k
 | `flags` | list | Extra args for this step only (merged with workflow-level) |
 | `timeout` | duration | Override `timeout_default` for this step |
 | `retry` | object | Step-level retry policy (see above) |
+| `foreach` | object | forEach concurrency and error policy (see below) |
 | `approve` | object | Human-approval gate before the step runs (advanced) |
 
 Example combining several:
@@ -156,3 +161,50 @@ Classify the ticket body into one label.
 ## Approval gates
 
 A step may pause for human approval before running by including `approve:` in its `config`. The run enters a `pending` state; the operator inspects and resumes with `markflow approve <run> <node> <choice>`. See the CLI `markflow pending --help` and `markflow approve --help` for current options — this is an evolving surface.
+
+## forEach config (dynamic task mapping)
+
+Steps that source a forEach fan-out (`==>|each: KEY|` thick edge) accept a `foreach:` block in their per-step config:
+
+````markdown
+## produce
+
+```config
+foreach:
+  maxConcurrency: 3
+  onItemError: continue
+```
+
+```bash
+echo 'LOCAL: {"items": [{"id":1}, {"id":2}, {"id":3}]}'
+echo 'RESULT: {"edge": "next", "summary": "produced 3 items"}'
+```
+````
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `maxConcurrency` | non-negative integer | `0` (unlimited) | Max item tokens executing concurrently. `1` = serial. |
+| `onItemError` | `fail-fast` \| `continue` | `fail-fast` | Behavior on item failure |
+
+### maxConcurrency behavior
+
+| Value | Effect |
+|---|---|
+| `0` or omitted | All items spawn immediately (original behavior) |
+| `1` | Serial — items process one at a time, in order |
+| `N` | Sliding window — up to N items in-flight; as one completes, the next spawns |
+
+### onItemError behavior
+
+- **fail-fast** (default): first item failure stops spawning new items; collector is skipped; source routes via `fail` edge.
+- **continue**: all items run regardless; collector receives `GLOBAL.results` with `{ ok, edge, local }` per item.
+
+### Body step context
+
+| Variable | Content |
+|---|---|
+| `$ITEM` | JSON of the current array element |
+| `$ITEM_INDEX` | Zero-based position in the source array |
+| `$GLOBAL` | Shared workflow context (read/write) |
+
+Results are always ordered by original array index in `GLOBAL.results`, regardless of completion order.

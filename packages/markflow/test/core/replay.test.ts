@@ -249,4 +249,48 @@ describe("replay fold", () => {
       ),
     ).toThrow(InconsistentLogError);
   });
+
+  // Protects against: batch:complete for unknown batchId not being caught
+  it("throws InconsistentLogError on batch:complete for unknown batchId", () => {
+    expect(() =>
+      replay(
+        stamp([
+          runStart,
+          {
+            type: "batch:complete" as const,
+            v: 2 as const,
+            batchId: "unknown",
+            status: "ok" as const,
+            succeeded: 0,
+            failed: 0,
+          },
+        ] as EngineEventPayload[]),
+      ),
+    ).toThrow(InconsistentLogError);
+  });
+
+  // Protects against: token:reset for unknown tokenId not being caught
+  it("throws InconsistentLogError on token:reset for unknown tokenId", () => {
+    expect(() =>
+      replay(
+        stamp([
+          runStart,
+          { type: "token:reset" as const, v: 1 as const, tokenId: "ghost" },
+        ] as EngineEventPayload[]),
+      ),
+    ).toThrow(InconsistentLogError);
+  });
+
+  // Protects against: suspended status not being inferred from waiting tokens
+  it("infers suspended status when a token is in waiting state", () => {
+    const snap = replay(
+      stamp([
+        runStart,
+        { type: "token:created", tokenId: "t1", nodeId: "a", generation: 0 },
+        { type: "token:state", tokenId: "t1", from: "pending", to: "running" },
+        { type: "token:state", tokenId: "t1", from: "running", to: "waiting" },
+      ]),
+    );
+    expect(snap.status).toBe("suspended");
+  });
 });

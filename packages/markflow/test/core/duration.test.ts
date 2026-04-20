@@ -41,4 +41,27 @@ describe("parseDuration", () => {
     expect(() => parseDuration("abc")).toThrow(ConfigError);
     expect(() => parseDuration("5m extra")).toThrow(ConfigError);
   });
+
+  // Protects against: "0s" accidentally passing validation (total===0 check)
+  it("rejects zero-value duration '0s'", () => {
+    expect(() => parseDuration("0s")).toThrow(ConfigError);
+  });
+
+  // Protects against: "0m" or "0h" being silently accepted
+  it("rejects zero-value duration '0m' and '0h'", () => {
+    expect(() => parseDuration("0m")).toThrow(ConfigError);
+    expect(() => parseDuration("0h")).toThrow(ConfigError);
+  });
+
+  // Protects against: negative durations parsing as valid
+  it("rejects negative duration strings", () => {
+    expect(() => parseDuration("-5s")).toThrow(ConfigError);
+    expect(() => parseDuration("-1h")).toThrow(ConfigError);
+  });
+
+  // Protects against: non-string input not being caught
+  it("throws on non-string input", () => {
+    expect(() => parseDuration(42 as any)).toThrow(ConfigError);
+    expect(() => parseDuration(null as any)).toThrow(ConfigError);
+  });
 });

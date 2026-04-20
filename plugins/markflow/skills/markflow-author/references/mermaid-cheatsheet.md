@@ -67,19 +67,20 @@ A -->|fail:max| C
 
 ## Start nodes
 
-The engine auto-detects start nodes as **any node with no incoming edges**. This works for DAGs.
+**Exactly one start node is allowed.** The engine determines it two ways:
 
-For cyclic graphs (loops), the loop target *has* an incoming edge, so auto-detection fails. Mark the entry explicitly with **stadium shape** — `A([Label])` — at its first occurrence:
+1. **DAGs (no cycles):** Auto-detected as the node with no incoming edges.
+2. **Cyclic graphs (loops):** Mark the workflow's *entry point* with **stadium shape** — `A([Label])`. Once any node carries stadium shape, the "no incoming edges" fallback is disabled and stadium nodes become the complete start set.
 
 ```mermaid
 flowchart TD
   emit([Emit next item])
   emit -->|next| process
-  process --> emit
+  process -->|loop| emit
   emit -->|done| finalize
 ```
 
-Once any node carries stadium shape, the "no incoming edges" fallback is disabled and stadium nodes become the complete start set.
+**Important:** The stadium shape marks where the workflow *begins*, NOT the loop target. If your workflow has a linear prelude (`fetch → emit → ...`), only `fetch` is the start node. The loop target `emit` is NOT a start node — it receives a back-edge. Don't give it stadium shape unless it's truly the first node to execute.
 
 ## Fan-out / fan-in
 
@@ -98,6 +99,76 @@ flowchart TD
 ```
 
 Here `start` fans out to three parallel steps; `join` runs once after all three finish.
+
+## Loops and fan-in
+
+A loop target (node receiving a back-edge) can deadlock if it's treated as a fan-in merge. The rule:
+
+> A node is a fan-in merge ONLY when ALL incoming edges are unlabeled AND come from distinct sources.
+
+If any incoming edge is labeled, the node is NOT a merge — tokens fire it immediately.
+
+**Safe loop pattern** — label the back-edge:
+
+```mermaid
+flowchart TD
+  emit([Emit next])
+  emit -->|next| process
+  emit -->|done| finish
+  process -->|loop| emit
+```
+
+Here `emit` has two incoming edges (it's the start node, plus `process -->|loop| emit`), but the back-edge is labeled, so no fan-in wait.
+
+**Deadlock pattern** — all unlabeled incoming:
+
+```mermaid
+flowchart TD
+  fetch --> emit
+  emit -->|next| process
+  emit -->|done| finish
+  process --> emit
+```
+
+Here `emit` has unlabeled edges from both `fetch` and `process` → treated as merge → deadlocks on iteration 2.
+
+**Fix:** `process -->|loop| emit` (label the back-edge).
+
+## Self-edges
+
+Self-edges ARE supported. They're the basis of edge-level retry:
+
+```mermaid
+flowchart TD
+  fetch([Fetch data])
+  fetch -->|pass| process
+  fetch -->|fail max:3| fetch
+  fetch -->|fail:max| fallback
+```
+
+The engine tracks a per-node retry counter for `fail max:N` self-edges.
+
+## forEach (thick edges)
+
+A thick edge (`==>`) with an `each:` label declares dynamic task mapping:
+
+```mermaid
+flowchart TD
+  produce ==>|each: items| process --> collect
+```
+
+- The source step (`produce`) emits an array in `LOCAL.items`.
+- The engine spawns one token per element through the body chain.
+- The collector (`collect`) waits for all items to complete.
+- Multi-node body chains are supported: `produce ==>|each: items| A --> B --> collect`.
+
+Configure on the source step's `foreach:` config block:
+
+```yaml
+foreach:
+  maxConcurrency: 3       # 0 = unlimited (default), 1 = serial
+  onItemError: continue   # or: fail-fast (default)
+```
 
 ## Subgraphs
 

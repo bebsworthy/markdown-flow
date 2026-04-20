@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
-import { access, mkdtemp, writeFile } from "node:fs/promises";
+import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -24,6 +24,10 @@ describe("engine resume", () => {
 
   beforeEach(async () => {
     runsDir = await mkdtemp(join(tmpdir(), "markflow-resume-"));
+  });
+
+  afterEach(async () => {
+    await rm(runsDir, { recursive: true, force: true });
   });
 
   it("round-trip: truncate mid-run, resume, complete", async () => {

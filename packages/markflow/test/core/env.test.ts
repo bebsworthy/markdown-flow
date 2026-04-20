@@ -31,6 +31,24 @@ describe("parseEnvContent", () => {
     const result = parseEnvContent("EMPTY=");
     expect(result).toEqual({ EMPTY: "" });
   });
+
+  // Protects against: mismatched quotes passing through unstripped
+  it("does not strip mismatched quotes", () => {
+    const result = parseEnvContent('KEY="hello\'');
+    expect(result).toEqual({ KEY: '"hello\'' });
+  });
+
+  // Protects against: empty key being accepted as a valid variable
+  it("skips entries with empty key (=value)", () => {
+    const result = parseEnvContent("=value\nGOOD=yes");
+    expect(result).toEqual({ GOOD: "yes" });
+  });
+
+  // Protects against: values with = signs being split incorrectly
+  it("preserves equals signs within the value", () => {
+    const result = parseEnvContent("URL=https://host?a=1&b=2");
+    expect(result).toEqual({ URL: "https://host?a=1&b=2" });
+  });
 });
 
 describe("input layer resolution (engine)", () => {

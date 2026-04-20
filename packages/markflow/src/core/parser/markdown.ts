@@ -552,6 +552,14 @@ function parseStepConfig(yaml: string): {
             );
           }
           foreach!.onItemError = val;
+        } else if (key === "maxConcurrency") {
+          const n = Number(val);
+          if (!Number.isInteger(n) || n < 0) {
+            throw new ParseError(
+              `foreach.maxConcurrency must be a non-negative integer (got "${val}")`,
+            );
+          }
+          foreach!.maxConcurrency = n;
         }
         continue;
       }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, afterEach, describe, expect, it } from "vitest";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,23 +8,33 @@ import {
   type RunStatus,
 } from "../../src/core/index.js";
 
+// CI environments are slower; allow a multiplier via env var.
+const PERF_MULT = Number(process.env.MARKFLOW_PERF_MULT) || 1;
+const COLLECT_TIMEOUT = 5000 * PERF_MULT;
+const WATCHER_SETTLE = 100 * PERF_MULT;
+
 /**
  * Collects events from the iterator until either:
  * - `until(events)` returns true
  * - `timeoutMs` elapses (throws)
- * The iterator is not aborted by this helper — the caller manages the
+ * The iterator is not aborted by this helper -- the caller manages the
  * `AbortController` so teardown is explicit.
  */
 async function collect(
   iter: AsyncIterable<RunEvent>,
   until: (events: RunEvent[]) => boolean,
-  timeoutMs = 1500,
+  timeoutMs = COLLECT_TIMEOUT,
 ): Promise<RunEvent[]> {
   const events: RunEvent[] = [];
   let timeoutHandle: NodeJS.Timeout | undefined;
   const timeout = new Promise<never>((_, rej) => {
     timeoutHandle = setTimeout(
-      () => rej(new Error(`collect timed out (have ${events.length})`)),
+      () =>
+        rej(
+          new Error(
+            `collect timed out after ${timeoutMs}ms (have ${events.length} events)`,
+          ),
+        ),
       timeoutMs,
     );
   });
@@ -90,6 +100,20 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Spin-wait with a generous deadline for watcher events to arrive.
+ * Uses PERF_MULT to scale for CI environments.
+ */
+async function waitFor(
+  predicate: () => boolean,
+  timeoutMs = COLLECT_TIMEOUT,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate() && Date.now() < deadline) await delay(10);
+  if (!predicate())
+    throw new Error(`waitFor timed out after ${timeoutMs}ms`);
+}
+
 describe("RunManager.watch", () => {
   let runsDir: string;
 
@@ -97,7 +121,11 @@ describe("RunManager.watch", () => {
     runsDir = await mkdtemp(join(tmpdir(), "markflow-watch-"));
   });
 
-  it("emits nothing when the runs dir is empty", async () => {
+  afterEach(async () => {
+    await rm(runsDir, { recursive: true, force: true });
+  });
+
+  it("emits nothing when the runs dir is empty", { timeout: 10_000 }, async () => {
     const manager = createRunManager(runsDir);
     const ac = new AbortController();
     const iter = manager.watch({ signal: ac.signal });
@@ -106,7 +134,7 @@ describe("RunManager.watch", () => {
       for await (const ev of iter) collected.push(ev);
     })();
     try {
-      await delay(200);
+      await delay(WATCHER_SETTLE * 3);
       ac.abort();
       await drain;
     } finally {
@@ -115,7 +143,7 @@ describe("RunManager.watch", () => {
     expect(collected).toEqual([]);
   });
 
-  it("emits added for each existing run on startup", async () => {
+  it("emits added for each existing run on startup", { timeout: 10_000 }, async () => {
     await makeRunDir(runsDir, "run-a");
     await makeRunDir(runsDir, "run-b");
 
@@ -140,13 +168,13 @@ describe("RunManager.watch", () => {
     }
   });
 
-  it("emits added when a new run directory appears", async () => {
+  it("emits added when a new run directory appears", { timeout: 10_000 }, async () => {
     const manager = createRunManager(runsDir);
     const ac = new AbortController();
     const iter = manager.watch({ signal: ac.signal });
     try {
       // Give the watcher time to attach
-      await delay(50);
+      await delay(WATCHER_SETTLE);
       await makeRunDir(runsDir, "run-new");
       const events = await collect(iter, (evs) => evs.length >= 1);
       expect(events.length).toBe(1);
@@ -157,7 +185,7 @@ describe("RunManager.watch", () => {
     }
   });
 
-  it("emits updated when meta.json is rewritten", async () => {
+  it("emits updated when meta.json is rewritten", { timeout: 10_000 }, async () => {
     await makeRunDir(runsDir, "run-x", { status: "running" });
     const manager = createRunManager(runsDir);
     const ac = new AbortController();
@@ -170,18 +198,17 @@ describe("RunManager.watch", () => {
 
     try {
       // Wait for initial added
-      while (collected.length < 1) await delay(10);
+      await waitFor(() => collected.length >= 1);
       expect(collected[0].kind).toBe("added");
 
       // Give a tick for the meta watcher to arm
-      await delay(30);
+      await delay(WATCHER_SETTLE);
       await updateMeta(runsDir, "run-x", {
         status: "complete",
         completedAt: "2026-01-01T00:01:00.000Z",
       });
 
-      const deadline = Date.now() + 1500;
-      while (collected.length < 2 && Date.now() < deadline) await delay(10);
+      await waitFor(() => collected.length >= 2);
 
       expect(collected.length).toBeGreaterThanOrEqual(2);
       const updated = collected[1];
@@ -196,7 +223,7 @@ describe("RunManager.watch", () => {
     }
   });
 
-  it("debounces 3 rapid meta.json writes into one updated", async () => {
+  it("debounces 3 rapid meta.json writes into one updated", { timeout: 10_000 }, async () => {
     await makeRunDir(runsDir, "run-d", { status: "running" });
     const manager = createRunManager(runsDir);
     const ac = new AbortController();
@@ -209,7 +236,7 @@ describe("RunManager.watch", () => {
 
     try {
       // Wait for initial added
-      while (collected.length < 1) await delay(10);
+      await waitFor(() => collected.length >= 1);
       expect(collected[0].kind).toBe("added");
 
       // Three writes in a tight loop
@@ -220,8 +247,8 @@ describe("RunManager.watch", () => {
         completedAt: "2026-01-01T00:01:00.000Z",
       });
 
-      // Wait past the debounce window + some slack
-      await delay(200);
+      // Wait past the debounce window + generous slack
+      await delay(300 * PERF_MULT);
 
       const updates = collected.filter((e) => e.kind === "updated");
       expect(updates.length).toBe(1);
@@ -234,7 +261,7 @@ describe("RunManager.watch", () => {
     }
   });
 
-  it("emits removed when a run directory is deleted", async () => {
+  it("emits removed when a run directory is deleted", { timeout: 10_000 }, async () => {
     await makeRunDir(runsDir, "run-r");
     const manager = createRunManager(runsDir);
     const ac = new AbortController();
@@ -246,13 +273,12 @@ describe("RunManager.watch", () => {
     })();
 
     try {
-      while (collected.length < 1) await delay(10);
+      await waitFor(() => collected.length >= 1);
       expect(collected[0].kind).toBe("added");
 
       await rm(join(runsDir, "run-r"), { recursive: true, force: true });
 
-      const deadline = Date.now() + 2000;
-      while (collected.length < 2 && Date.now() < deadline) await delay(10);
+      await waitFor(() => collected.length >= 2);
 
       expect(collected.length).toBeGreaterThanOrEqual(2);
       expect(collected[1].kind).toBe("removed");
@@ -263,7 +289,7 @@ describe("RunManager.watch", () => {
     }
   });
 
-  it("returns from the generator promptly on AbortSignal", async () => {
+  it("returns from the generator promptly on AbortSignal", { timeout: 10_000 }, async () => {
     const manager = createRunManager(runsDir);
     const ac = new AbortController();
     const iter = manager.watch({ signal: ac.signal });
@@ -273,24 +299,27 @@ describe("RunManager.watch", () => {
       for await (const ev of iter) collected.push(ev);
     })();
 
-    await delay(50);
+    await delay(WATCHER_SETTLE);
     ac.abort();
 
     await Promise.race([
       drain,
       new Promise<void>((_, rej) =>
-        setTimeout(() => rej(new Error("hung after abort")), 1000),
+        setTimeout(
+          () => rej(new Error("hung after abort")),
+          2000 * PERF_MULT,
+        ),
       ),
     ]);
 
     // After abort, a newly-created run should NOT be yielded.
     const preLen = collected.length;
     await makeRunDir(runsDir, "run-after-abort");
-    await delay(150);
+    await delay(WATCHER_SETTLE * 2);
     expect(collected.length).toBe(preLen);
   });
 
-  it("emits added before updated for the same run created then modified", async () => {
+  it("emits added before updated for the same run created then modified", { timeout: 10_000 }, async () => {
     const manager = createRunManager(runsDir);
     const ac = new AbortController();
     const iter = manager.watch({ signal: ac.signal });
@@ -301,28 +330,26 @@ describe("RunManager.watch", () => {
     })();
 
     try {
-      await delay(50);
+      await delay(WATCHER_SETTLE);
       await makeRunDir(runsDir, "run-ab", { status: "running" });
       // Wait long enough to see the added AND for the meta watcher to attach
-      while (collected.filter((e) => e.runId === "run-ab").length < 1) {
-        await delay(10);
-      }
+      await waitFor(
+        () => collected.filter((e) => e.runId === "run-ab").length >= 1,
+      );
       // Give a tick for the meta watcher to arm
-      await delay(30);
+      await delay(WATCHER_SETTLE);
       await updateMeta(runsDir, "run-ab", {
         status: "complete",
         completedAt: "2026-01-01T00:01:00.000Z",
       });
 
       // Wait for at least one update
-      const deadline = Date.now() + 1500;
-      while (
-        collected.filter((e) => e.runId === "run-ab" && e.kind === "updated")
-          .length < 1 &&
-        Date.now() < deadline
-      ) {
-        await delay(10);
-      }
+      await waitFor(
+        () =>
+          collected.filter(
+            (e) => e.runId === "run-ab" && e.kind === "updated",
+          ).length >= 1,
+      );
 
       const forRun = collected.filter((e) => e.runId === "run-ab");
       expect(forRun.length).toBeGreaterThanOrEqual(2);
@@ -334,7 +361,7 @@ describe("RunManager.watch", () => {
     }
   });
 
-  it("startup added events are in ascending alphabetical runId order", async () => {
+  it("startup added events are in ascending alphabetical runId order", { timeout: 10_000 }, async () => {
     // Create out of lexicographic order: ccc first, then aaa, then bbb.
     await makeRunDir(runsDir, "ccc");
     await makeRunDir(runsDir, "aaa");

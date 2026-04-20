@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -24,6 +24,10 @@ describe("replay round-trip", () => {
 
   beforeEach(async () => {
     tempRunsDir = await mkdtemp(join(tmpdir(), "markflow-rt-"));
+  });
+
+  afterEach(async () => {
+    await rm(tempRunsDir, { recursive: true, force: true });
   });
 
   it.each(CASES)("$name: replay(log) deep-equals live snapshot", async ({ file, inputs }) => {

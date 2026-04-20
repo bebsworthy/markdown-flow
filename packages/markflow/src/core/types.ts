@@ -89,6 +89,13 @@ export interface ForEachConfig {
    *   entries. Read on the first `batch:start` and pinned in the event log.
    */
   onItemError: ForEachItemErrorMode;
+  /**
+   * Maximum number of batch items executing concurrently.
+   * - `undefined` or `0`: all items spawn immediately (unlimited).
+   * - `1`: serial iteration (items run one at a time in index order).
+   * - `N > 1`: sliding window of N concurrent items.
+   */
+  maxConcurrency?: number;
 }
 
 export interface StepConfig {
@@ -284,6 +291,8 @@ export type EngineEventPayload =
       /** Per-item context values (`LOCAL[key]`), preserved for mid-batch resume. */
       itemContexts: unknown[];
       onItemError: ForEachItemErrorMode;
+      /** Concurrency limit pinned at batch start. 0 = unlimited. */
+      maxConcurrency: number;
     }
   | {
       type: "batch:item:complete";
@@ -356,6 +365,10 @@ export interface BatchState {
   failed: number;
   /** Failure policy pinned at `batch:start` time. */
   onItemError: ForEachItemErrorMode;
+  /** Concurrency limit pinned at `batch:start` time. 0 = unlimited. */
+  maxConcurrency: number;
+  /** Number of items spawned so far (watermark for sliding window). */
+  spawned: number;
   /**
    * Per-item input contexts, indexed by `itemIndex`. Captured on `batch:start`
    * so mid-batch resume can re-spawn unfinished items without consulting the

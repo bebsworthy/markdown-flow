@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -79,6 +79,10 @@ describe("approval nodes — engine suspend/resume", () => {
 
   beforeEach(async () => {
     runsDir = await mkdtemp(join(tmpdir(), "markflow-approval-"));
+  });
+
+  afterEach(async () => {
+    await rm(runsDir, { recursive: true, force: true });
   });
 
   it("suspends at an approval node with status=suspended and emits step:waiting", async () => {

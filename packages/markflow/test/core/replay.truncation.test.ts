@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { readEventLog } from "../../src/core/replay.js";
@@ -10,6 +10,10 @@ describe("readEventLog truncation handling", () => {
 
   beforeEach(async () => {
     dir = await mkdtemp(join(tmpdir(), "markflow-trunc-"));
+  });
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true });
   });
 
   const line = (obj: object) => JSON.stringify(obj) + "\n";
