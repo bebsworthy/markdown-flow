@@ -78,19 +78,21 @@ jobs:
 
       - name: Bump version
         run: |
-          cd packages/markflow
           npm version ${{ inputs.version }} --no-git-tag-version
           VERSION=$(node -p "require('./package.json').version")
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
           echo "📦 Version: ${VERSION}"
+        working-directory: packages/markflow
 
       - name: Publish (dry run)
         if: inputs.dry-run
-        run: npm publish -w markflow-cli --provenance --access public --dry-run
+        run: npm publish --provenance --access public --dry-run
+        working-directory: packages/markflow
 
       - name: Publish
         if: ${{ !inputs.dry-run }}
-        run: npm publish -w markflow-cli --provenance --access public
+        run: npm publish --provenance --access public
+        working-directory: packages/markflow
 
       - name: Summary
         run: |
