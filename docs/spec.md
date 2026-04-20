@@ -304,13 +304,29 @@ Choose edge from: <label1>, <label2>, ...
 
 Single-edge steps get no edge hint — the routing is unambiguous and `"edge": "done"` (or any label) suffices.
 
-The engine streams stdout, intercepting three sentinel prefixes on their own lines:
+The engine streams stdout, intercepting three sentinel prefixes:
 
 - `LOCAL: {...}` — shallow-merged into this step's own `local` state (accumulates across multiple lines).
 - `GLOBAL: {...}` — shallow-merged into the workflow-wide `global` context (visible to every subsequent step via `$GLOBAL` / `$STEPS`).
 - `RESULT: {"edge": "...", "summary": "..."}` — the terminal routing decision. Optional: when omitted (or emitted without an `edge` key), the engine defaults to `edge: "next"` on exit 0 and `edge: "fail"` on non-zero exit — the same rule for script and agent steps. May appear at most once. Including `local` or `global` keys inside RESULT is an error and fails the step.
 
-Everything else in stdout is logged unchanged and ignored by the engine. Sentinel-looking lines whose JSON is malformed are treated as prose.
+**Multiline JSON:** The parser uses brace-balanced accumulation. A sentinel line whose JSON `{` does not close on that line causes the parser to collect subsequent output lines until braces balance, then parses the concatenated text as JSON. This allows natural `jq` pretty-printed output:
+
+```bash
+echo "GLOBAL:"
+curl -s "$API_URL/data" | jq '{payload: ., count: (.items | length)}'
+```
+
+A bare sentinel (e.g. `GLOBAL:` with nothing after the colon) begins accumulation from the next line.
+
+**RESULT shorthand:** If the text after `RESULT:` does not begin with `{`, it is parsed as plain text in the format `<edge>` or `<edge> | <summary>`:
+
+```bash
+echo "RESULT: pass"
+echo "RESULT: fail | region us-east unhealthy after 30s"
+```
+
+Everything else in stdout is logged unchanged and ignored by the engine.
 
 Invocation: the engine spawns the agent with its CLI-specific non-interactive
 argv prefix (engine-owned) followed by the configured `agent_flags`, and pipes

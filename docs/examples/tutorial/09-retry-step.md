@@ -25,7 +25,7 @@ flowchart TD
 
 ```bash
 echo "Starting workflow with unreliable step..."
-echo 'RESULT: {"edge": "next", "summary": "ready"}'
+echo "RESULT: next | ready"
 ```
 
 ## unreliable
@@ -46,13 +46,13 @@ echo "Attempt: rolled $roll (need >= 40 to succeed)"
 
 if [ "$roll" -lt 40 ]; then
   echo "Failed! Will retry..."
-  echo 'RESULT: {"edge": "fail", "summary": "rolled too low"}'
+  echo "RESULT: fail | rolled too low"
   exit 1
 fi
 
 echo "Success!"
-echo "LOCAL: {\"roll\": $roll}"
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"succeeded with $roll\"}"
+echo 'LOCAL: {"roll": '$roll'}'
+echo "RESULT: next | succeeded with $roll"
 ```
 
 ## report
@@ -62,5 +62,5 @@ set -euo pipefail
 
 result=$(echo "$STEPS" | jq -r '.unreliable.summary')
 echo "Unreliable step result: $result"
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"done\"}"
+echo "RESULT: next | done"
 ```

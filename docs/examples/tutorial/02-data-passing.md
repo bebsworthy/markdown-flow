@@ -28,9 +28,13 @@ set -euo pipefail
 timestamp=$(date +%s)
 items='["alpha", "bravo", "charlie"]'
 
-echo "GLOBAL: {\"items\": $items, \"count\": 3}"
-echo "LOCAL: {\"generated_at\": $timestamp}"
-echo 'RESULT: {"edge": "next", "summary": "produced 3 items"}'
+echo "GLOBAL:"
+jq -n --argjson items "$items" '{items: $items, count: ($items | length)}'
+
+echo "LOCAL:"
+jq -n --arg ts "$timestamp" '{generated_at: $ts}'
+
+echo "RESULT: next | produced 3 items"
 ```
 
 ## transform
@@ -41,11 +45,13 @@ Reads shared data from GLOBAL, transforms it, and updates GLOBAL.
 set -euo pipefail
 
 count=$(echo "$GLOBAL" | jq '.count')
-items=$(echo "$GLOBAL" | jq -c '[.items[] | "[\(. | length)]_\(.)"]')
 
 echo "Transformed $count items (added length prefix)"
-echo "GLOBAL: {\"transformed\": $items}"
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"transformed $count items\"}"
+
+echo "GLOBAL:"
+echo "$GLOBAL" | jq '{transformed: [.items[] | "[\(. | length)]_\(.)"]}'
+
+echo "RESULT: next | transformed $count items"
 ```
 
 ## report
@@ -61,5 +67,5 @@ transformed=$(echo "$GLOBAL" | jq -c '.transformed')
 
 echo "Produce said: $produce_summary (at $produce_ts)"
 echo "Transformed items: $transformed"
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"report complete\"}"
+echo "RESULT: next | report complete"
 ```

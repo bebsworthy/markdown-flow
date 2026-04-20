@@ -36,12 +36,14 @@ flowchart TD
 
 ```bash
 echo "Hello from markflow!"
-echo 'GLOBAL: {"message": "it works"}'
+echo "GLOBAL:"
+jq -n '{message: "it works"}'
 ```
 
 ## shout
 
 ```bash
+message=$(echo "$GLOBAL" | jq -r '.message')
 echo "Step 2 received: $message"
 ```
 ````
@@ -66,7 +68,7 @@ A workflow is a Markdown file with up to four sections:
 ## Features
 
 - **Fan-out/fan-in**: Multiple edges from a node run in parallel; nodes with multiple incoming edges wait for all upstream to complete
-- **Routing**: Exit code 0 follows the success path, non-zero follows `fail`. Steps can emit `RESULT: {"edge": "..."}` for explicit routing
+- **Routing**: Exit code 0 follows the success path, non-zero follows `fail`. Steps can emit `RESULT: pass | summary` for explicit routing
 - **Retries**: Edge-level (`fail max:N`) or step-level (`retry:` config block) with backoff and jitter
 - **Timeouts**: Per-step or workflow-level with configurable defaults
 - **Data flow**: Steps communicate via `LOCAL` (step-scoped), `GLOBAL` (workflow-wide), and `STEPS` (read upstream outputs) contexts, rendered with LiquidJS templates

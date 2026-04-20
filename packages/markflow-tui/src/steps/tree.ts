@@ -398,6 +398,8 @@ export function projectStepsSnapshot(
           succeeded: 0,
           failed: 0,
           onItemError,
+          maxConcurrency: ev.maxConcurrency ?? 0,
+          spawned: 0,
           itemContexts: [...ev.itemContexts],
           results: Array.from({ length: ev.items }, () => undefined),
           done: false,

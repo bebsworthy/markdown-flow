@@ -2,6 +2,7 @@
   "name": "markflow-monorepo",
   "version": "0.0.0",
   "private": true,
+  "license": "MIT",
   "description": "markflow monorepo — engine (packages/markflow) and TUI (packages/markflow-tui).",
   "workspaces": [
     "packages/*"

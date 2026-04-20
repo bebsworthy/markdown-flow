@@ -53,11 +53,26 @@ Every step can read and emit two JSON-shaped context surfaces:
 
 Scripts receive `$LOCAL`, `$GLOBAL`, and `$STEPS` as JSON-string env vars, and emit updates as stdout sentinels:
 
+```bash
+# Multiline JSON (brace-balanced accumulation) — preferred
+echo "GLOBAL:"
+jq -n --arg t "$TOPIC" '{item: $t}'
+
+echo "LOCAL:"
+jq -n --argjson c "$NEXT" '{cursor: $c}'
+
+# RESULT shorthand — preferred for scripts
+echo "RESULT: next | processed 5 items"
+
+# Single-line JSON still works
+echo 'LOCAL: {"cursor": 3}'
+echo 'GLOBAL: {"item": "value"}'
+echo 'RESULT: {"edge": "next", "summary": "..."}'
 ```
-LOCAL:  {"cursor": 3}
-GLOBAL: {"item": {...}}
-RESULT: {"edge": "next", "summary": "..."}
-```
+
+The parser uses brace-balanced accumulation: if JSON after a sentinel doesn't close on one line, subsequent lines are collected until braces balance. A bare sentinel (e.g. `GLOBAL:` with nothing after the colon) starts accumulation from the next line.
+
+RESULT shorthand: if text after `RESULT:` doesn't start with `{`, it's parsed as `<edge>` or `<edge> | <summary>`.
 
 Multiple `LOCAL:` / `GLOBAL:` lines shallow-merge (later keys win).
 

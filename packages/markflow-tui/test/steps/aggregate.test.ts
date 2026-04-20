@@ -47,6 +47,8 @@ function batch(overrides: Partial<BatchState> = {}): BatchState {
     succeeded: overrides.succeeded ?? 0,
     failed: overrides.failed ?? 0,
     onItemError: overrides.onItemError ?? "fail-fast",
+    maxConcurrency: overrides.maxConcurrency ?? 0,
+    spawned: overrides.spawned ?? 0,
     itemContexts: overrides.itemContexts ?? ["us-west-2", "eu-west-1", "ap-south-1"],
     results: overrides.results ?? [undefined, undefined, undefined],
     done: overrides.done ?? false,

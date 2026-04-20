@@ -24,7 +24,7 @@ Completes well within any timeout.
 
 ```bash
 echo "Quick task done."
-echo 'RESULT: {"edge": "next", "summary": "fast"}'
+echo "RESULT: next | fast"
 ```
 
 ## slow-task
@@ -37,14 +37,14 @@ timeout: 1s
 echo "Starting long operation..."
 sleep 5
 echo "This line is never reached."
-echo 'RESULT: {"edge": "next", "summary": "completed"}'
+echo "RESULT: next | completed"
 ```
 
 ## success
 
 ```bash
 echo "Slow task completed normally (should not happen in this demo)."
-echo 'RESULT: {"edge": "next", "summary": "success path"}'
+echo "RESULT: next | success path"
 ```
 
 ## timeout-handler
@@ -52,5 +52,5 @@ echo 'RESULT: {"edge": "next", "summary": "success path"}'
 ```bash
 echo "Slow task was killed after exceeding timeout."
 echo "Proceeding with degraded service..."
-echo 'RESULT: {"edge": "next", "summary": "timeout handled"}'
+echo "RESULT: next | timeout handled"
 ```

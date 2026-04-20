@@ -32,12 +32,13 @@ roll=$((RANDOM % 100))
 echo "Fetch attempt $attempt: rolled $roll (need >= 50)"
 
 if [ "$roll" -lt 50 ]; then
-  echo "RESULT: {\"edge\": \"fail\", \"summary\": \"fetch failed (roll=$roll)\"}"
+  echo "RESULT: fail | fetch failed (roll=$roll)"
   exit 1
 fi
 
-echo "GLOBAL: {\"payload\": {\"items\": [\"alpha\", \"beta\", \"gamma\"], \"source\": \"api\"}}"
-echo "RESULT: {\"edge\": \"pass\", \"summary\": \"fetched 3 items\"}"
+echo "GLOBAL:"
+jq -n '{payload: {items: ["alpha", "beta", "gamma"], source: "api"}}'
+echo "RESULT: pass | fetched 3 items"
 ```
 
 ## process
@@ -59,7 +60,7 @@ for item in $items; do
   echo "  Processed: $item"
 done
 
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"processed $count items\"}"
+echo "RESULT: next | processed $count items"
 ```
 
 ## fallback
@@ -68,8 +69,9 @@ echo "RESULT: {\"edge\": \"next\", \"summary\": \"processed $count items\"}"
 set -euo pipefail
 
 echo "All fetch attempts exhausted. Using cached data."
-echo "GLOBAL: {\"payload\": {\"items\": [\"cached-1\", \"cached-2\"], \"source\": \"cache\"}}"
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"fell back to cache\"}"
+echo "GLOBAL:"
+jq -n '{payload: {items: ["cached-1", "cached-2"], source: "cache"}}'
+echo "RESULT: next | fell back to cache"
 ```
 
 ## done
@@ -83,5 +85,5 @@ count=$(echo "$GLOBAL" | jq '.payload.items | length')
 echo "=== Complete ==="
 echo "  Source: $source"
 echo "  Items:  $count"
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"done ($source, $count items)\"}"
+echo "RESULT: next | done ($source, $count items)"
 ```

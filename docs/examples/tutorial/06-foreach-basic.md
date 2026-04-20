@@ -23,7 +23,7 @@ flowchart TD
 
 ```bash
 echo 'LOCAL: {"cities": ["Tokyo", "Paris", "New York", "Sydney", "Berlin"]}'
-echo 'RESULT: {"edge": "next", "summary": "emitted 5 cities"}'
+echo "RESULT: next | emitted 5 cities"
 ```
 
 ## process
@@ -36,10 +36,11 @@ index=$ITEM_INDEX
 length=${#city}
 
 echo "[$index] Processing: $city ($length chars)"
-local_json=$(jq -nc --arg c "$city" --argjson l "$length" '{city: $c, length: $l}')
-result_json=$(jq -nc --arg s "$city ($length chars)" '{edge: "next", summary: $s}')
-echo "LOCAL: $local_json"
-echo "RESULT: $result_json"
+
+echo "LOCAL:"
+jq -n --arg c "$city" --argjson l "$length" '{city: $c, length: $l}'
+
+echo "RESULT: next | $city ($length chars)"
 ```
 
 ## collect
@@ -52,5 +53,5 @@ count=$(echo "$results" | jq 'length')
 longest=$(echo "$results" | jq -r '[.[] | .local.city] | sort_by(length) | last')
 
 echo "Processed $count cities. Longest name: $longest"
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"collected $count cities\"}"
+echo "RESULT: next | collected $count cities"
 ```

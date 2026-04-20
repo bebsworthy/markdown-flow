@@ -92,6 +92,8 @@ describe("selectStepDetail — dispatch", () => {
       succeeded: 1,
       failed: 1,
       onItemError: "continue",
+      maxConcurrency: 0,
+      spawned: 0,
       itemContexts: [],
       results: [],
       done: false,

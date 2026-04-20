@@ -28,9 +28,9 @@ score=$((RANDOM % 100))
 echo "Health score: $score/100"
 
 if [ "$score" -ge 40 ]; then
-  echo "RESULT: {\"edge\": \"pass\", \"summary\": \"healthy ($score)\"}"
+  echo "RESULT: pass | healthy ($score)"
 else
-  echo "RESULT: {\"edge\": \"fail\", \"summary\": \"unhealthy ($score)\"}"
+  echo "RESULT: fail | unhealthy ($score)"
 fi
 ```
 
@@ -38,7 +38,7 @@ fi
 
 ```bash
 echo "System is healthy — no action needed."
-echo 'RESULT: {"edge": "next", "summary": "all clear"}'
+echo "RESULT: next | all clear"
 ```
 
 ## recover
@@ -47,5 +47,5 @@ echo 'RESULT: {"edge": "next", "summary": "all clear"}'
 echo "System unhealthy — running recovery..."
 sleep 0.2
 echo "Recovery complete."
-echo 'RESULT: {"edge": "next", "summary": "recovered"}'
+echo "RESULT: next | recovered"
 ```

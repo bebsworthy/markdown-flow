@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { createWriteStream, type WriteStream } from "node:fs";
 import { writeFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import type {
   StepDefinition,
   StepOutput,
@@ -39,10 +39,14 @@ export async function runScript(
   const interpreter = LANG_TO_INTERPRETER[lang];
   const ext = LANG_TO_EXT[lang];
 
-  // Write script to a temp file in the run directory
+  // Write script to a temp file in the run directory.
+  // Use the sidecar seq as suffix to avoid races when forEach runs the same
+  // step concurrently — without it, concurrent writeFile calls to the same
+  // path can truncate the file while another iteration's bash is reading it.
   const scriptsDir = join(runDir, "scripts");
   await mkdir(scriptsDir, { recursive: true });
-  const scriptPath = join(scriptsDir, `${step.id}${ext}`);
+  const seqPrefix = sidecar ? basename(sidecar.stdoutPath).split("-")[0] : "";
+  const scriptPath = join(scriptsDir, `${step.id}${seqPrefix ? `-${seqPrefix}` : ""}${ext}`);
   await writeFile(scriptPath, step.content, "utf-8");
 
   return new Promise<StepOutput>((resolve) => {

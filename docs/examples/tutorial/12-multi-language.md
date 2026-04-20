@@ -24,8 +24,10 @@ set -euo pipefail
 
 measurements='[{"sensor":"temp","value":22.5,"unit":"C"},{"sensor":"temp","value":23.1,"unit":"C"},{"sensor":"humidity","value":65,"unit":"%"},{"sensor":"temp","value":21.8,"unit":"C"},{"sensor":"humidity","value":70,"unit":"%"},{"sensor":"pressure","value":1013,"unit":"hPa"},{"sensor":"temp","value":24.0,"unit":"C"}]'
 
-echo "GLOBAL: {\"measurements\": $measurements}"
-echo 'RESULT: {"edge": "next", "summary": "generated 7 measurements"}'
+echo "GLOBAL:"
+jq -n --argjson m "$measurements" '{measurements: $m}'
+
+echo "RESULT: next | generated 7 measurements"
 ```
 
 ## analyze

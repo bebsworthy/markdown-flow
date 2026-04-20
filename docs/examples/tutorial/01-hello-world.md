@@ -17,12 +17,12 @@ flowchart TD
 
 ```bash
 echo "Hello from the first step!"
-echo 'RESULT: {"edge": "next", "summary": "greeted"}'
+echo "RESULT: next | greeted"
 ```
 
 ## farewell
 
 ```bash
 echo "Goodbye from the second step!"
-echo 'RESULT: {"edge": "next", "summary": "done"}'
+echo "RESULT: next | done"
 ```

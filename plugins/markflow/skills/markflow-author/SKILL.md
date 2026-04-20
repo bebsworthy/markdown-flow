@@ -51,7 +51,7 @@ Draft the Mermaid flowchart *before* writing step bodies. Getting the topology r
 - Use short, lowercase, underscore-separated IDs (`lint`, `run_tests`, `emit_next`). They appear in logs and as `## <id>` headings.
 - **Start nodes**: exactly one start node is allowed. In DAGs the engine auto-detects it (node with no incoming edges). In cyclic graphs, mark the *entry point* with stadium shape `([...])` — the node the workflow begins at. Loop targets are NOT start nodes; don't give them stadium shape.
 - **Fan-out**: multiple unlabeled edges from a node run in parallel. **Fan-in**: a node with multiple incoming edges waits for *all* upstream to complete.
-- **Routing**: use labeled edges (`A -->|pass| B`, `A -->|fail| C`). The step emits `RESULT: {"edge": "pass", ...}` to choose one. Exit code 0 auto-picks a non-`fail` edge; non-zero auto-picks `fail`.
+- **Routing**: use labeled edges (`A -->|pass| B`, `A -->|fail| C`). The step emits `RESULT: pass` (or `RESULT: pass | summary`) to choose one. Exit code 0 auto-picks a non-`fail` edge; non-zero auto-picks `fail`.
 - **Retries (graph-visible)**: `A -->|fail max:3| fix` plus `A -->|fail:max| abort`. `max:N` without `:max` halts on exhaustion — always pair them. See `references/mermaid-cheatsheet.md`.
 - **Retries (in-place)**: for "try the same step again with backoff", use a step-level `retry:` in its ` ```config ` block instead — the graph stays clean. See `references/routing-and-config.md`.
 - **forEach**: A thick edge `==>|each: KEY|` fans out dynamically — the engine spawns one token per array element. The body chain runs per item and converges at a collector. Configure `maxConcurrency` (0=unlimited, 1=serial, N=sliding window) and `onItemError` in the source step's `foreach:` config block. See `references/routing-and-config.md`.
@@ -119,15 +119,30 @@ Typos here fail silently — `${MARKFLOW_RUN_DIR:-.}` will fall through to `.` e
 
 Steps *publish* by emitting sentinel lines on stdout:
 
+```bash
+# RESULT shorthand — preferred for script steps
+echo "RESULT: next | picked issue #42"
+echo "RESULT: fail | validation error"
+
+# Multiline JSON — brace-balanced accumulation
+echo "GLOBAL:"
+jq -n --arg t "$TOPIC" '{topic: $t}'
+
+echo "LOCAL:"
+jq -n --argjson c "$NEXT" '{cursor: $c}'
+
+# Single-line JSON still works
+echo 'LOCAL: {"cursor": 3}'
+echo 'GLOBAL: {"topic": "autumn leaves"}'
+echo 'RESULT: {"edge": "next", "summary": "picked issue #42"}'
 ```
-LOCAL:  {"cursor": 3}
-GLOBAL: {"topic": "autumn leaves"}
-RESULT: {"edge": "next", "summary": "picked issue #42"}
-```
+
+The parser uses **brace-balanced accumulation**: if the JSON after a sentinel doesn't close on one line, subsequent lines are collected until braces balance. A bare sentinel (e.g. `GLOBAL:` with nothing after the colon) starts accumulation from the next line. This lets `jq` output flow naturally without escaping.
 
 Rules that trip people up:
 
-- `RESULT` must be the **last line** when emitted. Required for agent steps with ≥2 outgoing edges. For steps with a single outgoing edge, the engine routes automatically without it. Emitting RESULT is always valid and adds a log-visible summary.
+- `RESULT` must be the **last sentinel** when emitted. Required for agent steps with ≥2 outgoing edges. For steps with a single outgoing edge, the engine routes automatically without it. Emitting RESULT is always valid and adds a log-visible summary.
+- **RESULT shorthand**: if text after `RESULT:` doesn't start with `{`, it's parsed as `<edge>` or `<edge> | <summary>`. Use this in scripts instead of JSON.
 - `LOCAL` / `GLOBAL` lines **shallow-merge** (later keys win). Don't nest `"local"` / `"global"` inside `RESULT`.
 - Agent prompts are rendered through **Liquid in strict mode** before being sent — any `{{ GLOBAL.missing }}` hard-fails. If a variable might be absent, use `{{ value | default: "…" }}`.
 

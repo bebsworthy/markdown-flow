@@ -33,13 +33,13 @@ echo "Fetch attempt (roll=$roll, need >= 60)..."
 
 if [ "$roll" -lt 60 ]; then
   echo "Connection timeout!"
-  echo "RESULT: {\"edge\": \"fail\", \"summary\": \"timeout (roll=$roll)\"}"
+  echo "RESULT: fail | timeout (roll=$roll)"
   exit 1
 fi
 
 echo "Success!"
 echo 'LOCAL: {"data": {"status": "live", "items": 42}}'
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"fetched 42 items\"}"
+echo "RESULT: next | fetched 42 items"
 ```
 
 ## process
@@ -51,7 +51,7 @@ set -euo pipefail
 
 items=$(echo "$STEPS" | jq '.fetch.local.data.items')
 echo "Processing $items items from successful fetch..."
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"processed $items items\"}"
+echo "RESULT: next | processed $items items"
 ```
 
 ## fallback
@@ -60,5 +60,5 @@ Only runs if all 3 retries are exhausted.
 
 ```bash
 echo "All retries exhausted — using cached data instead."
-echo 'RESULT: {"edge": "next", "summary": "used fallback (cached)"}'
+echo "RESULT: next | used fallback (cached)"
 ```

@@ -37,9 +37,9 @@ echo "GLOBAL: $(jq -nc --arg s "$SHA" '{sha:$s}')"
 
 ```bash
 if npm run lint --silent; then
-  echo "RESULT: $(jq -nc '{edge:"ok", summary:"lint clean"}')"
+  echo "RESULT: ok | lint clean"
 else
-  echo "RESULT: $(jq -nc '{edge:"ok", summary:"lint failed"}')"
+  echo "RESULT: ok | lint failed"
 fi
 ```
 
@@ -47,9 +47,9 @@ fi
 
 ```bash
 if npm test --silent; then
-  echo "RESULT: $(jq -nc '{edge:"ok", summary:"tests passed"}')"
+  echo "RESULT: ok | tests passed"
 else
-  echo "RESULT: $(jq -nc '{edge:"ok", summary:"tests failed"}')"
+  echo "RESULT: ok | tests failed"
 fi
 ```
 
@@ -57,7 +57,7 @@ fi
 
 ```bash
 COUNT=$(npm audit --json 2>/dev/null | jq -r '.metadata.vulnerabilities.total // 0')
-echo "RESULT: $(jq -nc --arg c "$COUNT" '{edge:"ok", summary:("audit: " + $c + " vulns")}')"
+echo "RESULT: ok | audit: $COUNT vulns"
 ```
 
 ## report

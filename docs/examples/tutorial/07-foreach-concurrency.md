@@ -32,8 +32,10 @@ set -euo pipefail
 
 jobs='[{"id":1,"name":"alpha","duration":0.4},{"id":2,"name":"bravo","duration":0.2},{"id":3,"name":"charlie","duration":0.6},{"id":4,"name":"delta","duration":0.3},{"id":5,"name":"echo","duration":0.5},{"id":6,"name":"foxtrot","duration":0.2},{"id":7,"name":"golf","duration":0.4},{"id":8,"name":"hotel","duration":0.1}]'
 
-echo "LOCAL: {\"jobs\": $jobs}"
-echo 'RESULT: {"edge": "next", "summary": "prepared 8 jobs"}'
+echo "LOCAL:"
+jq -n --argjson j "$jobs" '{jobs: $j}'
+
+echo "RESULT: next | prepared 8 jobs"
 ```
 
 ## process
@@ -53,13 +55,16 @@ sleep "$duration"
 
 if [ "$id" = "5" ]; then
   echo "[$id] $name failed!"
-  echo "RESULT: {\"edge\": \"fail\", \"summary\": \"$name failed\"}"
+  echo "RESULT: fail | $name failed"
   exit 1
 fi
 
 echo "[$id] $name done"
-echo "LOCAL: {\"id\": $id, \"name\": \"$name\", \"took\": $duration}"
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"$name processed in ${duration}s\"}"
+echo "LOCAL:"
+jq -n --argjson id "$id" --arg name "$name" --argjson took "$duration" \
+  '{id: $id, name: $name, took: $took}'
+
+echo "RESULT: next | $name processed in ${duration}s"
 ```
 
 ## aggregate
@@ -75,5 +80,5 @@ succeeded=$(echo "$results" | jq '[.[] | select(.ok == true)] | length')
 failed=$((total - succeeded))
 
 echo "Processed $succeeded/$total jobs ($failed failed)"
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"$succeeded/$total jobs completed\"}"
+echo "RESULT: next | $succeeded/$total jobs completed"
 ```

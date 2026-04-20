@@ -54,19 +54,62 @@ Spelling warning: It's `MARKFLOW_RUNDIR` (one word). `MARKFLOW_RUN_DIR` does not
 
 ## Sentinel protocol (how steps publish)
 
-Steps write these on stdout to communicate back to the engine:
+Steps write sentinel lines on stdout to communicate back to the engine. Three prefixes are recognized: `LOCAL:`, `GLOBAL:`, and `RESULT:`.
 
+### Basic forms
+
+```bash
+# Single-line JSON (still works)
+echo 'LOCAL: {"cursor": 3, "seen": 12}'
+echo 'GLOBAL: {"topic": "autumn leaves"}'
+
+# RESULT shorthand (preferred for scripts)
+echo "RESULT: next | picked issue #42"
+echo "RESULT: fail | validation error"
+echo "RESULT: pass"
+
+# RESULT JSON (still works, required for agent steps)
+echo 'RESULT: {"edge": "next", "summary": "picked issue #42"}'
 ```
-LOCAL:  { "cursor": 3, "seen": 12 }
-GLOBAL: { "topic": "autumn leaves" }
-RESULT: { "edge": "next", "summary": "picked issue #42" }
+
+### Multiline JSON (brace-balanced accumulation)
+
+The parser uses brace-balanced accumulation: if the JSON after a sentinel doesn't close on one line, the parser collects subsequent lines until braces balance. This lets `jq` output flow naturally:
+
+```bash
+# Bare sentinel — accumulation starts from the next line
+echo "GLOBAL:"
+jq -n --arg t "$TOPIC" '{topic: $t, timestamp: now | todate}'
+
+# Sentinel with opening brace — accumulates until balanced
+echo "LOCAL: {"
+echo "  \"cursor\": $NEXT,"
+echo "  \"processed\": $COUNT"
+echo "}"
 ```
 
-Rules:
+This eliminates the need for escaped single-line JSON. Use `jq -n` to construct payloads and let the output span multiple lines.
 
-- **One sentinel per line.** The marker must be at the start of the line.
+### RESULT shorthand
+
+If the text after `RESULT:` does not begin with `{`, it's parsed as plain text:
+
+| Format | Meaning |
+|---|---|
+| `RESULT: <edge>` | Route to the named edge, no summary |
+| `RESULT: <edge> \| <summary>` | Route + human-readable summary |
+
+```bash
+echo "RESULT: next | processed 42 items"
+echo "RESULT: fail | timeout after 30s"
+echo "RESULT: pass"
+```
+
+### Rules
+
+- **Sentinel must be at the start of a line.** Indented or mid-line occurrences are ignored.
 - `LOCAL:` and `GLOBAL:` may appear **zero or more times** anywhere in output. Multiple occurrences **shallow-merge** — later keys overwrite earlier.
-- `RESULT:` must be the **last line** when emitted. For agent steps it's required. For script steps it's optional; absent → route by exit code.
+- `RESULT:` should be the **last sentinel** when emitted. For agent steps it's required. For script steps it's optional; absent → route by exit code.
 - Do **not** nest `"local"` or `"global"` keys inside `RESULT`. Those are separate channels.
 - Lines that don't start with a sentinel are normal stdout and tee'd to the step's output sidecar.
 
@@ -142,10 +185,17 @@ LOCAL: {"label": "<choice>"}
 
 ## Examples
 
-### Script step publishing for downstream
+### Script step publishing for downstream (multiline)
 ```bash
 TOPIC="autumn leaves"
 echo "Topic: $TOPIC"
+echo "GLOBAL:"
+jq -n --arg t "$TOPIC" '{topic: $t}'
+echo "RESULT: next | picked $TOPIC"
+```
+
+### Script step with single-line publish (still valid)
+```bash
 echo "GLOBAL: $(jq -nc --arg t "$TOPIC" '{topic:$t}')"
 ```
 
@@ -154,6 +204,7 @@ echo "GLOBAL: $(jq -nc --arg t "$TOPIC" '{topic:$t}')"
 TOPIC=$(jq -r '.topic' <<< "$GLOBAL")
 HAIKU=$(jq -r '.compose.local.haiku // "(no haiku)"' <<< "$STEPS")
 printf '— %s —\n%s\n' "$TOPIC" "$HAIKU"
+echo "RESULT: next | rendered haiku"
 ```
 
 ### Script step maintaining loop cursor in LOCAL
@@ -161,7 +212,18 @@ printf '— %s —\n%s\n' "$TOPIC" "$HAIKU"
 CURSOR=$(jq -r '.cursor // -1' <<< "$LOCAL")
 NEXT=$((CURSOR + 1))
 # ...work...
-echo "LOCAL: $(jo cursor=$NEXT)"
+echo "LOCAL:"
+jq -n --argjson c "$NEXT" '{cursor: $c}'
+echo "RESULT: next | cursor=$NEXT"
+```
+
+### forEach item processing with RESULT shorthand
+```bash
+name=$(echo "$ITEM" | jq -r '.name')
+echo "Processing: $name"
+echo "LOCAL:"
+jq -n --arg n "$name" '{name: $n, processed: true}'
+echo "RESULT: next | $name done"
 ```
 
 ### Agent step reading GLOBAL and emitting LOCAL + RESULT

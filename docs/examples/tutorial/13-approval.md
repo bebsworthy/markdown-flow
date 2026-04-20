@@ -27,9 +27,11 @@ set -euo pipefail
 version="2.4.$(( RANDOM % 100 ))"
 changes=$((RANDOM % 10 + 1))
 
-echo "LOCAL: {\"version\": \"$version\", \"changes\": $changes}"
+echo "LOCAL:"
+jq -n --arg v "$version" --argjson c "$changes" '{version: $v, changes: $c}'
+
 echo "Release v$version ready: $changes changes staged"
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"v$version prepared ($changes changes)\"}"
+echo "RESULT: next | v$version prepared ($changes changes)"
 ```
 
 ## review
@@ -54,7 +56,7 @@ version=$(echo "$GLOBAL" | jq -r '.version')
 echo "Deploying v$version to production..."
 sleep 0.3
 echo "Deployment complete."
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"deployed v$version\"}"
+echo "RESULT: next | deployed v$version"
 ```
 
 ## cancel
@@ -64,5 +66,5 @@ set -euo pipefail
 
 version=$(echo "$GLOBAL" | jq -r '.version')
 echo "Release v$version was rejected. No deployment."
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"v$version cancelled\"}"
+echo "RESULT: next | v$version cancelled"
 ```

@@ -31,9 +31,9 @@ set -euo pipefail
 echo "Routing for: $NAME (style=$STYLE)"
 
 if [ "$STYLE" = "formal" ]; then
-  echo "RESULT: {\"edge\": \"formal\", \"summary\": \"formal greeting for $NAME\"}"
+  echo "RESULT: formal | formal greeting for $NAME"
 else
-  echo "RESULT: {\"edge\": \"casual\", \"summary\": \"casual greeting for $NAME\"}"
+  echo "RESULT: casual | casual greeting for $NAME"
 fi
 ```
 
@@ -43,7 +43,7 @@ fi
 set -euo pipefail
 
 echo "Hey $NAME! What's up?"
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"greeted $NAME casually\"}"
+echo "RESULT: next | greeted $NAME casually"
 ```
 
 ## formal_greet
@@ -52,5 +52,5 @@ echo "RESULT: {\"edge\": \"next\", \"summary\": \"greeted $NAME casually\"}"
 set -euo pipefail
 
 echo "Good day, $NAME. I hope this message finds you well."
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"greeted $NAME formally\"}"
+echo "RESULT: next | greeted $NAME formally"
 ```

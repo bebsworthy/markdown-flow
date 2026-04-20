@@ -28,12 +28,12 @@ set -euo pipefail
 
 if [ -z "${NAME:-}" ]; then
   echo "ERROR: NAME input is required"
-  echo 'RESULT: {"edge": "fail", "summary": "missing NAME"}'
+  echo "RESULT: fail | missing NAME"
   exit 1
 fi
 
 echo "Validated inputs: NAME=$NAME, GREETING=$GREETING, REPEAT=$REPEAT"
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"inputs valid\"}"
+echo "RESULT: next | inputs valid"
 ```
 
 ## process
@@ -46,8 +46,10 @@ for i in $(seq 1 "$REPEAT"); do
   messages=$(echo "$messages" | jq --arg msg "$GREETING, $NAME! (#$i)" '. + [$msg]')
 done
 
-echo "LOCAL: {\"messages\": $(echo "$messages" | jq -c .)}"
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"generated $REPEAT messages\"}"
+echo "LOCAL:"
+jq -n --argjson msgs "$messages" '{messages: $msgs}'
+
+echo "RESULT: next | generated $REPEAT messages"
 ```
 
 ## output
@@ -57,5 +59,5 @@ set -euo pipefail
 
 echo "$GLOBAL" | jq -r '.messages[]'
 count=$(echo "$GLOBAL" | jq '.messages | length')
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"printed $count messages\"}"
+echo "RESULT: next | printed $count messages"
 ```

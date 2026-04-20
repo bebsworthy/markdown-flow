@@ -27,8 +27,9 @@ set -euo pipefail
 tasks='[{"name":"alpha","weight":1},{"name":"beta","weight":2},{"name":"gamma","weight":3},{"name":"delta","weight":1},{"name":"epsilon","weight":2},{"name":"zeta","weight":3}]'
 count=$(echo "$tasks" | jq 'length')
 
-echo "LOCAL: {\"tasks\": $tasks}"
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"produced $count tasks\"}"
+echo "LOCAL:"
+echo "$tasks" | jq '{tasks: .}'
+echo "RESULT: next | produced $count tasks"
 ```
 
 ## process
@@ -51,13 +52,14 @@ sleep 0.$((weight))
 roll=$((RANDOM % 100))
 if [ "$roll" -lt 15 ]; then
   echo "[$ITEM_INDEX] Task $name failed (roll=$roll)"
-  echo "RESULT: {\"edge\": \"fail\", \"summary\": \"$name failed\"}"
+  echo "RESULT: fail | $name failed"
   exit 1
 fi
 
 echo "[$ITEM_INDEX] Task $name completed"
-echo "LOCAL: {\"name\": \"$name\", \"processed\": true}"
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"$name done\"}"
+echo "LOCAL:"
+jq -n --arg n "$name" '{name: $n, processed: true}'
+echo "RESULT: next | $name done"
 ```
 
 ## collect
@@ -77,5 +79,5 @@ echo "  Failed: $failed"
 
 echo "$results" | jq -r '.[] | "  [\(.ok | if . then "OK" else "FAIL" end)] \(.summary)"'
 
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"$ok/$total succeeded\"}"
+echo "RESULT: next | $ok/$total succeeded"
 ```

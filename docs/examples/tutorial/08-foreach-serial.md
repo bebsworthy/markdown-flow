@@ -28,8 +28,10 @@ set -euo pipefail
 
 steps='[{"order":1,"action":"create table","duration":0.2},{"order":2,"action":"add index","duration":0.3},{"order":3,"action":"migrate data","duration":0.4},{"order":4,"action":"drop old table","duration":0.1},{"order":5,"action":"verify schema","duration":0.2}]'
 
-echo "LOCAL: {\"steps\": $steps}"
-echo 'RESULT: {"edge": "next", "summary": "planned 5 migration steps"}'
+echo "LOCAL:"
+jq -n --argjson s "$steps" '{steps: $s}'
+
+echo "RESULT: next | planned 5 migration steps"
 ```
 
 ## execute
@@ -47,10 +49,10 @@ echo "[$order/5] Running: $action..."
 sleep "$duration"
 echo "[$order/5] Done: $action (${duration}s)"
 
-local_json=$(jq -nc --argjson o "$order" --arg a "$action" '{order: $o, action: $a}')
-result_json=$(jq -nc --arg s "step $order: $action" '{edge: "next", summary: $s}')
-echo "LOCAL: $local_json"
-echo "RESULT: $result_json"
+echo "LOCAL:"
+jq -n --argjson o "$order" --arg a "$action" '{order: $o, action: $a}'
+
+echo "RESULT: next | step $order: $action"
 ```
 
 ## summarize
@@ -64,5 +66,5 @@ actions=$(echo "$results" | jq -r '[.[] | .local.action] | join(" -> ")')
 
 echo "Migration complete: $count steps executed"
 echo "Order: $actions"
-echo "RESULT: {\"edge\": \"next\", \"summary\": \"$count migrations applied\"}"
+echo "RESULT: next | $count migrations applied"
 ```
