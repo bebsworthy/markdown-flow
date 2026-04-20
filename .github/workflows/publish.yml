@@ -38,14 +38,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build engine (needed for TUI lint)
+        run: npm run build -w markflow-cli
+
       - name: Lint
         run: npm run lint
 
       - name: Test engine
         run: npm test -w markflow-cli -- --run
-
-      - name: Build engine
-        run: npm run build -w markflow-cli
 
       - name: Test TUI
         run: npm test -w packages/markflow-tui -- --run
