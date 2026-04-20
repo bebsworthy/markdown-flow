@@ -10,7 +10,7 @@ import type {
   RunInfo,
   StepResult,
   Token,
-} from "markflow";
+} from "markflow-cli";
 import {
   computeAttemptLabel,
   computeStepTypeLabel,

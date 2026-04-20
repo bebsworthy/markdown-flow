@@ -21,7 +21,7 @@ import {
   RunLockedError,
   type EngineEvent,
   type RunManager,
-} from "markflow";
+} from "markflow-cli";
 import type { ApprovalSubmitResult } from "../approval/types.js";
 
 export interface DecideApprovalOptions {

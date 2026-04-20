@@ -1,7 +1,7 @@
 // test/log/ingest.test.ts
 
 import { describe, it, expect } from "vitest";
-import type { EngineEvent } from "markflow";
+import type { EngineEvent } from "markflow-cli";
 import {
   appendEventLines,
   mergeSidecarTail,

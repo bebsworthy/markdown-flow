@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
-import type { EngineEvent, RunInfo, StepResult } from "markflow";
+import type { EngineEvent, RunInfo, StepResult } from "markflow-cli";
 import { App } from "../../src/app.js";
 import { toRunsTableRow } from "../../src/runs/derive.js";
 import type { RunsTableRow } from "../../src/runs/types.js";

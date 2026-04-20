@@ -18,7 +18,7 @@ import {
   createRunManager,
   tailEventLog,
   type RunManager,
-} from "markflow";
+} from "markflow-cli";
 import type {
   EngineAdapterEvent,
   EngineAdapterOptions,

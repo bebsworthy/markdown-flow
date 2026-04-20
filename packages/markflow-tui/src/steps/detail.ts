@@ -18,7 +18,7 @@ import type {
   StepResult,
   StepType,
   Token,
-} from "markflow";
+} from "markflow-cli";
 import { UNICODE_GLYPHS } from "../theme/glyphs.js";
 import type { GlyphKey } from "../theme/glyphs.js";
 import type { ColorRole } from "../theme/tokens.js";

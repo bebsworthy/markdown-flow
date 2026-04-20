@@ -12,7 +12,7 @@
 // PURITY NOTE: no ink/react/node:* imports. Only type-only imports from
 // `markflow` and sibling pure modules + runtime constants from theme/glyphs.
 
-import type { StepResult, Token, TokenState } from "markflow";
+import type { StepResult, Token, TokenState } from "markflow-cli";
 import type { GlyphKey } from "../theme/glyphs.js";
 import { UNICODE_GLYPHS } from "../theme/glyphs.js";
 import type { ColorRole } from "../theme/tokens.js";

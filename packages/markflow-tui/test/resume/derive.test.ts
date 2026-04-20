@@ -9,7 +9,7 @@ import type {
   StepResult,
   Token,
   WorkflowDefinition,
-} from "markflow";
+} from "markflow-cli";
 
 function info(overrides: Partial<RunInfo> = {}): RunInfo {
   return {

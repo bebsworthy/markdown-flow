@@ -56,7 +56,7 @@ import type {
   RunWorkflowResult,
 } from "./runStart/types.js";
 import type { ResolvedEntry } from "./browser/types.js";
-import type { RunInfo, WorkflowDefinition } from "markflow";
+import type { RunInfo, WorkflowDefinition } from "markflow-cli";
 import { toRunsTableRow } from "./runs/derive.js";
 import {
   deriveInputRows,
@@ -170,7 +170,7 @@ export interface AppProps {
    * not currently use workflow fields beyond input declarations, which are
    * sourced via `deriveInputRows(workflow, events)`.
    */
-  readonly resumeWorkflow?: import("markflow").WorkflowDefinition | null;
+  readonly resumeWorkflow?: import("markflow-cli").WorkflowDefinition | null;
   /**
    * Test seam — overrides the `runWorkflow` call used by the run-entry
    * flow (P9-T1). Production defaults to the real engine bridge

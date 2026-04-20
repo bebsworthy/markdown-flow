@@ -15,7 +15,7 @@ import React, {
   useRef,
 } from "react";
 import { useInput } from "ink";
-import type { EngineEvent } from "markflow";
+import type { EngineEvent } from "markflow-cli";
 import type { EngineState } from "../engine/types.js";
 import {
   deriveEventsModel,

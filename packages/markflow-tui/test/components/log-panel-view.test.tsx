@@ -11,7 +11,7 @@
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render } from "ink-testing-library";
-import type { EngineEvent, RunInfo } from "markflow";
+import type { EngineEvent, RunInfo } from "markflow-cli";
 import { ThemeProvider } from "../../src/theme/context.js";
 import { buildTheme } from "../../src/theme/theme.js";
 import { LogPanelView } from "../../src/components/log-panel-view.js";

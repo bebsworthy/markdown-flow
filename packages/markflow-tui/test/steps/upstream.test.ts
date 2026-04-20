@@ -6,7 +6,7 @@
 // `"upstream failed"`.
 
 import { describe, it, expect } from "vitest";
-import type { StepResult, Token } from "markflow";
+import type { StepResult, Token } from "markflow-cli";
 import { isUpstreamFailed, upstreamNoteLabel } from "../../src/steps/upstream.js";
 
 function tok(overrides: Partial<Token> = {}): Token {

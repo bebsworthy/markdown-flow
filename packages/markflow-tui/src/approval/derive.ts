@@ -5,7 +5,7 @@
 // PURITY NOTE: no `ink` / `react` / `node:*` imports. Registered in
 // test/state/purity.test.ts.
 
-import type { EngineEvent, RunInfo } from "markflow";
+import type { EngineEvent, RunInfo } from "markflow-cli";
 import type { LiveRunSnapshot } from "../engine/types.js";
 import type { PendingApproval } from "./types.js";
 

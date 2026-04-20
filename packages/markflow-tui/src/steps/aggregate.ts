@@ -12,7 +12,7 @@
 // PURITY NOTE: no ink/react/node:* imports. Only type-only imports from
 // `markflow` and runtime imports from sibling pure modules + theme glyphs.
 
-import type { BatchState, Token } from "markflow";
+import type { BatchState, Token } from "markflow-cli";
 import { UNICODE_GLYPHS } from "../theme/glyphs.js";
 import type { GlyphKey } from "../theme/glyphs.js";
 import type { ColorRole } from "../theme/tokens.js";

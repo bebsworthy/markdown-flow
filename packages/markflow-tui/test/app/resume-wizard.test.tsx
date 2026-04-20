@@ -7,7 +7,7 @@
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render } from "ink-testing-library";
-import type { EngineEvent, RunInfo } from "markflow";
+import type { EngineEvent, RunInfo } from "markflow-cli";
 import { App } from "../../src/app.js";
 import type { EngineState, LiveRunSnapshot } from "../../src/engine/types.js";
 import type { ResumeSubmitResult } from "../../src/resume/types.js";

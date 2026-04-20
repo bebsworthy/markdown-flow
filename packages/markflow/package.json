@@ -1,5 +1,5 @@
 {
-  "name": "markflow",
+  "name": "markflow-cli",
   "version": "0.1.0",
   "description": "Workflow engine driven by Markdown + Mermaid flowcharts",
   "type": "module",
@@ -12,11 +12,15 @@
     }
   },
   "bin": {
-    "markflow": "./dist/cli/index.js"
+    "markflow": "dist/cli/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsx src/cli/index.ts",
+    "prepublishOnly": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit"

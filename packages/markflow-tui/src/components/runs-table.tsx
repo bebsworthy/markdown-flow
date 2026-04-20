@@ -37,7 +37,7 @@ import { DataTable, type ColumnDef } from "../primitives/DataTable.js";
 import { RunsFilterBar } from "./runs-filter-bar.js";
 import { RunsFooter } from "./runs-footer.js";
 import type { Action } from "../state/types.js";
-import type { RunInfo } from "markflow";
+import type { RunInfo } from "markflow-cli";
 
 export interface RunsTableProps {
   readonly rows: ReadonlyArray<RowData>;

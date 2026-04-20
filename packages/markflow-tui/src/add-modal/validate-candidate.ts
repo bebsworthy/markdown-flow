@@ -10,7 +10,7 @@
 
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join, resolve as resolvePath } from "node:path";
-import { parseWorkflow, validateWorkflow } from "markflow";
+import { parseWorkflow, validateWorkflow } from "markflow-cli";
 import type { Candidate, ValidationResult } from "./types.js";
 
 function errorMessage(err: unknown): string {

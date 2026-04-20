@@ -17,7 +17,7 @@ import type {
   RunEvent as MarkflowRunEvent,
   RunInfo,
   RunManager,
-} from "markflow";
+} from "markflow-cli";
 
 // Re-export `MarkflowRunEvent` so downstream consumers have one import point.
 export type { MarkflowRunEvent };

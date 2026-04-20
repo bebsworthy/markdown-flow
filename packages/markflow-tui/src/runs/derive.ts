@@ -13,7 +13,7 @@
 // `markflow` and the sibling pure modules plus runtime constants from the
 // theme tokens module (which is itself pure).
 
-import type { RunInfo, RunStatus, StepResult } from "markflow";
+import type { RunInfo, RunStatus, StepResult } from "markflow-cli";
 import type { ColorRole } from "../theme/tokens.js";
 import type { GlyphKey } from "../theme/glyphs.js";
 import { UNICODE_GLYPHS } from "../theme/glyphs.js";

@@ -18,7 +18,7 @@ import {
   type RunInfo,
   type ValidationDiagnostic,
   type WorkflowDefinition,
-} from "markflow";
+} from "markflow-cli";
 import { formatEntryId } from "./preview-layout.js";
 import type {
   EntrySourceKind,

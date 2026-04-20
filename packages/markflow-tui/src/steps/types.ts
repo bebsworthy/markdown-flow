@@ -13,7 +13,7 @@
 // `fs`, `path`, or any I/O / rendering surface. Only type-only imports are
 // permitted.
 
-import type { BatchState, StepResult, Token } from "markflow";
+import type { BatchState, StepResult, Token } from "markflow-cli";
 import type { GlyphKey } from "../theme/glyphs.js";
 import type { ColorRole } from "../theme/tokens.js";
 

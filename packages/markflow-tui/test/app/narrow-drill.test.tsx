@@ -6,7 +6,7 @@ import React from "react";
 import { EventEmitter } from "node:events";
 import { describe, it, expect } from "vitest";
 import { render as inkRender } from "ink";
-import type { EngineEvent, RunInfo, StepResult } from "markflow";
+import type { EngineEvent, RunInfo, StepResult } from "markflow-cli";
 import { App } from "../../src/app.js";
 import { toRunsTableRow } from "../../src/runs/derive.js";
 import type { RunsTableRow } from "../../src/runs/types.js";

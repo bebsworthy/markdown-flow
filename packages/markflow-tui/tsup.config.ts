@@ -13,5 +13,5 @@ export default defineConfig({
   banner: {
     js: "#!/usr/bin/env node",
   },
-  external: ["react", "react/jsx-runtime", "ink", "markflow"],
+  external: ["react", "react/jsx-runtime", "ink", "markflow-cli"],
 });

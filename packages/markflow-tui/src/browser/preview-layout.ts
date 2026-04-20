@@ -15,7 +15,7 @@ import type {
   InputDeclaration,
   ValidationDiagnostic,
   WorkflowDefinition,
-} from "markflow";
+} from "markflow-cli";
 import type { ResolvedEntry } from "./types.js";
 
 // ---------------------------------------------------------------------------

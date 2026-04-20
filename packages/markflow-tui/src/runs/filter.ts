@@ -15,7 +15,7 @@
 // PURITY NOTE: no ink/react/node:* imports. Only type-only imports from
 // `markflow` and the sibling pure modules.
 
-import type { RunInfo, RunStatus } from "markflow";
+import type { RunInfo, RunStatus } from "markflow-cli";
 import { tryParseDurationMs } from "./duration.js";
 import type {
   RunsArchivePolicy,

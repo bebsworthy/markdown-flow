@@ -4,7 +4,7 @@
 // Mirrors the grammar documented in docs/tui/plans/P5-T2.md §3.
 
 import { describe, it, expect } from "vitest";
-import type { RunInfo, StepResult } from "markflow";
+import type { RunInfo, StepResult } from "markflow-cli";
 import {
   applyFilter,
   parseFilterInput,

@@ -14,7 +14,7 @@
 //
 // PURITY NOTE: no ink/react/node:* imports.
 
-import type { EngineEvent } from "markflow";
+import type { EngineEvent } from "markflow-cli";
 import type { RetryHint } from "./types.js";
 
 // ---------------------------------------------------------------------------

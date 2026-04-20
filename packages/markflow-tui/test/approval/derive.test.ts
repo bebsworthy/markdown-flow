@@ -3,7 +3,7 @@
 // Unit tests for the pure approval derivations (P7-T1).
 
 import { describe, it, expect } from "vitest";
-import type { EngineEvent, RunInfo } from "markflow";
+import type { EngineEvent, RunInfo } from "markflow-cli";
 import {
   derivePendingApprovals,
   countPendingApprovalsByRun,

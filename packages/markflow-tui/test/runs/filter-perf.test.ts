@@ -10,7 +10,7 @@
 // See docs/tui/plans/P5-T2.md §9 for the discipline + rationale.
 
 import { describe, it, expect } from "vitest";
-import type { RunInfo, RunStatus, StepResult } from "markflow";
+import type { RunInfo, RunStatus, StepResult } from "markflow-cli";
 import {
   applyArchive,
   applyFilter,

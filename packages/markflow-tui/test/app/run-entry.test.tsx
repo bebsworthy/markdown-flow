@@ -17,7 +17,7 @@
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
 import { render } from "ink-testing-library";
-import type { WorkflowDefinition, RunInfo } from "markflow";
+import type { WorkflowDefinition, RunInfo } from "markflow-cli";
 import { App } from "../../src/app.js";
 import type { ResolvedEntry } from "../../src/browser/types.js";
 import type { RunsTableRow } from "../../src/runs/types.js";

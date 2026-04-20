@@ -29,7 +29,7 @@ import type {
   StepResult,
   Token,
   TokenState,
-} from "markflow";
+} from "markflow-cli";
 import { UNICODE_GLYPHS } from "../theme/glyphs.js";
 import {
   aggregateBatchRow,

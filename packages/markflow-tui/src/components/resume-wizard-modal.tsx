@@ -6,7 +6,7 @@
 
 import React, { useReducer, useRef } from "react";
 import { Box, Text, useInput } from "ink";
-import type { WorkflowDefinition } from "markflow";
+import type { WorkflowDefinition } from "markflow-cli";
 import { useTheme } from "../theme/context.js";
 import { Modal } from "../primitives/Modal.js";
 import {

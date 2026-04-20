@@ -6,7 +6,7 @@
 //  - §6 terminal aggregate: "2 / 3   ██████░░░   1 ✗ · 0 ⏸"
 
 import { describe, it, expect } from "vitest";
-import type { BatchState, Token } from "markflow";
+import type { BatchState, Token } from "markflow-cli";
 import {
   BATCH_COLLAPSE_THRESHOLD,
   DEFAULT_PROGRESS_BAR_WIDTH,

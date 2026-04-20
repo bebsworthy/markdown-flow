@@ -11,7 +11,7 @@ import type {
   StepDefinition,
   FlowEdge,
   FlowNode,
-} from "markflow";
+} from "markflow-cli";
 import {
   countSteps,
   formatDiagnostics,

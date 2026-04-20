@@ -6,7 +6,7 @@
 //
 // PURITY NOTE: only type-only imports from markflow + sibling pure types.
 
-import type { EngineEvent } from "markflow";
+import type { EngineEvent } from "markflow-cli";
 import type { StepsSnapshot } from "../steps/types.js";
 import type { LogPanelEmptyReason } from "./types.js";
 

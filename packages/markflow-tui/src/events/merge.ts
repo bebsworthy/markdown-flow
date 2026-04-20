@@ -9,7 +9,7 @@
 //
 // PURITY NOTE: no ink/react/node:* imports.
 
-import type { EngineEvent } from "markflow";
+import type { EngineEvent } from "markflow-cli";
 
 export function mergeEventSources(
   ring: readonly EngineEvent[],

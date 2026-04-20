@@ -1,5 +1,5 @@
 import { render } from "ink";
-import { createRunManager } from "markflow";
+import { createRunManager } from "markflow-cli";
 import { App } from "./app.js";
 import { parseRegistryFlags } from "./cli-args.js";
 import { toRunsTableRow } from "./runs/derive.js";

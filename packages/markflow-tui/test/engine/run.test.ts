@@ -9,7 +9,7 @@ import {
   type EngineEvent,
   type RunInfo,
   type WorkflowDefinition,
-} from "markflow";
+} from "markflow-cli";
 import { runWorkflow } from "../../src/engine/run.js";
 
 function wf(inputs: WorkflowDefinition["inputs"] = []): WorkflowDefinition {

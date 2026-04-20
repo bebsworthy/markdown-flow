@@ -14,7 +14,7 @@ import type {
   EngineEvent,
   EngineEventPayload,
   RunStatus,
-} from "markflow";
+} from "markflow-cli";
 
 export interface MakeRunOptions {
   status?: RunStatus;

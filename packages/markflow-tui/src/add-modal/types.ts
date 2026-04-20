@@ -9,11 +9,11 @@
 //
 // PURITY NOTE: this module MUST NOT import from `ink`, `react`, `node:*`,
 // `fs`, `path`, or any I/O / rendering surface. Type-only imports from the
-// engine package are fine (`import type { ... } from "markflow"`), per the
+// engine package are fine (`import type { ... } from "markflow-cli"`), per the
 // same convention used by browser/types.ts. Registered in
 // test/state/purity.test.ts as a pure module.
 
-import type { ValidationDiagnostic } from "markflow";
+import type { ValidationDiagnostic } from "markflow-cli";
 
 /**
  * The two input modes the add modal exposes. Controlled by the overlay

@@ -12,7 +12,7 @@ import {
   type RunInfo,
   type RunManager,
   type Token,
-} from "markflow";
+} from "markflow-cli";
 import { resumeRun } from "../../src/engine/resume.js";
 
 function ts(seq: number): string {

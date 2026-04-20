@@ -1,7 +1,7 @@
 // test/log/select.test.ts
 
 import { describe, it, expect } from "vitest";
-import type { EngineEvent, Token } from "markflow";
+import type { EngineEvent, Token } from "markflow-cli";
 import { resolveLogTarget } from "../../src/log/select.js";
 import type { StepsSnapshot } from "../../src/steps/types.js";
 

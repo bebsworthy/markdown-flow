@@ -7,7 +7,7 @@
 // PURITY NOTE: no `ink` / `react` / `node:*` imports. Registered in
 // test/state/purity.test.ts.
 
-import type { WorkflowDefinition } from "markflow";
+import type { WorkflowDefinition } from "markflow-cli";
 import type { RunInputRow } from "./types.js";
 
 /** Project `workflow.inputs[]` into modal rows, preserving declaration order. */

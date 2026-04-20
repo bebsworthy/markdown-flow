@@ -7,7 +7,7 @@
 //
 // PURITY NOTE: no ink/react/node:* imports.
 
-import type { EngineEvent, EngineEventType } from "markflow";
+import type { EngineEvent, EngineEventType } from "markflow-cli";
 import type { EventKindGroup, EventsFilter } from "./types.js";
 
 /**

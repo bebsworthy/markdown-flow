@@ -17,7 +17,7 @@ import type {
   EngineState,
   MarkflowRunEvent,
 } from "../../src/engine/types.js";
-import type { EngineEvent, RunInfo } from "markflow";
+import type { EngineEvent, RunInfo } from "markflow-cli";
 import { stepStart } from "./helpers.js";
 
 // ---------------------------------------------------------------------------

@@ -23,7 +23,7 @@ import {
   RunLockedError,
   type EngineEvent,
   type RunManager,
-} from "markflow";
+} from "markflow-cli";
 import type { ResumeSubmitResult } from "../resume/types.js";
 
 export interface ResumeRunOptions {

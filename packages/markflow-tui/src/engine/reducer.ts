@@ -16,7 +16,7 @@ import type {
   EngineState,
   LiveRunSnapshot,
 } from "./types.js";
-import type { EngineEvent } from "markflow";
+import type { EngineEvent } from "markflow-cli";
 
 /**
  * Ring-buffer cap for `activeRun.events`. Callers that need full history

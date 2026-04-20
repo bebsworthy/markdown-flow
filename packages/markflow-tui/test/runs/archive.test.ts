@@ -3,7 +3,7 @@
 // Archive predicate + partition tests (P5-T2 §10.3). Behaviour per plan §4.
 
 import { describe, it, expect } from "vitest";
-import type { RunInfo, StepResult } from "markflow";
+import type { RunInfo, StepResult } from "markflow-cli";
 import { applyArchive, isArchived } from "../../src/runs/filter.js";
 import { toRunsTableRow } from "../../src/runs/derive.js";
 import {

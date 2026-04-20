@@ -8,7 +8,7 @@
 // The ONLY hook in P6-T3 that touches node I/O (via `markflow`).
 
 import { useEffect, useRef, useState } from "react";
-import { getSidecarStream as defaultGetSidecarStream } from "markflow";
+import { getSidecarStream as defaultGetSidecarStream } from "markflow-cli";
 import type { LogStream } from "../log/types.js";
 
 export type SidecarState = "idle" | "reading" | "done" | "error";

@@ -10,7 +10,7 @@ import type {
   RunInfo,
   Token,
   WorkflowDefinition,
-} from "markflow";
+} from "markflow-cli";
 import type { InputRow, RerunNode, ResumableRun } from "./types.js";
 
 /**

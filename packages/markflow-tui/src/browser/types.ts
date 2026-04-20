@@ -10,13 +10,13 @@
 //
 // PURITY NOTE: this module MUST NOT import from `ink`, `react`, `node:*`,
 // `fs`, `path`, or any I/O / rendering surface. Only type-only imports are
-// allowed (`import type { ... } from "markflow"` is OK because purity tests
+// allowed (`import type { ... } from "markflow-cli"` is OK because purity tests
 // scan runtime imports via regex — type-only imports pass through).
 
 import type {
   ValidationDiagnostic,
   WorkflowDefinition,
-} from "markflow";
+} from "markflow-cli";
 import type { RegistryEntry } from "../registry/types.js";
 
 /** Where the entry actually lives, once resolved. */

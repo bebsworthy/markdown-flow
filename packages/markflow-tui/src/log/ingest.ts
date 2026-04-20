@@ -5,7 +5,7 @@
 //
 // PURITY NOTE: only type-only imports from `markflow`; no fs/react/ink.
 
-import type { EngineEvent } from "markflow";
+import type { EngineEvent } from "markflow-cli";
 import { parseAnsi, stripAnsi } from "./ansi.js";
 import type { LogLine, LogStream } from "./types.js";
 

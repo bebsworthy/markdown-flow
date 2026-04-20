@@ -3,7 +3,7 @@
 // Unit tests for the pure `RunInfo` → `RunsTableRow` projection helpers.
 
 import { describe, it, expect } from "vitest";
-import type { RunInfo, StepResult } from "markflow";
+import type { RunInfo, StepResult } from "markflow-cli";
 import {
   deriveElapsedMs,
   deriveNote,

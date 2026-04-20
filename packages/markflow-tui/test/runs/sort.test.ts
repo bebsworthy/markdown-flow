@@ -3,7 +3,7 @@
 // Unit tests for the pure sort primitives (P5-T1).
 
 import { describe, it, expect } from "vitest";
-import type { RunInfo, RunStatus } from "markflow";
+import type { RunInfo, RunStatus } from "markflow-cli";
 import {
   SORT_KEY_ORDER,
   attentionBucket,

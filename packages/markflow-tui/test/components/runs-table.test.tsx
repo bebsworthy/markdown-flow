@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { render } from "ink-testing-library";
-import type { RunInfo, StepResult } from "markflow";
+import type { RunInfo, StepResult } from "markflow-cli";
 import { ThemeProvider } from "../../src/theme/context.js";
 import { RunsTable } from "../../src/components/runs-table.js";
 import { toRunsTableRow } from "../../src/runs/derive.js";

@@ -11,7 +11,7 @@ import {
   type ResumeHandle,
   type RunInfo,
   type RunManager,
-} from "markflow";
+} from "markflow-cli";
 import { decideApproval } from "../../src/engine/decide.js";
 
 function waitingEvent(

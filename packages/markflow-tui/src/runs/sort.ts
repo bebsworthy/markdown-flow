@@ -9,7 +9,7 @@
 // PURITY NOTE: no ink/react/node:* imports. Only type-only imports from
 // `markflow` and the sibling `types.js` module.
 
-import type { RunInfo, RunStatus } from "markflow";
+import type { RunInfo, RunStatus } from "markflow-cli";
 import type {
   AttentionBucket,
   RunsSortState,

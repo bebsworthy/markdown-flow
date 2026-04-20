@@ -14,7 +14,7 @@
 // `markflow` (the engine library) and the local theme tokens module are
 // allowed. Runtime imports must stay inside this pure envelope.
 
-import type { RunInfo, RunStatus } from "markflow";
+import type { RunInfo, RunStatus } from "markflow-cli";
 import type { ColorRole } from "../theme/tokens.js";
 import type { GlyphKey } from "../theme/glyphs.js";
 

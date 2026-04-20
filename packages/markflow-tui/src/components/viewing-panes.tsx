@@ -16,7 +16,7 @@ import { StepDetailPanelView } from "./step-detail-panel-view.js";
 import { LogPanelView } from "./log-panel-view.js";
 import { EventsPanelView } from "./events-panel-view.js";
 import type { StreamFactory } from "../hooks/useSidecarStream.js";
-import type { EngineEvent } from "markflow";
+import type { EngineEvent } from "markflow-cli";
 import {
   composeViewingTabRow,
   type ViewingTabKey,

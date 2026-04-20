@@ -22,7 +22,7 @@ import {
   RunLockedError,
   type EngineEvent,
   type RunManager,
-} from "markflow";
+} from "markflow-cli";
 import type { RunWorkflowResult } from "../runStart/types.js";
 
 const MISSING_INPUTS_PREFIX = "Missing required workflow inputs:";

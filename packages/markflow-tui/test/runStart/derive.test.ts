@@ -3,7 +3,7 @@
 // Unit tests for the pure `runStart/derive.ts` helpers (P9-T1).
 
 import { describe, it, expect } from "vitest";
-import type { WorkflowDefinition } from "markflow";
+import type { WorkflowDefinition } from "markflow-cli";
 import {
   canSubmitRunInputs,
   composeRunInputs,

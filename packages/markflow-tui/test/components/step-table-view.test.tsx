@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from "vitest";
 import { render } from "ink-testing-library";
-import type { EngineEvent, RunInfo } from "markflow";
+import type { EngineEvent, RunInfo } from "markflow-cli";
 import { ThemeProvider } from "../../src/theme/context.js";
 import { buildTheme } from "../../src/theme/theme.js";
 import { StepTableView } from "../../src/components/step-table-view.js";

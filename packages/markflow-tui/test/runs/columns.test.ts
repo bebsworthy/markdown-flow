@@ -3,7 +3,7 @@
 // Unit tests for the pure column table + width picker (P5-T1).
 
 import { describe, it, expect } from "vitest";
-import type { RunInfo } from "markflow";
+import type { RunInfo } from "markflow-cli";
 import {
   COLUMNS_140,
   COLUMNS_100,

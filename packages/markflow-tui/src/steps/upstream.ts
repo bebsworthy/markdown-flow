@@ -11,7 +11,7 @@
 //
 // PURITY NOTE: no ink/react/node:* imports.
 
-import type { Token } from "markflow";
+import type { Token } from "markflow-cli";
 
 // ---------------------------------------------------------------------------
 // Predicate

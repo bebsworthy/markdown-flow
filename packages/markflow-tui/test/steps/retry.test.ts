@@ -4,7 +4,7 @@
 // formatter. Plan §6 is the authoritative reference for the data flow.
 
 import { describe, it, expect } from "vitest";
-import type { EngineEvent } from "markflow";
+import type { EngineEvent } from "markflow-cli";
 import {
   applyRetryEvent,
   buildRetryHints,

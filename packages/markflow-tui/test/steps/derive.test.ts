@@ -4,7 +4,7 @@
 // engine `Token` + `StepResult` records into displayable step-row fields.
 
 import { describe, it, expect } from "vitest";
-import type { StepResult, Token } from "markflow";
+import type { StepResult, Token } from "markflow-cli";
 import {
   deriveStepElapsedMs,
   formatAttempt,
