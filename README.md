@@ -151,6 +151,17 @@ A thick edge declares a forEach fan-out — the engine spawns one token per arra
 A ==>|each: items| B --> C   # B runs once per item; C collects results
 ```
 
+The body supports complex topologies — branching, conditional skips, retry loops, and parallel fan-out using thick edges. Each item routes independently:
+
+```
+produce ==>|each: items| validate
+validate ==>|pass| transform
+validate ==>|fail| notify
+transform ==> merge
+notify ==> merge
+merge --> collect
+```
+
 Configure concurrency and failure policy on the source step:
 
 ```yaml
@@ -159,7 +170,7 @@ foreach:
   onItemError: continue      # or: fail-fast (default)
 ```
 
-Body steps receive `$ITEM` (current element) and `$ITEM_INDEX` (position). After all items complete, the collector receives `GLOBAL.results` indexed by original position.
+Body steps receive `$ITEM` (current element) and `$ITEM_INDEX` (position) in all body nodes. After all items complete, the collector receives `GLOBAL.results` indexed by original position.
 
 Full routing semantics — including step-level retry policies, forEach, and timeouts — in [`docs/arch/routing-and-retries.md`](docs/arch/routing-and-retries.md).
 
@@ -264,6 +275,7 @@ A progressive series of self-contained examples — each demonstrates one featur
 | 12 | [multi-language](docs/examples/tutorial/12-multi-language.md) | Bash, Python, and JavaScript steps |
 | 13 | [approval](docs/examples/tutorial/13-approval.md) | Human decision nodes |
 | 14 | [complex-pipeline](docs/examples/tutorial/14-complex-pipeline.md) | All features combined |
+| 15 | [foreach-diamond](docs/examples/tutorial/15-foreach-diamond.md) | forEach with branching in body |
 
 ### Real-World
 

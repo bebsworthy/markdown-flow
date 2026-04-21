@@ -186,6 +186,20 @@ echo 'RESULT: {"edge": "next", "summary": "produced 3 items"}'
 | `maxConcurrency` | non-negative integer | `0` (unlimited) | Max item tokens executing concurrently. `1` = serial. |
 | `onItemError` | `fail-fast` \| `continue` | `fail-fast` | Behavior on item failure |
 
+### Body topology
+
+The forEach body is a sub-graph — all nodes reachable from the entry node via thick edges (`==>`). It supports:
+
+- **Linear chains**: `produce ==>|each: items| A ==> B --> collect`
+- **Branching (diamond)**: labeled thick edges route items to different paths that reconverge at a merge node
+- **Conditional skip**: a labeled thick edge bypasses intermediate steps (e.g. `step1 ==>|skip| step3`)
+- **Retry loops**: `attempt ==>|fail max:3| attempt` with `attempt ==>|fail:max| handler` for exhaustion
+- **Fan-out**: multiple unlabeled thick edges from one body node create parallel branches per item
+
+All thick edges stay inside the body scope. A normal edge (`-->`) exits to the collector. All exit nodes must target the same collector.
+
+Each item routes independently — branches, retries, and skips are per-item. Retry budgets inside the body are also per-item (one item's retries don't affect another). An item with internal fan-out still counts as 1 concurrency slot.
+
 ### maxConcurrency behavior
 
 | Value | Effect |
@@ -196,8 +210,10 @@ echo 'RESULT: {"edge": "next", "summary": "produced 3 items"}'
 
 ### onItemError behavior
 
-- **fail-fast** (default): first item failure stops spawning new items; collector is skipped; source routes via `fail` edge.
+- **fail-fast** (default): first item failure at the exit node stops spawning; collector is skipped; source routes via `fail` edge.
 - **continue**: all items run regardless; collector receives `GLOBAL.results` with `{ ok, edge, local }` per item.
+
+Item failure is determined by the **exit node** (last body node before collector), not intermediate step failures.
 
 ### Body step context
 
@@ -206,5 +222,7 @@ echo 'RESULT: {"edge": "next", "summary": "produced 3 items"}'
 | `$ITEM` | JSON of the current array element |
 | `$ITEM_INDEX` | Zero-based position in the source array |
 | `$GLOBAL` | Shared workflow context (read/write) |
+
+`$ITEM` and `$ITEM_INDEX` are available in all body nodes (branches, merges, skips, retries), not just the entry.
 
 Results are always ordered by original array index in `GLOBAL.results`, regardless of completion order.

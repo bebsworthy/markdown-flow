@@ -1,6 +1,6 @@
 # 07 — Dynamic Task Mapping / forEach
 
-**Status** IMPLEMENTED (v1)
+**Status** IMPLEMENTED (v1 + complex body topologies: diamond branching, conditional skip, retry loops, fan-out)
 **Tier:** Essential | **Effort:** Deep (5-8 days) | **Priority:** High
 
 ## Guarantees (v1)

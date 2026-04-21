@@ -158,9 +158,23 @@ flowchart TD
 ```
 
 - The source step (`produce`) emits an array in `LOCAL.items`.
-- The engine spawns one token per element through the body chain.
+- The engine spawns one token per element through the body scope.
 - The collector (`collect`) waits for all items to complete.
-- Multi-node body chains are supported: `produce ==>|each: items| A --> B --> collect`.
+- The body supports complex topologies — branching, conditional skips, retry loops, and parallel fan-out:
+
+```mermaid
+flowchart TD
+  produce ==>|each: items| validate
+  validate ==>|pass| transform
+  validate ==>|fail| notify
+  transform ==> merge
+  notify ==> merge
+  merge --> collect
+```
+
+- All thick edges stay inside the body scope. Normal edges (`-->`) exit to the collector.
+- Each item routes independently (branches, retries, skips are per-item).
+- All exit nodes must target the same collector.
 
 Configure on the source step's `foreach:` config block:
 

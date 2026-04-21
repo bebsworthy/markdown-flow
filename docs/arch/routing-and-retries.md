@@ -87,12 +87,68 @@ User-initiated aborts (`SIGINT`) take precedence over timeouts — a step aborte
 
 ## forEach (dynamic task mapping)
 
-A thick edge (`==>|each: KEY|`) declares a forEach fan-out. The source step emits an array in `LOCAL.KEY`; the engine spawns one token per item through the body chain, then collects results at a downstream collector node.
+A thick edge (`==>|each: KEY|`) declares a forEach fan-out. The source step emits an array in `LOCAL.KEY`; the engine spawns one token per item through the body, then collects results at a downstream collector node.
+
+### Body topology
+
+The forEach body is a **sub-graph** — all nodes reachable from the entry node via thick edges (`==>`). A normal edge (`-->`) from any body node exits the scope to the collector. The simplest body is a single-step chain:
 
 ```mermaid
 flowchart TD
   produce ==>|each: items| process --> collect
 ```
+
+The body supports arbitrary DAG topologies using thick edges:
+
+```mermaid
+%% Diamond (branch + reconverge)
+flowchart TD
+  produce ==>|each: items| validate
+  validate ==>|pass| transform
+  validate ==>|fail| notify
+  transform ==> merge
+  notify ==> merge
+  merge --> collect
+```
+
+```mermaid
+%% Conditional skip
+flowchart TD
+  produce ==>|each: items| step1
+  step1 ==> step2 ==> step3 --> collect
+  step1 ==>|skip| step3
+```
+
+```mermaid
+%% Retry loop within body
+flowchart TD
+  produce ==>|each: items| attempt
+  attempt ==>|fail max:3| attempt
+  attempt ==>|fail:max| handle-failure
+  attempt ==> process
+  handle-failure ==> process
+  process --> collect
+```
+
+```mermaid
+%% Fan-out (parallel branches per item)
+flowchart TD
+  produce ==>|each: items| dispatch
+  dispatch ==> branch-a
+  dispatch ==> branch-b
+  branch-a ==> join
+  branch-b ==> join
+  join --> collect
+```
+
+**Key rules:**
+- Thick edges define scope. Normal edges exit to the collector.
+- Each item routes independently within the body via `resolveRoute()` — conditional branches, retries, and skips are per-item.
+- Merge nodes (multiple unlabeled incoming thick edges) wait for all upstream branches of the same item before firing.
+- Retry budgets inside the body are per-item — one item's retries don't consume another's budget.
+- Fan-out within the body (multiple unlabeled thick edges from one node) creates parallel branches per item. The merge node deduplicates tokens and waits for all branches.
+- All exit nodes must target the same collector (validator enforces `FOREACH_MULTI_COLLECTOR`).
+- Nested forEach (a body node that is itself a forEach source) is not supported in v1.
 
 ### Concurrency control
 
@@ -110,10 +166,14 @@ foreach:
 | `1` | Serial — items process one at a time in order |
 | `N` | Sliding window — as one item completes, the next spawns |
 
+An item with internal fan-out (parallel branches) still counts as 1 slot. The sliding window counts items, not tokens.
+
 ### Failure policies
 
-- **fail-fast** (default): first item failure stops spawning new items; collector is skipped; source node routes via `fail` edge.
+- **fail-fast** (default): first item failure at the exit node stops spawning new items; collector is skipped; source node routes via `fail` edge.
 - **continue**: all items run regardless; collector receives `GLOBAL.results` with `{ ok, edge, local }` per item.
+
+Item failure is determined by the **exit node** result (the last body node before the collector), not by intermediate step failures. A step that fails mid-body but has a valid routing edge (e.g. a `fail` branch) continues — only an unresolvable failure at the exit node marks the item as failed.
 
 ### Context available to body steps
 
@@ -122,6 +182,8 @@ foreach:
 | `$ITEM` | JSON of the current array element |
 | `$ITEM_INDEX` | Zero-based position in the source array |
 | `$GLOBAL` | Shared workflow context |
+
+`$ITEM` and `$ITEM_INDEX` are available in **all** body nodes, not just the entry — they propagate through branches, merges, skips, and retries.
 
 ### Results
 

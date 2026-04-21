@@ -5,7 +5,7 @@ emits an array via LOCAL, and the engine spawns one token per item
 through the body chain. A collector step runs once all items complete.
 
 Key concepts:
-- Thick edges (`==>`) define the forEach body chain
+- Thick edges (`==>`) define the forEach body scope
 - `|each: key|` specifies which LOCAL array to iterate
 - Body steps receive `$ITEM` (JSON value) and `$ITEM_INDEX` (0-based)
 - The collector receives `$GLOBAL` with a `results` array
