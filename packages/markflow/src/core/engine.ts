@@ -554,6 +554,8 @@ export class WorkflowEngine {
                 this.runDir.workdirPath,
                 env,
                 this.globalContext,
+                selfPrior?.local,
+                token.itemContext,
               )
             : undefined,
       };
@@ -602,16 +604,16 @@ export class WorkflowEngine {
               ? signals[0]
               : AbortSignal.any(signals);
 
-        output = await runStep(
+        output = await runStep({
           step,
-          this.completedResults,
-          edgeLabels,
-          this.runDir.workdirPath,
+          context: this.completedResults,
+          outgoingEdgeLabels: edgeLabels,
+          workdirPath: this.runDir.workdirPath,
           env,
-          this.runDir.path,
-          this.config,
-          this.globalContext,
-          (stream, chunk) => {
+          runDir: this.runDir.path,
+          config: this.config,
+          globalContext: this.globalContext,
+          onOutput: (stream, chunk) => {
             // step:output is non-persisted; fire-and-forget is fine — the
             // logger still assigns a monotonic seq synchronously.
             void this.emit({
@@ -621,9 +623,11 @@ export class WorkflowEngine {
               chunk,
             });
           },
-          composed,
+          signal: composed,
           sidecar,
-        );
+          localContext: selfPrior?.local,
+          itemContext: token.itemContext,
+        });
 
         let timedOut = false;
         // Distinguish our timeout from a user abort: only the timeoutSignal

@@ -158,3 +158,82 @@ describe("assembleAgentPrompt templating", () => {
     expect(prompt).toContain("Previous step said: built successfully");
   });
 });
+
+describe("assembleAgentPrompt ITEM/LOCAL namespace promotion", () => {
+  it("resolves {{ ITEM.field }} when itemContext is an object", () => {
+    const s: StepDefinition = {
+      id: "classify",
+      type: "agent",
+      content: "Issue #{{ ITEM.id }}: {{ ITEM.name }}",
+    };
+    const prompt = assembleAgentPrompt(
+      s, [], ["done"], "/w",
+      { ITEM: '{"id":1,"name":"alpha"}' },
+      {},
+      undefined,
+      { id: 1, name: "alpha" },
+    );
+    expect(prompt).toContain("Issue #1: alpha");
+  });
+
+  it("resolves {{ ITEM.nested.field }} for deep access", () => {
+    const s: StepDefinition = {
+      id: "review",
+      type: "agent",
+      content: "Tag: {{ ITEM.meta.tag }}",
+    };
+    const prompt = assembleAgentPrompt(
+      s, [], ["done"], "/w", {},
+      {},
+      undefined,
+      { meta: { tag: "urgent" } },
+    );
+    expect(prompt).toContain("Tag: urgent");
+  });
+
+  it("resolves {{ LOCAL.field }} when localContext is an object", () => {
+    const s: StepDefinition = {
+      id: "retry",
+      type: "agent",
+      content: "Cursor at {{ LOCAL.cursor }}",
+    };
+    const prompt = assembleAgentPrompt(
+      s, [], ["done"], "/w",
+      { LOCAL: '{"cursor":5}' },
+      {},
+      { cursor: 5 },
+    );
+    expect(prompt).toContain("Cursor at 5");
+  });
+
+  it("renders {{ ITEM }} as the string value for primitive items", () => {
+    const s: StepDefinition = {
+      id: "echo",
+      type: "agent",
+      content: "Item is {{ ITEM }}",
+    };
+    const prompt = assembleAgentPrompt(
+      s, [], ["done"], "/w",
+      { ITEM: '"hello"' },
+      {},
+      undefined,
+      undefined,
+    );
+    expect(prompt).toContain('Item is "hello"');
+  });
+
+  it("iterates over array ITEM with {% for %}", () => {
+    const s: StepDefinition = {
+      id: "list",
+      type: "agent",
+      content: "{% for x in ITEM %}{{ x }},{% endfor %}",
+    };
+    const prompt = assembleAgentPrompt(
+      s, [], ["done"], "/w", {},
+      {},
+      undefined,
+      [10, 20, 30],
+    );
+    expect(prompt).toContain("10,20,30,");
+  });
+});

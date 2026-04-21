@@ -9,6 +9,7 @@ import {
   validateWorkflow,
   type EngineEvent,
 } from "../../src/core/index.js";
+import type { BeforeStepContext } from "../../src/core/types.js";
 import { replay } from "../../src/core/replay.js";
 
 const FIXTURES = join(import.meta.dirname, "../fixtures");
@@ -1258,6 +1259,113 @@ echo 'RESULT: {"edge": "next", "summary": "collected-empty"}'
       expect(runInfo.steps.find((s) => s.node === "collect")).toBeDefined();
       expect(runInfo.steps.find((s) => s.node === "process")).toBeUndefined();
       expect(events.filter((e) => e.type === "batch:start")).toHaveLength(0);
+    });
+  });
+
+  describe("agent steps with ITEM templating", () => {
+    it("resolves {{ ITEM.field }} for object items in agent prompts", async () => {
+      const source = `
+# Agent forEach objects
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  produce ==>|each: items| classify --> collect
+\`\`\`
+
+# Steps
+
+## produce
+
+\`\`\`bash
+echo 'LOCAL: {"items": [{"id": 1, "name": "alpha"}, {"id": 2, "name": "beta"}]}'
+echo 'RESULT: {"edge": "next", "summary": "produced"}'
+\`\`\`
+
+## classify
+
+Classify item #{{ ITEM.id }}: {{ ITEM.name }}
+
+## collect
+
+\`\`\`bash
+echo 'RESULT: {"edge": "next", "summary": "collected"}'
+\`\`\`
+`;
+      const def = parseWorkflowFromString(source);
+      const prompts: string[] = [];
+
+      const runInfo = await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        beforeStep: (ctx: BeforeStepContext) => {
+          if (ctx.step.type === "agent") {
+            prompts.push(ctx.prompt!);
+            return { edge: "next", summary: `classified-${ctx.env.ITEM_INDEX}` };
+          }
+        },
+      });
+
+      expect(runInfo.status).toBe("complete");
+      expect(prompts).toHaveLength(2);
+
+      const sorted = [...prompts].sort();
+      expect(sorted[0]).toContain("Classify item #1: alpha");
+      expect(sorted[1]).toContain("Classify item #2: beta");
+
+      expect(sorted[0]).not.toContain("{{ ITEM.id }}");
+      expect(sorted[1]).not.toContain("{{ ITEM.name }}");
+    });
+
+    it("renders {{ ITEM }} for string items in agent prompts", async () => {
+      const source = `
+# Agent forEach strings
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  produce ==>|each: items| echo_item --> collect
+\`\`\`
+
+# Steps
+
+## produce
+
+\`\`\`bash
+echo 'LOCAL: {"items": ["foo", "bar"]}'
+echo 'RESULT: {"edge": "next", "summary": "produced"}'
+\`\`\`
+
+## echo_item
+
+Process: {{ ITEM }}
+
+## collect
+
+\`\`\`bash
+echo 'RESULT: {"edge": "next", "summary": "collected"}'
+\`\`\`
+`;
+      const def = parseWorkflowFromString(source);
+      const prompts: string[] = [];
+
+      const runInfo = await executeWorkflow(def, {
+        runsDir: tempRunsDir,
+        beforeStep: (ctx: BeforeStepContext) => {
+          if (ctx.step.type === "agent") {
+            prompts.push(ctx.prompt!);
+            return { edge: "next", summary: `echoed-${ctx.env.ITEM_INDEX}` };
+          }
+        },
+      });
+
+      expect(runInfo.status).toBe("complete");
+      expect(prompts).toHaveLength(2);
+
+      const sorted = [...prompts].sort();
+      expect(sorted[0]).toContain('Process: "bar"');
+      expect(sorted[1]).toContain('Process: "foo"');
     });
   });
 });

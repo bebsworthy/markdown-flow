@@ -57,6 +57,8 @@ export function assembleAgentPrompt(
   _workdirPath: string,
   env: Record<string, string> = {},
   globalContext: Record<string, unknown> = {},
+  localContext?: unknown,
+  itemContext?: unknown,
 ): string {
   const stepsMap: Record<string, { edge: string; summary: string; local?: unknown }> = {};
   for (const r of context) {
@@ -67,9 +69,13 @@ export function assembleAgentPrompt(
     };
   }
 
+  const namespaces: Record<string, unknown> = { GLOBAL: globalContext, STEPS: stepsMap };
+  if (localContext != null && typeof localContext === "object") namespaces.LOCAL = localContext;
+  if (itemContext != null && typeof itemContext === "object") namespaces.ITEM = itemContext;
+
   const templateCtx: TemplateContext = {
     vars: env,
-    namespaces: { GLOBAL: globalContext, STEPS: stepsMap },
+    namespaces,
   };
   const body = renderTemplate(step.content, templateCtx, step.id);
 
@@ -106,6 +112,8 @@ export async function runAgent(
   onOutput?: StepOutputHandler,
   signal?: AbortSignal,
   sidecar?: SidecarPaths,
+  localContext?: unknown,
+  itemContext?: unknown,
 ): Promise<StepOutput> {
   const prompt = assembleAgentPrompt(
     step,
@@ -114,6 +122,8 @@ export async function runAgent(
     workdirPath,
     env,
     globalContext,
+    localContext,
+    itemContext,
   );
 
   // Per-step config overrides global: step agent wins, step flags append to global flags
