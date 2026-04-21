@@ -1,6 +1,6 @@
 {
   "name": "markflow",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Helps Claude author markflow workflow markdown files — Mermaid flow topology plus script/agent steps — with validation via the markflow CLI.",
   "author": {
     "name": "markflow"
