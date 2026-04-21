@@ -159,7 +159,11 @@ export function replay(events: EngineEvent[]): EngineSnapshot {
       }
 
       case "retry:increment": {
-        snap.retryBudgets.set(`${evt.nodeId}:${evt.label}`, {
+        const retryKey =
+          evt.batchId != null && evt.itemIndex != null
+            ? `${evt.batchId}:${evt.itemIndex}:${evt.nodeId}:${evt.label}`
+            : `${evt.nodeId}:${evt.label}`;
+        snap.retryBudgets.set(retryKey, {
           count: evt.count,
           max: evt.max,
         });

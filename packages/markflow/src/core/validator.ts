@@ -317,6 +317,31 @@ export function validateWorkflow(
     }
   }
 
+  // 10f. FOREACH_MULTI_COLLECTOR — all exit nodes must target the same collector
+  for (const sourceNodeId of forEachSources) {
+    const scope = getForEachScope(graph, sourceNodeId);
+    if (!scope) continue;
+    const collectors = new Set<string>();
+    for (const exitNode of scope.exitNodes) {
+      for (const edge of getOutgoingEdges(graph, exitNode)) {
+        if (edge.stroke !== "thick" && !scope.bodyNodes.has(edge.to)) {
+          collectors.add(edge.to);
+        }
+      }
+    }
+    if (collectors.size > 1) {
+      diagnostics.push({
+        severity: "error",
+        code: "FOREACH_MULTI_COLLECTOR",
+        message: `forEach from "${sourceNodeId}" has exit nodes pointing to multiple collectors: ${[...collectors].join(", ")}`,
+        nodeId: sourceNodeId,
+        source,
+        suggestion:
+          "All exit nodes in a forEach body must route to the same collector node via normal `-->` edges.",
+      });
+    }
+  }
+
   // 10e. FOREACH_INVALID_CONCURRENCY — maxConcurrency must be a non-negative integer
   for (const sourceNodeId of forEachSources) {
     const step = def.steps.get(sourceNodeId);

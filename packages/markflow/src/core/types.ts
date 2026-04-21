@@ -264,13 +264,22 @@ export type EngineEventPayload =
       elapsedMs: number;
       limitMs: number;
     }
-  | { type: "route"; from: string; to: string; edge?: string }
+  | {
+      type: "route";
+      from: string;
+      to: string;
+      edge?: string;
+      batchId?: string;
+      itemIndex?: number;
+    }
   | {
       type: "retry:increment";
       nodeId: string;
       label: string;
       count: number;
       max: number;
+      batchId?: string;
+      itemIndex?: number;
     }
   | { type: "retry:exhausted"; nodeId: string; label: string }
   | {

@@ -68,15 +68,21 @@ export function getFanOutTargets(
 
 export interface ForEachScope {
   key: string;
-  bodyNodes: string[];
+  entryNode: string;
+  bodyNodes: Set<string>;
+  exitNodes: string[];
   collectorNode: string;
 }
 
 /**
- * Given a node with an outgoing thick `each:` edge, trace the `==>` chain
- * and return the forEach scope: item key, body nodes, and collector node.
+ * Given a node with an outgoing thick `each:` edge, discover the forEach
+ * scope via BFS over thick edges. The scope is the sub-graph of all nodes
+ * reachable from the entry node by following thick edges (labeled or not).
+ * Exit nodes are body nodes with a normal outgoing edge to a node outside
+ * the scope — that target is the collector.
  *
- * Returns `undefined` if the node has no outgoing forEach edge.
+ * Returns `undefined` if the node has no outgoing forEach edge or the
+ * scope has no collector.
  */
 export function getForEachScope(
   graph: FlowGraph,
@@ -89,23 +95,36 @@ export function getForEachScope(
   if (!forEachEdge) return undefined;
 
   const key = forEachEdge.annotations.forEach!.key;
-  const bodyNodes: string[] = [];
-  let current = forEachEdge.to;
+  const entryNode = forEachEdge.to;
 
-  while (true) {
-    bodyNodes.push(current);
-    const next = getOutgoingEdges(graph, current);
-    const thickNext = next.find((e) => e.stroke === "thick");
-    if (thickNext) {
-      current = thickNext.to;
-    } else {
-      const normalNext = next.find((e) => e.stroke === "normal" || !e.stroke);
-      if (!normalNext) break;
-      return { key, bodyNodes, collectorNode: normalNext.to };
+  // BFS: discover all nodes reachable via thick edges from entry
+  const bodyNodes = new Set<string>();
+  const queue: string[] = [entryNode];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (bodyNodes.has(current)) continue;
+    bodyNodes.add(current);
+    for (const edge of getOutgoingEdges(graph, current)) {
+      if (edge.stroke === "thick" && !bodyNodes.has(edge.to)) {
+        queue.push(edge.to);
+      }
     }
   }
 
-  return undefined;
+  // Find exit nodes: body nodes with a normal edge to a node outside the scope
+  const exitNodes: string[] = [];
+  let collectorNode: string | undefined;
+  for (const body of bodyNodes) {
+    for (const edge of getOutgoingEdges(graph, body)) {
+      if (edge.stroke !== "thick" && !bodyNodes.has(edge.to)) {
+        if (!exitNodes.includes(body)) exitNodes.push(body);
+        if (!collectorNode) collectorNode = edge.to;
+      }
+    }
+  }
+
+  if (!collectorNode) return undefined;
+  return { key, entryNode, bodyNodes, exitNodes, collectorNode };
 }
 
 /**
@@ -129,7 +148,7 @@ export function findForEachSource(
 ): { sourceNodeId: string; scope: ForEachScope } | undefined {
   for (const node of graph.nodes.values()) {
     const scope = getForEachScope(graph, node.id);
-    if (scope && scope.bodyNodes.includes(bodyNodeId)) {
+    if (scope && scope.bodyNodes.has(bodyNodeId)) {
       return { sourceNodeId: node.id, scope };
     }
   }

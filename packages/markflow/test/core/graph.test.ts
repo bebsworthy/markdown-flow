@@ -135,7 +135,9 @@ exit 1
     const scope = getForEachScope(def.graph, "produce");
     expect(scope).toBeDefined();
     expect(scope!.key).toBe("items");
-    expect(scope!.bodyNodes).toEqual(["process", "transform"]);
+    expect(scope!.entryNode).toBe("process");
+    expect(scope!.bodyNodes).toEqual(new Set(["process", "transform"]));
+    expect(scope!.exitNodes).toEqual(["transform"]);
     expect(scope!.collectorNode).toBe("collect");
   });
 

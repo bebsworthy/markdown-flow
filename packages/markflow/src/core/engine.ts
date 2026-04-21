@@ -22,6 +22,7 @@ import {
   getUpstreamNodes,
   isMergeNode,
   getForEachScope,
+  findForEachSource,
 } from "./graph.js";
 import {
   resolveRoute,
@@ -88,6 +89,9 @@ export interface EngineOptions {
 function rebuildRetryState(snap: EngineSnapshot): RetryState {
   const state = createRetryState();
   for (const [key, budget] of snap.retryBudgets) {
+    // Per-item keys: "batchId:itemIndex:nodeId:label" — skip those here.
+    const parts = key.split(":");
+    if (parts.length > 2) continue;
     const idx = key.lastIndexOf(":");
     if (idx <= 0) continue;
     const nodeId = key.slice(0, idx);
@@ -100,6 +104,27 @@ function rebuildRetryState(snap: EngineSnapshot): RetryState {
     perNode.set(label, budget.count);
   }
   return state;
+}
+
+function rebuildBatchItemRetryStates(
+  snap: EngineSnapshot,
+): Map<string, RetryState> {
+  const map = new Map<string, RetryState>();
+  for (const [key, budget] of snap.retryBudgets) {
+    // Per-item keys: "batchId:itemIndex:nodeId:label"
+    const parts = key.split(":");
+    if (parts.length <= 2) continue;
+    // Extract: batchId is "batch-N", itemIndex, nodeId, label
+    const match = key.match(/^(batch-\d+):(\d+):(.+):([^:]+)$/);
+    if (!match) continue;
+    const [, batchId, itemIndexStr, nodeId, label] = match;
+    const itemKey = `${batchId}:${itemIndexStr}`;
+    if (!map.has(itemKey)) map.set(itemKey, createRetryState());
+    const state = map.get(itemKey)!;
+    if (!state.counters.has(nodeId)) state.counters.set(nodeId, new Map());
+    state.counters.get(nodeId)!.set(label, budget.count);
+  }
+  return map;
 }
 
 export async function executeWorkflow(
@@ -134,6 +159,9 @@ export class WorkflowEngine {
 
   /** Active forEach batches (batchId → state). */
   private batches: Map<string, import("./types.js").BatchState> = new Map();
+
+  /** Per-item retry state: "batchId:itemIndex" → RetryState. */
+  private batchItemRetryStates: Map<string, RetryState> = new Map();
 
   constructor(definition: WorkflowDefinition, options: EngineOptions = {}) {
     this.def = definition;
@@ -315,11 +343,18 @@ export class WorkflowEngine {
           (t) => t.state === "pending",
         );
         if (pending.length > 0) {
-          // This shouldn't happen in a well-formed workflow
-          throw new ExecutionError(
-            `Deadlock: ${pending.length} pending tokens but none are ready. ` +
-            `Nodes: ${pending.map((t) => t.nodeId).join(", ")}`,
+          // Batch tokens at merge nodes may be waiting for sibling branch
+          // tokens from the same item — that's not a deadlock if there are
+          // running tokens that will eventually contribute.
+          const hasRunning = [...this.tokens.values()].some(
+            (t) => t.state === "running",
           );
+          if (!hasRunning) {
+            throw new ExecutionError(
+              `Deadlock: ${pending.length} pending tokens but none are ready. ` +
+              `Nodes: ${pending.map((t) => t.nodeId).join(", ")}`,
+            );
+          }
         }
         break;
       }
@@ -353,11 +388,26 @@ export class WorkflowEngine {
       if (token.state !== "pending") continue;
 
       if (isMergeNode(this.def.graph, token.nodeId)) {
-        // Merge node: all upstream nodes must be resolved
-        const upstreams = getUpstreamNodes(this.def.graph, token.nodeId);
-        const allResolved = upstreams.every((u) => this.resolvedNodes.has(u));
-        if (allResolved) {
-          ready.push(token);
+        if (token.batchId != null) {
+          // Per-item merge inside forEach: ready when no sibling batch token
+          // for the same item is still running at an upstream node.
+          const upstreams = getUpstreamNodes(this.def.graph, token.nodeId);
+          const hasRunningUpstream = [...this.tokens.values()].some(
+            (t) =>
+              t.batchId === token.batchId &&
+              t.itemIndex === token.itemIndex &&
+              t.id !== token.id &&
+              (t.state === "running" || t.state === "pending") &&
+              upstreams.includes(t.nodeId),
+          );
+          if (!hasRunningUpstream) ready.push(token);
+        } else {
+          // Global merge: all upstream nodes must be resolved
+          const upstreams = getUpstreamNodes(this.def.graph, token.nodeId);
+          const allResolved = upstreams.every((u) => this.resolvedNodes.has(u));
+          if (allResolved) {
+            ready.push(token);
+          }
         }
       } else {
         // Non-merge node: always ready if pending
@@ -811,29 +861,93 @@ export class WorkflowEngine {
       return;
     }
 
-    // Batch token routing within the forEach scope: if this token is a
-    // batch item and the next edge transitions from thick to normal,
-    // this is the end of the chain — complete the batch item.
+    // Batch token routing within the forEach scope: use resolveRoute()
+    // for conditional branching, retries, and fan-out within the scope.
     if (token.batchId) {
-      const nextThick = outgoing.find((e) => e.stroke === "thick");
-      if (nextThick) {
-        // Continue within the forEach scope — route to next body node.
-        await this.emit({
-          type: "route",
-          from: token.nodeId,
-          to: nextThick.to,
-        });
-        await this.createBatchToken(
-          nextThick.to,
-          token.batchId,
-          token.itemIndex!,
-          token.parentTokenId!,
-          token.itemContext,
-        );
+      const scopeInfo = findForEachSource(this.def.graph, token.nodeId);
+      if (!scopeInfo) {
+        await this.completeBatchItem(token);
         return;
       }
-      // No thick edge means end of chain — complete this batch item.
-      await this.completeBatchItem(token);
+      const { scope } = scopeInfo;
+
+      const itemKey = `${token.batchId}:${token.itemIndex}`;
+      if (!this.batchItemRetryStates.has(itemKey)) {
+        this.batchItemRetryStates.set(itemKey, createRetryState());
+      }
+      const itemRetryState = this.batchItemRetryStates.get(itemKey)!;
+
+      const decision = resolveRoute(
+        this.def.graph,
+        token.nodeId,
+        result,
+        itemRetryState,
+        this.config,
+      );
+
+      if (decision.retryIncrement) {
+        const inc = decision.retryIncrement;
+        await this.record(
+          {
+            type: "retry:increment",
+            nodeId: token.nodeId,
+            label: inc.label,
+            count: inc.count,
+            max: inc.max,
+            batchId: token.batchId,
+            itemIndex: token.itemIndex,
+          },
+          () => {
+            incrementRetry(itemRetryState, token.nodeId, inc.label);
+          },
+        );
+      }
+
+      if (decision.exhausted) {
+        await this.emit({
+          type: "retry:exhausted",
+          nodeId: token.nodeId,
+          label: result.edge,
+        });
+      }
+
+      for (const target of decision.targets) {
+        if (scope.bodyNodes.has(target.nodeId)) {
+          // Target is inside scope — route within forEach body
+          await this.emit({
+            type: "route",
+            from: token.nodeId,
+            to: target.nodeId,
+            edge: target.edge.label,
+            batchId: token.batchId,
+            itemIndex: token.itemIndex,
+          });
+
+          // For merge nodes: deduplicate — only create one token per item.
+          // Additional routes just contribute to readiness.
+          if (isMergeNode(this.def.graph, target.nodeId)) {
+            const existingMergeToken = [...this.tokens.values()].find(
+              (t) =>
+                t.batchId === token.batchId &&
+                t.itemIndex === token.itemIndex &&
+                t.nodeId === target.nodeId &&
+                t.state === "pending",
+            );
+            if (existingMergeToken) continue;
+          }
+
+          await this.createBatchToken(
+            target.nodeId,
+            token.batchId,
+            token.itemIndex!,
+            token.parentTokenId!,
+            token.itemContext,
+          );
+        } else {
+          // Target is outside scope (collector) — complete batch item
+          await this.completeBatchItem(token);
+        }
+      }
       return;
     }
 
@@ -932,7 +1046,7 @@ export class WorkflowEngine {
 
       const scope = getForEachScope(this.def.graph, batch.nodeId);
       if (!scope) continue;
-      const firstBodyNode = scope.bodyNodes[0];
+      const firstBodyNode = scope.entryNode;
 
       // Respect maxConcurrency on resume: only spawn up to the window limit.
       const inFlight = liveTokensByIndex.size;
@@ -1087,7 +1201,7 @@ export class WorkflowEngine {
         const nextIndex = batch.spawned;
         batch.spawned++;
         await this.createBatchToken(
-          scope.bodyNodes[0],
+          scope.entryNode,
           batchId,
           nextIndex,
           token.parentTokenId ?? `batch-source:${batch.nodeId}`,
@@ -1321,6 +1435,7 @@ export class WorkflowEngine {
     // `mergeCompletions` is populated by `routeFrom`; the readiness check
     // reads `resolvedNodes`, so leaving it empty on resume is safe.
     this.mergeCompletions = new Map();
+    this.batchItemRetryStates = rebuildBatchItemRetryStates(snap);
     this.batches = new Map(
       [...snap.batches.entries()].map(([id, b]) => [id, { ...b }]),
     );
