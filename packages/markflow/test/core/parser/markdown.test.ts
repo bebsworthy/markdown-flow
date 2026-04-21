@@ -463,4 +463,341 @@ echo b
     const sections = parseMarkdownSections(source);
     expect(sections.configDefaults).toBeUndefined();
   });
+
+  describe("step classification robustness", () => {
+    const wrap = (steps: string) => `# T
+
+# Flow
+
+\`\`\`mermaid
+flowchart TD
+  A --> B
+\`\`\`
+
+# Steps
+
+${steps}`;
+
+    it("classifies as script when prose appears before the code block (no config)", () => {
+      const source = wrap(`## A
+
+Some explanation of what this step does.
+
+\`\`\`bash
+echo "hello"
+\`\`\`
+
+## B
+
+\`\`\`bash
+echo done
+\`\`\``);
+
+      const sections = parseMarkdownSections(source);
+      const stepA = sections.steps.find((s) => s.id === "A")!;
+      expect(stepA.type).toBe("script");
+      expect(stepA.lang).toBe("bash");
+      expect(stepA.content).toContain("hello");
+    });
+
+    it("classifies as script when prose appears before the code block (with config)", () => {
+      const source = wrap(`## A
+
+\`\`\`config
+timeout: 5m
+\`\`\`
+
+Some explanation of what this step does.
+
+\`\`\`bash
+echo "hello"
+\`\`\`
+
+## B
+
+\`\`\`bash
+echo done
+\`\`\``);
+
+      const sections = parseMarkdownSections(source);
+      const stepA = sections.steps.find((s) => s.id === "A")!;
+      expect(stepA.type).toBe("script");
+      expect(stepA.lang).toBe("bash");
+      expect(stepA.content).toContain("hello");
+      expect(stepA.stepConfig).toEqual({ timeout: "5m" });
+    });
+
+    it("classifies as script when code block is first (regression guard)", () => {
+      const source = wrap(`## A
+
+\`\`\`bash
+echo "hello"
+\`\`\`
+
+## B
+
+\`\`\`bash
+echo done
+\`\`\``);
+
+      const sections = parseMarkdownSections(source);
+      const stepA = sections.steps.find((s) => s.id === "A")!;
+      expect(stepA.type).toBe("script");
+      expect(stepA.lang).toBe("bash");
+    });
+
+    it("classifies as script when config + code block is first (regression guard)", () => {
+      const source = wrap(`## A
+
+\`\`\`config
+timeout: 5m
+\`\`\`
+
+\`\`\`bash
+echo "hello"
+\`\`\`
+
+## B
+
+\`\`\`bash
+echo done
+\`\`\``);
+
+      const sections = parseMarkdownSections(source);
+      const stepA = sections.steps.find((s) => s.id === "A")!;
+      expect(stepA.type).toBe("script");
+    });
+
+    it("classifies as agent when only prose exists (regression guard)", () => {
+      const source = wrap(`## A
+
+\`\`\`config
+agent: claude
+\`\`\`
+
+Review the code and provide feedback.
+
+## B
+
+\`\`\`bash
+echo done
+\`\`\``);
+
+      const sections = parseMarkdownSections(source);
+      const stepA = sections.steps.find((s) => s.id === "A")!;
+      expect(stepA.type).toBe("agent");
+      expect(stepA.content).toContain("Review the code");
+    });
+
+    it("explicit type:agent forces agent even with a code block", () => {
+      const source = wrap(`## A
+
+\`\`\`config
+type: agent
+agent: claude
+\`\`\`
+
+Here is an example script to review:
+
+\`\`\`bash
+echo "review this"
+\`\`\`
+
+## B
+
+\`\`\`bash
+echo done
+\`\`\``);
+
+      const sections = parseMarkdownSections(source);
+      const stepA = sections.steps.find((s) => s.id === "A")!;
+      expect(stepA.type).toBe("agent");
+      expect(stepA.agentConfig?.agent).toBe("claude");
+      expect(stepA.content).toContain("example script to review");
+      expect(stepA.content).toContain('echo "review this"');
+    });
+
+    it("explicit type:script with prose before code classifies as script", () => {
+      const source = wrap(`## A
+
+\`\`\`config
+type: script
+timeout: 5m
+\`\`\`
+
+This explanation is before the code.
+
+\`\`\`bash
+echo "hello"
+\`\`\`
+
+## B
+
+\`\`\`bash
+echo done
+\`\`\``);
+
+      const sections = parseMarkdownSections(source);
+      const stepA = sections.steps.find((s) => s.id === "A")!;
+      expect(stepA.type).toBe("script");
+      expect(stepA.lang).toBe("bash");
+      expect(stepA.content).toContain("hello");
+    });
+
+    it("explicit type:script with no code block throws ParseError", () => {
+      const source = wrap(`## A
+
+\`\`\`config
+type: script
+\`\`\`
+
+Just some prose, no code block.
+
+## B
+
+\`\`\`bash
+echo done
+\`\`\``);
+
+      expect(() => parseMarkdownSections(source)).toThrow(/type:script.*no code block/);
+    });
+
+    it("explicit type:script with agent config throws ParseError", () => {
+      const source = wrap(`## A
+
+\`\`\`config
+type: script
+agent: claude
+\`\`\`
+
+\`\`\`bash
+echo hi
+\`\`\`
+
+## B
+
+\`\`\`bash
+echo done
+\`\`\``);
+
+      expect(() => parseMarkdownSections(source)).toThrow(/type:script.*agent\/flags/);
+    });
+
+    it("emits SHELL_LIKE_AGENT_CONTENT warning for shell-like agent prose", () => {
+      const source = wrap(`## A
+
+\`\`\`config
+agent: claude
+\`\`\`
+
+#!/bin/bash
+set -euo pipefail
+curl https://example.com
+
+## B
+
+\`\`\`bash
+echo done
+\`\`\``);
+
+      const sections = parseMarkdownSections(source);
+      const stepA = sections.steps.find((s) => s.id === "A")!;
+      expect(stepA.type).toBe("agent");
+      const warning = sections.parserDiagnostics.find((d) => d.code === "SHELL_LIKE_AGENT_CONTENT");
+      expect(warning).toBeDefined();
+      expect(warning!.severity).toBe("warning");
+      expect(warning!.nodeId).toBe("A");
+      expect(warning!.suggestion).toBeDefined();
+    });
+
+    it("uses the first supported code block when multiple exist", () => {
+      const source = wrap(`## A
+
+Some prose.
+
+\`\`\`python
+print("first")
+\`\`\`
+
+More prose.
+
+\`\`\`bash
+echo "second"
+\`\`\`
+
+## B
+
+\`\`\`bash
+echo done
+\`\`\``);
+
+      const sections = parseMarkdownSections(source);
+      const stepA = sections.steps.find((s) => s.id === "A")!;
+      expect(stepA.type).toBe("script");
+      expect(stepA.lang).toBe("python");
+      expect(stepA.content).toContain("first");
+    });
+
+    it("explicit type:agent with agent config works without error", () => {
+      const source = wrap(`## A
+
+\`\`\`config
+type: agent
+agent: claude
+flags:
+  - --verbose
+\`\`\`
+
+Analyze the codebase.
+
+## B
+
+\`\`\`bash
+echo done
+\`\`\``);
+
+      const sections = parseMarkdownSections(source);
+      const stepA = sections.steps.find((s) => s.id === "A")!;
+      expect(stepA.type).toBe("agent");
+      expect(stepA.agentConfig?.agent).toBe("claude");
+      expect(stepA.agentConfig?.flags).toContain("--verbose");
+      expect(stepA.content).toContain("Analyze the codebase");
+    });
+
+    it("no warnings for a clean script step", () => {
+      const source = wrap(`## A
+
+\`\`\`bash
+echo "hello"
+\`\`\`
+
+## B
+
+\`\`\`bash
+echo done
+\`\`\``);
+
+      const sections = parseMarkdownSections(source);
+      expect(sections.parserDiagnostics).toHaveLength(0);
+    });
+
+    it("no warnings for a clean agent step", () => {
+      const source = wrap(`## A
+
+\`\`\`config
+agent: claude
+\`\`\`
+
+Review the PR carefully and check for bugs.
+
+## B
+
+\`\`\`bash
+echo done
+\`\`\``);
+
+      const sections = parseMarkdownSections(source);
+      expect(sections.parserDiagnostics).toHaveLength(0);
+    });
+  });
 });

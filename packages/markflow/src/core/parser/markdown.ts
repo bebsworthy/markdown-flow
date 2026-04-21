@@ -164,8 +164,9 @@ function extractSteps(
     const node = children[i];
     if (node.type === "heading" && (node as Heading).depth === 2) {
       if (currentId) {
-        const step = buildStep(source, currentId, currentNodes, currentLine);
+        const { step, diagnostics: stepDiags } = buildStep(source, currentId, currentNodes, currentLine);
         steps.push(step);
+        diagnostics.push(...stepDiags);
         if (!step.content.trim() && step.type !== "approval") {
           diagnostics.push({
             severity: "warning",
@@ -200,8 +201,9 @@ function extractSteps(
   }
 
   if (currentId) {
-    const step = buildStep(source, currentId, currentNodes, currentLine);
+    const { step, diagnostics: stepDiags } = buildStep(source, currentId, currentNodes, currentLine);
     steps.push(step);
+    diagnostics.push(...stepDiags);
     if (!step.content.trim()) {
       diagnostics.push({
         severity: "warning",
@@ -221,7 +223,9 @@ function buildStep(
   id: string,
   nodes: Root["children"],
   line?: number,
-): StepDefinition {
+): { step: StepDefinition; diagnostics: ValidationDiagnostic[] } {
+  const diagnostics: ValidationDiagnostic[] = [];
+
   // If the first code block has lang "config", extract agent + step config
   const firstCode = nodes.find((n) => n.type === "code") as Code | undefined;
   let agentConfig: StepAgentConfig | undefined;
@@ -252,8 +256,6 @@ function buildStep(
   }
 
   if (explicitType === "approval") {
-    // Approval steps must not carry a runnable code block. Prose is allowed
-    // and ignored (documentation for reviewers).
     const hasCode = remainingNodes.some((n) => n.type === "code");
     if (hasCode) {
       throw new ParseError(
@@ -277,69 +279,100 @@ function buildStep(
       );
     }
     return {
-      id,
-      type: "approval",
-      content: "",
-      approvalConfig,
-      line,
+      step: { id, type: "approval", content: "", approvalConfig, line },
+      diagnostics,
     };
   }
 
-  // Classify as script only when the step's body is a single runnable code
-  // block at the top (no prose before it). If a `config` block is present,
-  // "top" means immediately after it. Anything else — prose, nested fences,
-  // lists, etc. — is an agent step. This lets scripts carry a config block
-  // (e.g. `timeout`) while still preserving agent prose verbatim.
-  const firstRemaining = remainingNodes.find((n) => !isEmptyNode(n));
-  const scriptCandidate =
-    firstRemaining?.type === "code"
-      ? (firstRemaining as Code)
-      : agentConfig === undefined && stepConfig === undefined
-        ? (remainingNodes.find((n) => n.type === "code") as Code | undefined)
-        : undefined;
+  // Explicit type: agent — skip code detection, treat everything as prose.
+  if (explicitType === "agent") {
+    const prose = sliceRemainingSource(source, firstCode, remainingNodes);
+    return {
+      step: { id, type: "agent", content: prose, agentConfig, stepConfig, line },
+      diagnostics,
+    };
+  }
+
+  // Explicit type: script — find any supported code block regardless of position.
+  if (explicitType === "script") {
+    const codeBlock = remainingNodes.find(
+      (n) => n.type === "code" && SUPPORTED_LANGS.includes((n as Code).lang || ""),
+    ) as Code | undefined;
+    if (!codeBlock) {
+      throw new ParseError(
+        `Step "${id}" declares type:script but contains no code block with a supported language (${SUPPORTED_LANGS.join(", ")}).`,
+      );
+    }
+    if (agentConfig !== undefined) {
+      throw new ParseError(
+        `Step "${id}" declares type:script but also has agent/flags in its config block. ` +
+          `Agent settings apply only to agent (prose) steps.`,
+      );
+    }
+    return {
+      step: { id, type: "script", lang: codeBlock.lang as ScriptLang, content: codeBlock.value, stepConfig, line },
+      diagnostics,
+    };
+  }
+
+  // Auto-detection: presence of any supported code block → script.
+  const scriptCandidate = remainingNodes.find(
+    (n) => n.type === "code" && SUPPORTED_LANGS.includes((n as Code).lang || ""),
+  ) as Code | undefined;
 
   if (scriptCandidate) {
-    const lang = scriptCandidate.lang || "";
-    if (!SUPPORTED_LANGS.includes(lang)) {
-      // No config block: legacy behavior — unsupported lang is an error.
-      // With a config block present, an unsupported/empty lang is treated as
-      // embedded prose → fall through to agent classification.
-      if (agentConfig === undefined && stepConfig === undefined) {
-        throw new ParseError(
-          `Step "${id}" uses unsupported language "${lang}". Supported: ${SUPPORTED_LANGS.join(", ")}`,
-        );
-      }
-    } else {
-      if (agentConfig !== undefined) {
-        throw new ParseError(
-          `Step "${id}" has a \`config\` block with agent/flags but is a script step. ` +
-            `Agent settings apply only to agent (prose) steps.`,
-        );
-      }
-      return {
+    if (agentConfig !== undefined) {
+      throw new ParseError(
+        `Step "${id}" has a \`config\` block with agent/flags but contains a script code block. ` +
+          `Agent settings apply only to agent (prose) steps. ` +
+          `Use \`type: agent\` in the config block if the code block is intentionally part of the agent prompt.`,
+      );
+    }
+    return {
+      step: {
         id,
         type: "script",
-        lang: lang as ScriptLang,
+        lang: scriptCandidate.lang as ScriptLang,
         content: scriptCandidate.value,
         stepConfig,
         line,
-      };
+      },
+      diagnostics,
+    };
+  }
+
+  // Check for unsupported code block language (only when no config block)
+  if (agentConfig === undefined && stepConfig === undefined && explicitType === undefined) {
+    const unsupported = remainingNodes.find(
+      (n) => n.type === "code" && (n as Code).lang && !SUPPORTED_LANGS.includes((n as Code).lang || ""),
+    ) as Code | undefined;
+    if (unsupported) {
+      throw new ParseError(
+        `Step "${id}" uses unsupported language "${unsupported.lang}". Supported: ${SUPPORTED_LANGS.join(", ")}`,
+      );
     }
   }
 
   // Agent step. Prose is everything after the config block (if present)
-  // through the end of the step, sliced verbatim so lists, sub-headings,
-  // quotes, and nested code fences survive intact.
+  // through the end of the step, sliced verbatim.
   const prose = sliceRemainingSource(source, firstCode, remainingNodes);
-  return { id, type: "agent", content: prose, agentConfig, stepConfig, line };
-}
 
-function isEmptyNode(n: Root["children"][number]): boolean {
-  // Empty paragraph nodes can appear from blank lines; treat as non-content.
-  if (n.type === "paragraph" && (!("children" in n) || n.children.length === 0)) {
-    return true;
+  const shellPatterns = /^(#!\s*\/|set -[euxo]|export\s+\w+=|cd\s+|mkdir\s|rm\s|cp\s|mv\s|chmod\s|curl\s|wget\s|pip\s+install|npm\s+(install|run)|apt(-get)?\s|brew\s|sudo\s)/m;
+  if (shellPatterns.test(prose.trim())) {
+    diagnostics.push({
+      severity: "warning",
+      code: "SHELL_LIKE_AGENT_CONTENT",
+      message: `Step "${id}" is classified as agent but its content resembles shell commands. The agent will receive this as a prose prompt, not execute it as a script.`,
+      nodeId: id,
+      line,
+      suggestion: `If this should be a script, wrap the commands in a fenced code block (\`\`\`bash) and place it in the step body.`,
+    });
   }
-  return false;
+
+  return {
+    step: { id, type: "agent", content: prose, agentConfig, stepConfig, line },
+    diagnostics,
+  };
 }
 
 /**

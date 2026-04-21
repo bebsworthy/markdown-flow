@@ -52,18 +52,18 @@ Must contain exactly one fenced ` ```mermaid ` block. Only `flowchart` (alias `g
 
 ## Section 4 — `# Steps`
 
-One `## <node_id>` subsection per node referenced in the flow. Heading must match the node ID exactly. Step type is determined by what's inside:
+One `## <node_id>` subsection per node referenced in the flow. Heading must match the node ID exactly. Step type is determined by the **presence** of a supported code block anywhere in the subsection — position relative to prose does not matter:
 
 | Content pattern | Step type | Executor |
 |---|---|---|
-| ` ```bash ` or ` ```sh ` code block | script | `bash` |
-| ` ```python ` code block | script | `python3` |
-| ` ```js ` or ` ```javascript ` code block | script | `node` |
-| Plain prose (no code block) | agent | configured agent CLI |
+| Contains ` ```bash ` or ` ```sh ` code block | script | `bash` |
+| Contains ` ```python ` code block | script | `python3` |
+| Contains ` ```js ` or ` ```javascript ` code block | script | `node` |
+| Plain prose only (no supported code block) | agent | configured agent CLI |
 
-An unknown code language is a parse error.
+An unknown code language (without a ` ```config ` block) is a parse error.
 
-A step may start with a ` ```config ` block before its body to override workflow defaults for that step. See `routing-and-config.md`.
+A step may start with a ` ```config ` block before its body to override workflow defaults for that step. See `routing-and-config.md`. The config block can also declare `type: agent` to force agent classification even when a code block is present (e.g., when the code is example content for the agent prompt).
 
 ## `# Inputs` section (optional)
 

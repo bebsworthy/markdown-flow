@@ -79,16 +79,26 @@ echo "Workflow failed after max retries" && exit 1
 
 ## Step Types
 
-Step type is determined solely by the content of the `##` subsection.
+Step type is determined by the **presence** of a supported fenced code block anywhere in the `##` subsection. Prose may appear before, after, or around the code block without affecting classification.
 
 | Content | Type | Executor |
 |---|---|---|
-| Fenced code block ` ```bash ` or ` ```sh ` | Script | `bash` |
-| Fenced code block ` ```python ` | Script | `python3` |
-| Fenced code block ` ```js ` or ` ```javascript ` | Script | `node` |
-| Plain prose (no code block) | Agent | Configured agent CLI |
+| Contains ` ```bash ` or ` ```sh ` code block | Script | `bash` |
+| Contains ` ```python ` code block | Script | `python3` |
+| Contains ` ```js ` or ` ```javascript ` code block | Script | `node` |
+| Plain prose only (no supported code block) | Agent | Configured agent CLI |
 
-Any unrecognised code block language is an error at parse time.
+Any unrecognised code block language (without a ` ```config ` block) is an error at parse time.
+
+### Explicit type override
+
+A step's ` ```config ` block may declare `type: agent` to force agent classification even when a supported code block is present. This is useful when the code block is example content for an AI agent prompt, not executable logic.
+
+```
+type: script   # redundant — validates a code block exists, errors if not
+type: agent    # forces agent; code blocks become part of the prose prompt
+type: approval # interactive approval gate (see Approval Steps)
+```
 
 ---
 
