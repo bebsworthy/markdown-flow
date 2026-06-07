@@ -9,8 +9,8 @@
   ],
   "devDependencies": {
     "husky": "^9.1.7",
-    "ink": "^7.0.1",
-    "react": "^19.2.5"
+    "ink": "^7.0.5",
+    "react": "^19.2.7"
   },
   "scripts": {
     "build": "npm run build --workspaces --if-present",
