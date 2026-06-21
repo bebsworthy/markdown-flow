@@ -21,19 +21,19 @@
     "test:e2e:frames": "E2E_FRAME_DIR=./test/e2e/.frames npm run build && E2E_FRAME_DIR=./test/e2e/.frames vitest --config vitest.e2e.config.ts run"
   },
   "dependencies": {
-    "ink": "^7.0.1",
+    "ink": "^7.1.0",
     "markflow-cli": "*",
-    "react": "^19.2.5"
+    "react": "^19.2.7"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
-    "@types/react": "^19.2.14",
+    "@types/react": "^19.2.17",
     "@xterm/headless": "^6.0.0",
     "ink-testing-library": "^4.0.0",
     "node-pty": "^1.1.0",
     "tsup": "^8.5.1",
-    "tsx": "^4.21.0",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.9"
   }
 }
